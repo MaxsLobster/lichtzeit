@@ -742,18 +742,24 @@ function seasonLayer(C,cr,cols,rows,hyRow,t,cs){const S=seasonAmt(C.d),L=C.L;
 }
 
 let MASK=null;
+// Pixelsturz: die festen Zufallswerte jeder Zelle (Startzeit, Landeplatz, Helligkeit) einmal berechnen statt in jedem Bild
+const PF={key:'',rel:null,land:null,h7:null,src:null};
+function pixelFallVorbereiten(cols,rows,hyRow){const key=cols+'|'+rows+'|'+hyRow;if(PF.key===key)return;PF.key=key;const M=(hyRow+1)*cols,N=cols*rows;
+  PF.rel=new Float64Array(M);PF.land=new Int32Array(M);PF.h7=new Float64Array(N);PF.src=new Float32Array(N*3);
+  for(let j=0;j<=hyRow;j++)for(let i=0;i<cols;i++){PF.rel[j*cols+i]=2+hsh(i,j,5)*22+(j/Math.max(1,hyRow))*6;PF.land[j*cols+i]=hyRow+2+Math.floor(hsh(i,j,6)*(rows-hyRow-3));}
+  for(let j=hyRow+1;j<rows;j++)for(let i=0;i<cols;i++)PF.h7[j*cols+i]=hsh(i,j,7);}
 function pixelFall(cr,cols,rows,hyRow,e,t){
-  const N=cols*rows;if(!MASK||MASK.length!==N)MASK=new Uint8Array(N);MASK.fill(1);
-  const src=Float32Array.from(cr),nc=[4,6,14],rel=(i,j)=>2+hsh(i,j,5)*22+(j/Math.max(1,hyRow))*6;
+  const N=cols*rows;if(!MASK||MASK.length!==N)MASK=new Uint8Array(N);MASK.fill(1);pixelFallVorbereiten(cols,rows,hyRow);
+  const src=PF.src,REL=PF.rel,LAND=PF.land,H7=PF.h7,nc=[4,6,14],rel=(i,j)=>REL[j*cols+i];src.set(cr);
   let landed=0,total=0,aR=0,aG=0,aB=0;
   for(let j=0;j<=hyRow;j++)for(let i=0;i<cols;i++){total++;if(e>=rel(i,j)){const o=(j*cols+i)*3;cr[o]=nc[0];cr[o+1]=nc[1];cr[o+2]=nc[2];}}
   const dark=smooth(28,50,e);
   for(let j=hyRow+1;j<rows;j++)for(let i=0;i<cols;i++){const o=(j*cols+i)*3;cr[o]=lerp(cr[o],2,dark);cr[o+1]=lerp(cr[o+1],3,dark);cr[o+2]=lerp(cr[o+2],8,dark);}
-  for(let j=0;j<=hyRow;j++)for(let i=0;i<cols;i++){const t0=rel(i,j);if(e<t0)continue;const o=(j*cols+i)*3,dt=e-t0,y=j+11*dt*dt,land=hyRow+2+Math.floor(hsh(i,j,6)*(rows-hyRow-3));
+  for(let j=0;j<=hyRow;j++)for(let i=0;i<cols;i++){const t0=rel(i,j);if(e<t0)continue;const o=(j*cols+i)*3,dt=e-t0,y=j+11*dt*dt,land=LAND[j*cols+i];
     if(y<land){const yy=Math.floor(y),x=i+Math.round(Math.sin(i*3.1+j)*dt*0.8);if(x>=0&&x<cols&&yy<rows){const q=(yy*cols+x)*3;cr[q]=src[o];cr[q+1]=src[o+1];cr[q+2]=src[o+2];}}
     else{landed++;aR+=src[o];aG+=src[o+1];aB+=src[o+2];}}
   if(landed){const F=landed/total,fillTo=rows-Math.floor(F*(rows-hyRow-1)*1.05),sr=aR/landed,sg=aG/landed,sb=aB/landed,dk=smooth(40,54,e);
-    for(let j=Math.max(hyRow+1,fillTo);j<rows;j++)for(let i=0;i<cols;i++){const o=(j*cols+i)*3,n=0.65+0.6*hsh(i,j,7)*(0.8+0.2*Math.sin(t*3+i));cr[o]=lerp(sr*n,2,dk);cr[o+1]=lerp(sg*n,3,dk);cr[o+2]=lerp(sb*n,8,dk);}}
+    for(let j=Math.max(hyRow+1,fillTo);j<rows;j++)for(let i=0;i<cols;i++){const o=(j*cols+i)*3,n=0.65+0.6*H7[j*cols+i]*(0.8+0.2*Math.sin(t*3+i));cr[o]=lerp(sr*n,2,dk);cr[o+1]=lerp(sg*n,3,dk);cr[o+2]=lerp(sb*n,8,dk);}}
   for(let q=0;q<120;q++){const s=STARS[q],i=Math.floor(s.x*cols),j=Math.floor(s.y*hyRow*0.9),o=(j*cols+i)*3;if(e>=rel(i,j)+1){const a=200+55*Math.sin(t*s.f+s.p);cr[o]=a;cr[o+1]=a;cr[o+2]=a*0.95;}}
   if(e>=55){const rv=smooth(55,82,e)*16;for(let j=0;j<rows;j++)for(let i=0;i<cols;i++)if(BAYER[(i&3)+((j&3)<<2)]<rv)MASK[j*cols+i]=0;}
   return src;}
@@ -786,24 +792,16 @@ function drawRaster(t,A,d,st){const p0=performance.now();
     L_islands(c);if(rare.advent)R_advent(c,rare.advent);L_mist(c);if(rare.fire)R_fire(c,rare.fire);if(rare.glut)R_glut(c,rare.glut);
     R_bells(c);L_beam(c);L_shore(c);L_finish(c,{...st,tex:0,vig:st.vig*0.7});W_lightning(c);var p1=performance.now();img=readScene(off,cols,rows);}
   finally{ctx=sc;W=sW;H=sH;LS=1;}const p2=performance.now();
-  const N=cols*rows;if(!CR||CR.length!==N*3)CR=new Float32Array(N*3);const cr=CR,hyRow=Math.floor(C.hy/cs),tq=Math.floor(t*3);
+  const N=cols*rows;if(!CR||CR.length!==N*3)CR=new Float32Array(N*3);const cr=CR,hyRow=Math.floor(C.hy/cs),tq=Math.floor(t*3)%4096; // Takt für Zufallsmuster; begrenzt, sonst rechnet der Sinus nach Stunden Laufzeit sechsmal langsamer (Muster wiederholt sich nach 23 min)
   // Schnell: was nur von Zeile, Spalte oder dem Drittelsekunden-Takt abhängt, wird einmal berechnet statt für jede Zelle (gleiches Ergebnis)
-  const jit=RS.jitter>0?jitterMap(cols,rows,tq):null,smc=RS.smear>0?smearCols(cols):null,jA=RS.jitter,sm6=RS.smear*0.6;
-  for(let j=0;j<rows;j++){const dr=(RS.drift>0.05&&j>hyRow)?Math.round(RS.drift*1.8*Math.sin(j*0.35+t*0.9)):0;
-    let gRow=0;if(RS.glitch>0){const band=Math.floor(j/3);if(hsh(band,7,tq)<RS.glitch*0.25)gRow=Math.round((hsh(band,9,tq)-0.5)*16);}
-    if(!jit&&!smc&&dr===0&&gRow===0){for(let i=0,k=j*cols*4,o=j*cols*3;i<cols;i++,k+=4,o+=3){cr[o]=img[k];cr[o+1]=img[k+1];cr[o+2]=img[k+2];}continue;} // nichts verschoben: direkt übernehmen
-    for(let i=0;i<cols;i++){let si=i+dr,sj=j;const gOff=gRow;
-    if(jit){const q=2*(j*cols+i);si+=Math.round((jit[q]-0.5)*jA*4);sj+=Math.round((jit[q+1]-0.5)*jA*3);}
-    si+=gOff;
-    si=clamp(si,0,cols-1);sj=clamp(sj,0,rows-1);const k=(sj*cols+si)*4;let r=img[k],g=img[k+1],b=img[k+2];
-    if(gOff){const kl=(sj*cols+clamp(si-2,0,cols-1))*4,kr=(sj*cols+clamp(si+2,0,cols-1))*4;r=img[kr];b=img[kl+2];}
-    if(smc&&sj>1){const dj=smc[i],up=(Math.max(0,sj-dj)*cols+si)*4;r=lerp(r,img[up],sm6);g=lerp(g,img[up+1],sm6);b=lerp(b,img[up+2],sm6);}
-    const o=(j*cols+i)*3;cr[o]=r;cr[o+1]=g;cr[o+2]=b;}}
+  const jit=RS.jitter>=0.25?jitterMap(cols,rows,tq):null, /* unter 0,25 verschiebt sich keine Zelle (Rundung ergibt 0) */smc=RS.smear>0?smearCols(cols):null,jA=RS.jitter,sm6=RS.smear*0.6;
+  abtasten(img,cr,cols,rows,hyRow,t,tq,jit,smc,jA,sm6,RS.drift,RS.glitch);
   if(RS.sort>0){const Ls=Math.max(2,Math.floor(hyRow*RS.sort)),key=new Float64Array(Ls),idx=new Array(Ls),tmp=new Float32Array(Ls*3);
     for(let i=0;i<cols;i++){for(let j=0;j<Ls;j++){const o=(j*cols+i)*3;key[j]=cr[o]*0.3+cr[o+1]*0.59+cr[o+2]*0.11;idx[j]=j;tmp[3*j]=cr[o];tmp[3*j+1]=cr[o+1];tmp[3*j+2]=cr[o+2];}
       idx.sort((p,q)=>key[p]-key[q]);for(let j=0;j<Ls;j++){const o=(j*cols+i)*3,s=3*idx[j];cr[o]=tmp[s];cr[o+1]=tmp[s+1];cr[o+2]=tmp[s+2];}}}
   physics(C,cr,cols,rows,hyRow,t);seasonLayer(C,cr,cols,rows,hyRow,t,cs);
   const eMid=C.hr<1?C.hr*3600:-1,falling=st.rmode==='mix'&&eMid>=0&&eMid<85;if(falling)pixelFall(cr,cols,rows,hyRow,eMid,t);
+  if(st.rmode==='mix'&&C.hr>=23.98)pixelFallVorbereiten(cols,rows,hyRow); // eine gute Minute vorher, damit der Sturz selbst flüssig läuft
   const p3=performance.now();
   // Eine Farbe pro Rasterzelle; die Grafikkarte vergrößert danach auf Bildschirmgröße
   if(!buf||buf.width!==cols||buf.height!==rows){buf=document.createElement('canvas');buf.width=cols;buf.height=rows;bufCtx=buf.getContext('2d');bufImg=bufCtx.createImageData(cols,rows);bufU=new Uint32Array(bufImg.data.buffer);}
@@ -817,15 +815,7 @@ function drawRaster(t,A,d,st){const p0=performance.now();
   // Auf der Grafikeinheit (WebGL2), wenn möglich; sonst die gleiche Rechnung hier im Prozessor
   let src=GPU_WUNSCH?glCells(cols,rows,cr,WF,sp,cp,amp,oneBit,inv,avg,nAmt,scan,falling,eMid,pal):null;PERF.gpu=!!src;
   if(!src){
-  for(let j=0;j<rows;j++){const na=scan>=0?(j>scan?1:0):nAmt,row=j*cols;
-    for(let i=0;i<cols;i++){const o=(row+i)*3;let r=cr[o],g=cr[o+1],b=cr[o+2];const lum=(0.3*r+0.59*g+0.11*b)/255,bt=BAYER[(i&3)+((j&3)<<2)]/16,mk=falling&&MASK[row+i];
-      if(mk){if(eMid>=55){r=2;g=3;b=8;}}else{
-      if(oneBit){const v=lum+(bt-0.5)*0.22>avg;r=v?228:24;g=v?224:28;b=v?210:40;}
-      else if(bt<na&&!(r>b+50&&lum>0.3)){const b2=BAYER[((i+2)&3)+(((j+1)&3)<<2)]/16,lv=clamp(Math.floor(lum*4.4+b2*0.9-0.25),0,4),p=pal[lv];r=p[0];g=p[1];b=p[2];}
-      if(inv){r=lerp(r,255-r,0.85);g=lerp(g,255-g,0.85);b=lerp(b,255-b,0.85);}
-      if(j===scan){r=lerp(r,255,0.5);g=lerp(g,255,0.5);b=lerp(b,255,0.5);}}
-      const w=0.5+0.5*(sp*WC[row+i]-cp*WS[row+i]),f=(oneBit||mk)?1:0.9+amp*w*(0.4+0.6*Math.sqrt(lum));
-      bufU[row+i]=(255<<24)|(Math.min(255,b*f)<<16)|(Math.min(255,g*f)<<8)|Math.min(255,r*f);}}
+  farbenCPU(cr,cols,rows,WC,WS,sp,cp,amp,oneBit,inv,avg,nAmt,scan,falling,eMid,pal,bufU);
   bufCtx.putImageData(bufImg,0,0);src=buf;}
   // Zellen ohne Weichzeichnen auf Bildschirmgröße ziehen, dann die dunklen Rasterlinien. Deren Breite wird so verteilt,
   // dass ihr Flächenanteil auf jedem Bildschirm gleich bleibt (z. B. abwechselnd 1 und 2 Pixel bei 1,5).
@@ -836,14 +826,50 @@ function drawRaster(t,A,d,st){const p0=performance.now();
   const p4=performance.now();ctx.setTransform(DPR,0,0,DPR,0,0);
   astroLayer(C,cs,t);rasterClock(C,cs,RS.gap,t,A);extrasLayer(C,cs,t);familyLayer(C,cs,t); // Astro zuerst: die Uhr liegt immer obenauf
   PERF.szene+=p1-p0;PERF.lesen+=p2-p1;PERF.zellen+=p3-p2;PERF.farben+=p4-p3;PERF.rest+=performance.now()-p4;}
+// Abtasten: jede Zelle holt ihre Farbe aus der Szene, verschoben durch Wind, Glitch, Flimmern, Regen-Schlieren.
+// Eigene Funktion, damit sie optimiert weiterläuft, auch wenn der Browser drawRaster wegen eines seltenen Zweigs neu übersetzt.
+function abtasten(img,cr,cols,rows,hyRow,t,tq,jit,smc,jA,sm6,drift,glitch){
+  for(let j=0;j<rows;j++){const dr=(drift>0.05&&j>hyRow)?Math.round(drift*1.8*Math.sin(j*0.35+t*0.9)):0;
+    let gRow=0;if(glitch>0){const band=Math.floor(j/3);if(hsh(band,7,tq)<glitch*0.25)gRow=Math.round((hsh(band,9,tq)-0.5)*16);}
+    if(!jit&&!smc&&dr===0&&gRow===0){for(let i=0,k=j*cols*4,o=j*cols*3;i<cols;i++,k+=4,o+=3){cr[o]=img[k];cr[o+1]=img[k+1];cr[o+2]=img[k+2];}continue;} // nichts verschoben: direkt übernehmen
+    for(let i=0;i<cols;i++){let si=i+dr,sj=j;const gOff=gRow;
+    if(jit){const q=2*(j*cols+i);si+=Math.round((jit[q]-0.5)*jA*4);sj+=Math.round((jit[q+1]-0.5)*jA*3);}
+    si+=gOff;
+    si=clamp(si,0,cols-1);sj=clamp(sj,0,rows-1);const k=(sj*cols+si)*4;let r=img[k],g=img[k+1],b=img[k+2];
+    if(gOff){const kl=(sj*cols+clamp(si-2,0,cols-1))*4,kr=(sj*cols+clamp(si+2,0,cols-1))*4;r=img[kr];b=img[kl+2];}
+    if(smc&&sj>1){const dj=smc[i],up=(Math.max(0,sj-dj)*cols+si)*4;r=lerp(r,img[up],sm6);g=lerp(g,img[up+1],sm6);b=lerp(b,img[up+2],sm6);}
+    const o=(j*cols+i)*3;cr[o]=r;cr[o+1]=g;cr[o+2]=b;}}
+}
+// Endfarbe jeder Zelle im Prozessor (gleiche Rechnung wie auf der Grafikeinheit), ebenfalls als eigene Funktion.
+function farbenCPU(cr,cols,rows,WC,WS,sp,cp,amp,oneBit,inv,avg,nAmt,scan,falling,eMid,pal,bufU){
+  for(let j=0;j<rows;j++){const na=scan>=0?(j>scan?1:0):nAmt,row=j*cols;
+    for(let i=0;i<cols;i++){const o=(row+i)*3;let r=cr[o],g=cr[o+1],b=cr[o+2];const lum=(0.3*r+0.59*g+0.11*b)/255,bt=BAYER[(i&3)+((j&3)<<2)]/16,mk=falling&&MASK[row+i];
+      if(mk){if(eMid>=55){r=2;g=3;b=8;}}else{
+      if(oneBit){const v=lum+(bt-0.5)*0.22>avg;r=v?228:24;g=v?224:28;b=v?210:40;}
+      else if(bt<na&&!(r>b+50&&lum>0.3)){const b2=BAYER[((i+2)&3)+(((j+1)&3)<<2)]/16,lv=clamp(Math.floor(lum*4.4+b2*0.9-0.25),0,4),p=pal[lv];r=p[0];g=p[1];b=p[2];}
+      if(inv){r=lerp(r,255-r,0.85);g=lerp(g,255-g,0.85);b=lerp(b,255-b,0.85);}
+      if(j===scan){r=lerp(r,255,0.5);g=lerp(g,255,0.5);b=lerp(b,255,0.5);}}
+      const w=0.5+0.5*(sp*WC[row+i]-cp*WS[row+i]),f=(oneBit||mk)?1:0.9+amp*w*(0.4+0.6*Math.sqrt(lum));
+      bufU[row+i]=(255<<24)|(Math.min(255,b*f)<<16)|(Math.min(255,g*f)<<8)|Math.min(255,r*f);}}
+}
 const PERF={szene:0,lesen:0,zellen:0,farben:0,rest:0,gpu:false}; // Zeitaufschlüsselung für die FPS-Anzeige
-// Zufallsversatz für "Nebel löst auf" und Unruhe: ändert sich dreimal pro Sekunde. Pro Takt einmal berechnen, den nächsten Takt schon vorab in Stücken.
-const JM={cols:0,rows:0,tq:NaN,a:null,b:null,next:NaN,fill:0};
-function jitterMap(cols,rows,tq){const N=cols*rows;
-  if(JM.cols!==cols||JM.rows!==rows){JM.cols=cols;JM.rows=rows;JM.a=new Float64Array(2*N);JM.b=new Float64Array(2*N);JM.tq=NaN;JM.next=NaN;}
-  const fill=(arr,q,from,to)=>{for(let k=from;k<to;k++){const i=k%cols,j=(k-i)/cols;arr[2*k]=hsh(i,j,q);arr[2*k+1]=hsh(j,i,q);}};
-  if(JM.tq!==tq){if(JM.next===tq){fill(JM.b,tq,JM.fill,N);const s=JM.a;JM.a=JM.b;JM.b=s;}else fill(JM.a,tq,0,N);JM.tq=tq;JM.next=tq+1;JM.fill=0;}
-  const to=Math.min(N,JM.fill+Math.ceil(N/6));fill(JM.b,JM.next,JM.fill,to);JM.fill=to;return JM.a;}
+// Zufallsversatz für "Nebel löst auf" und Unruhe: ändert sich dreimal pro Sekunde (Takt tq). Ein Hintergrund-Thread rechnet die
+// nächsten Takte mit derselben Formel voraus; die Speicher wandern hin und her statt neu angelegt zu werden. Ohne Thread: hier rechnen.
+const JM={cols:0,rows:0,maps:new Map(),pending:new Set(),cur:null,curTq:NaN,sync:null};
+const JW=(()=>{try{const w=new Worker(URL.createObjectURL(new Blob([`const hsh=${hsh.toString()},pool=[];
+onmessage=e=>{const m=e.data;if(m.zurueck){pool.push(m.zurueck);return;}const N=m.cols*m.rows;let a=pool.pop();if(!a||a.length!==2*N)a=new Float64Array(2*N);
+  for(let j=0,k=0;j<m.rows;j++)for(let i=0;i<m.cols;i++,k++){a[2*k]=hsh(i,j,m.tq);a[2*k+1]=hsh(j,i,m.tq);}postMessage({cols:m.cols,rows:m.rows,tq:m.tq,a},[a.buffer]);};`],{type:'text/javascript'})));
+  w.onmessage=e=>{const m=e.data;JM.pending.delete(m.tq);if(m.cols===JM.cols&&m.rows===JM.rows&&m.tq!==JM.curTq&&!JM.maps.has(m.tq))JM.maps.set(m.tq,m.a);else w.postMessage({zurueck:m.a},[m.a.buffer]);};return w;}catch(e){return null;}})();
+function jitterMap(cols,rows,tq){const N=cols*rows,P=4096,nah=[tq,(tq+1)%P,(tq+2)%P];
+  if(JM.cols!==cols||JM.rows!==rows){JM.cols=cols;JM.rows=rows;JM.maps.clear();JM.pending.clear();JM.curTq=NaN;JM.cur=null;}
+  if(JM.curTq!==tq){let m=JM.maps.get(tq);
+    if(m||!JM.cur||!JW){const alt=JM.cur;JM.maps.delete(tq);
+      if(!m){if(!JM.sync||JM.sync.length!==2*N)JM.sync=new Float64Array(2*N);m=JM.sync;for(let j=0,k=0;j<rows;j++)for(let i=0;i<cols;i++,k++){m[2*k]=hsh(i,j,tq);m[2*k+1]=hsh(j,i,tq);}}
+      if(alt&&alt!==JM.sync&&alt!==m&&JW)JW.postMessage({zurueck:alt},[alt.buffer]);JM.cur=m;JM.curTq=tq;}
+    // sonst: Hintergrund-Thread noch nicht fertig -> altes Muster einen Moment länger zeigen statt zu stocken
+    for(const [q,a] of JM.maps)if(!nah.includes(q)){JM.maps.delete(q);if(JW)JW.postMessage({zurueck:a},[a.buffer]);}}
+  if(JW)for(const q of nah.slice(1))if(!JM.maps.has(q)&&!JM.pending.has(q)){JM.pending.add(q);JW.postMessage({cols,rows,tq:q});}
+  return JM.cur;}
 // Abstand jeder Zelle zu Sonne/Mond (im Wasser gestreckt) als cos/sin vorberechnen. Die Sonne wandert nur etwa 0,03 Bildpunkte
 // pro Sekunde: Das Feld gilt, bis sie 0,25 Bildpunkte weiter ist, und wird vorher stückweise im Hintergrund erneuert. Bei Sprüngen sofort.
 const WV={ver:0,key:'',lx:0,ly:0,c:null,s:null,nc:null,ns:null,nlx:0,nly:0,fill:-1};
