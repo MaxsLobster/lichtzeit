@@ -11,5 +11,12 @@
   "wetter": { "echt": true, "aktualisieren_minuten": 15 },
   "anzeige": { "raster_px": "auto", "max_fps": 30, "interne_aufloesung": "auto" },
   "astro": { "planeten": true, "mond_zeichen": true, "kamm_punkte": true },
-  "astro_punkte": []
+  "astro_punkte": [
+    {"stern": 1, "planet": "sonne",   "richtung": "ost",  "km": 82},
+    {"stern": 2, "planet": "merkur",  "richtung": "ost",  "km": 119},
+    {"stern": 1, "planet": "jupiter", "richtung": "ost",  "km": 130},
+    {"stern": 1, "planet": "uranus",  "richtung": "west", "km": 512},
+    {"stern": 2, "planet": "mond",    "richtung": "west", "km": 613},
+    {"stern": 1, "planet": "neptun",  "richtung": "ost",  "km": 665}
+  ]
 }
