@@ -234,7 +234,7 @@ function scene(t,A,d,st){
   // Echtes Wetter ersetzt die simulierten Werte, sobald Daten für diesen Zeitpunkt vorliegen
   const LW=st.mode==='weather'?wxAt(d.getTime()):null;C.live=LW;
   if(LW){const grow=smooth(9,16,C.hr);C.wtype=LW.wtype;C.cgrow=lerp(LW.wtype===1?grow:0.3,1,LW.th);C.cscale=(0.85+C.cgrow*(0.45+0.45*LW.th))*lerp(0.9,1.2,LW.cloud/100);
-    C.cloudList=cloudsAll(dayKey(d)*5+1).slice(0,1+Math.round(clamp(LW.cloud/100,0.05,1)*6));C.storm=LW.storm;C.rain=LW.rain;C.windStr=LW.wind;
+    C.cloudList=LW.cloud<WOLKEN_KLAR?[]:cloudsAll(dayKey(d)*5+1).slice(0,1+Math.round(clamp((LW.cloud-WOLKEN_KLAR)/(100-WOLKEN_KLAR),0,1)*6));C.storm=LW.storm;C.rain=LW.rain;C.windStr=LW.wind;
     C.rainbow=LW.bow*smooth(REGENBOGEN.sonne_min,REGENBOGEN.sonne_min+5,C.sa)*(C.sa<REGENBOGEN.sonne_max?1:0);C.baroU=LW.baro;C.tempK=LW.tempK;}
   C.L=Math.max(0.22+0.78*smooth(-10,14,C.sa),0.22+0.22*C.S.lift)*(1-0.28*C.storm);
   if(C.storm>0){C.S={...C.S,top:mix(C.S.top,[88,92,104],C.storm*0.6),hor:mix(C.S.hor,[140,142,150],C.storm*0.5)};}
@@ -797,6 +797,7 @@ function loadConfig(){const ctl=window.AbortController?new AbortController():nul
 // Grenzwerte zum Anpassen:
 const WX_MAX_ALTER_H=6;                // so viele Stunden gilt ein gespeicherter Stand ohne neuen Abruf
 const WIND_RUHIG=5,WIND_STURM=35;      // km/h: darunter kein Wind im Bild, ab hier voller Wind
+const WOLKEN_KLAR=10;                  // % Bewölkung: darunter keine einzige Wolke, klarer Himmel
 const BARO={stunden:3,steigt:1,faellt:-1,stark:-3,ruhe:0.4,unruhe:0.35,sturm:0.8}; // Druckänderung in hPa über 3 h; ruhe/unruhe/sturm = wie stark das Raster reagiert
 const REGENBOGEN={sonne_min:3,sonne_max:40,wolken_max:70,nach_regen_h:1.25};      // Sonnenhöhe in Grad, Bewölkung in %, wie lange nach dem Regen
 const SEE_TEMP={kalt:0,warm:25,staerke:0.05};                                      // °C; staerke = wie deutlich der See kühler oder wärmer wirkt
