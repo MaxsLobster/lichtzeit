@@ -1,0 +1,12 @@
+{
+  "ort": { "name": "Chiemsee", "breite": 47.87, "laenge": 12.43 },
+  "familie": [
+    { "name": "Stern 1", "geburtstag": "06-19" },
+    { "name": "Stern 2", "geburtstag": "05-17" },
+    { "name": "Stern 3", "geburtstag": "02-07", "geburtsjahr": 2023 }
+  ],
+  "hochzeitstag": "01-20",
+  "feuerwehrboot": { "von": "14:00", "bis": "19:00", "minuten": 5 },
+  "eisvogel": { "pro_tag": 3, "minuten": 5 },
+  "wetter": { "echt": true, "aktualisieren_minuten": 15 }
+}
