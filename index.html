@@ -47,6 +47,8 @@ body.clean{cursor:none}
 /* Ausstellungsmodus (Standard): nur das Bild, keine Steuerung, kein Mauszeiger, keine Berührungsgesten. Test-Modus mit ?dev=1 */
 body:not(.dev) #panel,body:not(.dev) #title,body:not(.dev) #cd{display:none}
 body:not(.dev){cursor:none;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+#fps{position:fixed;top:calc(env(safe-area-inset-top,0px) + 10px);right:12px;font:600 12px/1.35 Figtree,system-ui,sans-serif;color:#f1ead9;background:rgba(0,0,0,.5);padding:5px 9px;border-radius:8px;pointer-events:none;white-space:pre;text-align:right}
+body:not(.dev) #fps{display:none}
 .tabs{display:flex;gap:4px;background:var(--chip);border-radius:12px;padding:3px}
 .tabs button{flex:1;border:0;background:transparent;color:var(--ink-soft);font:600 13px/1 Figtree,system-ui,sans-serif;padding:9px 4px;border-radius:9px;cursor:pointer}
 .tabs button.on{background:var(--ink);color:#15161e}
@@ -67,6 +69,7 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--gold);outline-o
 <canvas id="c" aria-label="Generatives Kunstwerk, das Uhrzeit und Mondphase zeigt"></canvas>
 <div id="title"><span class="k">Lichtzeit</span><span class="s" id="sname">Chiemsee</span></div>
 <div id="cd" aria-live="polite"></div>
+<div id="fps"></div>
 <div id="panel">
   
   <div id="readout"></div>
@@ -161,7 +164,30 @@ function buildTexture(){
 function buildAq(){texAq=document.createElement('canvas');texAq.width=W;texAq.height=H;const c=texAq.getContext('2d'),r=rng(314);c.fillStyle='rgb(128,128,128)';c.fillRect(0,0,W,H);
   for(let i=0;i<Math.round(W*H/900);i++){const x=r()*W,y=r()*H,rr=12+r()*55,v=r()<0.5?255:0,g=c.createRadialGradient(x,y,0,x,y,rr);g.addColorStop(0,`rgba(${v},${v},${v},${0.02+r()*0.04})`);g.addColorStop(0.85,`rgba(${v},${v},${v},${0.02+r()*0.03})`);g.addColorStop(1,`rgba(${v},${v},${v},0)`);c.fillStyle=g;c.beginPath();c.arc(x,y,rr,0,TAU);c.fill();}
   for(let i=0;i<Math.round(W*H/40);i++){const v=r()<0.5?255:0;c.fillStyle=`rgba(${v},${v},${v},${0.05+r()*0.07})`;c.fillRect(r()*W,r()*H,1,1);}}
-function resize(){DPR=Math.min(2,window.devicePixelRatio||1);W=innerWidth;H=innerHeight;cv.width=W*DPR;cv.height=H*DPR;buildTexture();buildAq();}
+// Anzeige (einstellbar in config.json unter "anzeige", 0 = automatisch):
+// raster_px = Größe einer normalen Rasterzelle in echten Bildschirmpixeln, aufl = interne Auflösung als Anteil der echten Pixel, max_fps = höchste Bildrate
+let ANZ={raster_px:0,max_fps:30,aufl:0},GROSS=false,PW=0,PH=0,RPX=0,AUFL=1;
+// Automatik für große Bildschirme (nur wenn raster_px bzw. interne_aufloesung auf "auto" stehen): misst nach dem Start einige Sekunden,
+// wie schnell das Gerät rechnet, und wählt das feinste Raster, das flüssig läuft. Kommt die Grafikkarte nicht mit, wird die interne Auflösung gesenkt.
+const AUTO={rpx:6,aufl:1,stufen:[6,8,10],runde:0, // nur Stufen mit gleichmäßigen Rasterlinien (bei 5 oder 7 px wäre jede vierte Linie anders breit)
+start:0,pro:[],abst:[],last:0,fertig:false};
+function autoTune(now,work){if(AUTO.fertig||!GROSS||(ANZ.raster_px>0&&ANZ.aufl>0)||!off)return;
+  if(!AUTO.start||now-AUTO.last>500){AUTO.start=now+3000;AUTO.pro=[];AUTO.abst=[];AUTO.last=now;return;} // Aufwärmen bzw. nach einer Pause neu messen
+  if(now>=AUTO.start){AUTO.pro.push(work/(off.width*off.height));AUTO.abst.push(now-AUTO.last);}AUTO.last=now;if(now-AUTO.start<4000)return;
+  const med=a=>a.sort((x,y)=>x-y)[a.length>>1],pro=med(AUTO.pro),abst=med(AUTO.abst),iv=1000/ANZ.max_fps,budget=0.55*iv; // gut die Hälfte der Bildzeit für die Rechnung
+  const zellen=r=>Math.ceil(PW/r)*Math.ceil(PH/r)*1.3; // normales Raster, 30 % Reserve für klare Tage mit feineren Zellen
+  let rpx=AUTO.rpx,aufl=AUTO.aufl;
+  if(!(ANZ.raster_px>0))rpx=AUTO.stufen.find(r=>pro*zellen(r)<=budget)||AUTO.stufen[AUTO.stufen.length-1];
+  if(!(ANZ.aufl>0)&&abst>1.2*iv&&pro*off.width*off.height<0.5*iv)aufl=aufl>0.75?0.75:0.5; // Rechnung schnell genug, Bilder trotzdem dauerhaft zu spät: Grafikkarte entlasten
+  AUTO.runde++;if((rpx===AUTO.rpx&&aufl===AUTO.aufl)||AUTO.runde>=3){AUTO.fertig=true;}
+  if(rpx!==AUTO.rpx||aufl!==AUTO.aufl){AUTO.rpx=rpx;AUTO.aufl=aufl;resize();AUTO.start=0;}}
+// Papiertextur einmal auf die benötigte Größe verkleinern statt in jedem Bild neu (gleiches Ergebnis, viel schneller)
+let TEXS=null;
+function texFor(src,w,h){if(!TEXS||TEXS.src!==src||TEXS.w!==w||TEXS.h!==h){const c=document.createElement('canvas');c.width=w;c.height=h;c.getContext('2d',{willReadFrequently:true}).drawImage(src,0,0,w,h);TEXS={src,w,h,c};}return TEXS.c;} // willReadFrequently: sonst mischt Chrome minimal anders
+function resize(){const dpr=window.devicePixelRatio||1;PW=innerWidth*dpr;PH=innerHeight*dpr;GROSS=Math.min(PW,PH)>=2000; // 4K-Bildschirm wie der Muse Frame
+  const rpx=RPX=ANZ.raster_px>0?ANZ.raster_px:GROSS?AUTO.rpx:4*dpr,aufl=AUFL=ANZ.aufl>0?ANZ.aufl:GROSS?AUTO.aufl:Math.min(1,2/dpr),U=rpx/4; // U = Bildschirmpixel pro Bildpunkt
+  W=PW/U;H=PH/U;if(Math.abs(W-Math.round(W))<1e-6)W=Math.round(W);if(Math.abs(H-Math.round(H))<1e-6)H=Math.round(H);
+  cv.width=Math.round(PW*aufl);cv.height=Math.round(PH*aufl);DPR=cv.width/W;cv.style.imageRendering=GROSS||ANZ.aufl>0?'pixelated':'';buildTexture();buildAq();}
 addEventListener('resize',resize);resize();
 
 function litPath(x,y,r,phase){
@@ -364,7 +390,7 @@ function L_shore(C){const {t,S,L,st}=C;const shore=mix(mix([20,26,18],S.top,0.15
 function L_finish(C,st){const {S,sa,mn}=C;
   if(st.wash){ctx.fillStyle=rgba(st.wash==='hor'?mix(S.hor,[255,255,255],0.3):st.wash,st.washA);ctx.fillRect(0,0,W,H);}
   if(st.sat>0){ctx.save();ctx.globalCompositeOperation='saturation';ctx.globalAlpha=st.sat;ctx.fillStyle='rgb(128,128,128)';ctx.fillRect(0,0,W,H);ctx.restore();}
-  ctx.save();ctx.globalCompositeOperation='overlay';ctx.globalAlpha=st.tex;ctx.drawImage(st.paper?texAq:tex,0,0,W,H);
+  ctx.save();ctx.globalCompositeOperation='overlay';ctx.globalAlpha=st.tex;ctx.drawImage(texFor(st.paper?texAq:tex,W,H),0,0,W,H);
   ctx.globalCompositeOperation='soft-light';ctx.globalAlpha=1;ctx.fillStyle='rgba(200,150,80,0.22)';ctx.fillRect(0,0,W,H);const gw=Math.exp(-(((sa-4)/5)**2))*(1-C.storm);if(gw>0.02){ctx.fillStyle=`rgba(255,140,60,${0.2*gw})`;ctx.fillRect(0,0,W,H);}ctx.restore();
   const vg=ctx.createRadialGradient(W/2,H/2,mn*0.3,W/2,H/2,Math.hypot(W,H)*0.62);vg.addColorStop(0,'rgba(0,0,0,0)');vg.addColorStop(1,`rgba(10,8,5,${st.vig})`);ctx.fillStyle=vg;ctx.fillRect(0,0,W,H);
 }
@@ -695,39 +721,86 @@ function drawRaster(t,A,d,st){
     L_clouds(c);L_far(c);if(rare.sonnwend)R_sonnwend(c,rare.sonnwend);W_rainbow(c);W_rain(c);L_mid(c);L_lake(c);if(rare.ice)R_ice(c,rare.ice);
     if(rare.aurora)softEllipse(W/2,c.hy+(H-c.hy)*0.12,W*0.6,(H-c.hy)*0.12,[70,230,140],0.1*rare.aurora*c.night);
     L_islands(c);if(rare.advent)R_advent(c,rare.advent);L_mist(c);if(rare.fire)R_fire(c,rare.fire);if(rare.glut)R_glut(c,rare.glut);
-    R_bells(c);L_beam(c);L_shore(c);L_finish(c,{...st,tex:0,vig:st.vig*0.7});W_lightning(c);img=ctx.getImageData(0,0,cols,rows).data;}
+    R_bells(c);L_beam(c);L_shore(c);L_finish(c,{...st,tex:0,vig:st.vig*0.7});W_lightning(c);img=readScene(off,cols,rows);}
   finally{ctx=sc;W=sW;H=sH;LS=1;}
   const N=cols*rows;if(!CR||CR.length!==N*3)CR=new Float32Array(N*3);const cr=CR,hyRow=Math.floor(C.hy/cs),tq=Math.floor(t*3);
-  for(let j=0;j<rows;j++)for(let i=0;i<cols;i++){let si=i,sj=j,gOff=0;
-    if(RS.drift>0.05&&j>hyRow)si+=Math.round(RS.drift*1.8*Math.sin(j*0.35+t*0.9));
-    if(RS.jitter>0){si+=Math.round((hsh(i,j,tq)-0.5)*RS.jitter*4);sj+=Math.round((hsh(j,i,tq)-0.5)*RS.jitter*3);}
-    if(RS.glitch>0){const band=Math.floor(j/3);if(hsh(band,7,tq)<RS.glitch*0.25)gOff=Math.round((hsh(band,9,tq)-0.5)*16);si+=gOff;}
+  // Schnell: was nur von Zeile, Spalte oder dem Drittelsekunden-Takt abhängt, wird einmal berechnet statt für jede Zelle (gleiches Ergebnis)
+  const jit=RS.jitter>0?jitterMap(cols,rows,tq):null,smc=RS.smear>0?smearCols(cols):null,jA=RS.jitter,sm6=RS.smear*0.6;
+  for(let j=0;j<rows;j++){const dr=(RS.drift>0.05&&j>hyRow)?Math.round(RS.drift*1.8*Math.sin(j*0.35+t*0.9)):0;
+    let gRow=0;if(RS.glitch>0){const band=Math.floor(j/3);if(hsh(band,7,tq)<RS.glitch*0.25)gRow=Math.round((hsh(band,9,tq)-0.5)*16);}
+    if(!jit&&!smc&&dr===0&&gRow===0){for(let i=0,k=j*cols*4,o=j*cols*3;i<cols;i++,k+=4,o+=3){cr[o]=img[k];cr[o+1]=img[k+1];cr[o+2]=img[k+2];}continue;} // nichts verschoben: direkt übernehmen
+    for(let i=0;i<cols;i++){let si=i+dr,sj=j;const gOff=gRow;
+    if(jit){const q=2*(j*cols+i);si+=Math.round((jit[q]-0.5)*jA*4);sj+=Math.round((jit[q+1]-0.5)*jA*3);}
+    si+=gOff;
     si=clamp(si,0,cols-1);sj=clamp(sj,0,rows-1);const k=(sj*cols+si)*4;let r=img[k],g=img[k+1],b=img[k+2];
     if(gOff){const kl=(sj*cols+clamp(si-2,0,cols-1))*4,kr=(sj*cols+clamp(si+2,0,cols-1))*4;r=img[kr];b=img[kl+2];}
-    if(RS.smear>0&&sj>1){const dj=1+Math.floor(hsh(i,3,0)*3),up=(Math.max(0,sj-dj)*cols+si)*4;r=lerp(r,img[up],RS.smear*0.6);g=lerp(g,img[up+1],RS.smear*0.6);b=lerp(b,img[up+2],RS.smear*0.6);}
-    const o=(j*cols+i)*3;cr[o]=r;cr[o+1]=g;cr[o+2]=b;}
-  if(RS.sort>0){const Ls=Math.max(2,Math.floor(hyRow*RS.sort)),col=[];for(let i=0;i<cols;i++){col.length=0;for(let j=0;j<Ls;j++){const o=(j*cols+i)*3;col.push([cr[o],cr[o+1],cr[o+2]]);}
-    col.sort((p,q)=>(p[0]*0.3+p[1]*0.59+p[2]*0.11)-(q[0]*0.3+q[1]*0.59+q[2]*0.11));for(let j=0;j<Ls;j++){const o=(j*cols+i)*3;cr[o]=col[j][0];cr[o+1]=col[j][1];cr[o+2]=col[j][2];}}}
+    if(smc&&sj>1){const dj=smc[i],up=(Math.max(0,sj-dj)*cols+si)*4;r=lerp(r,img[up],sm6);g=lerp(g,img[up+1],sm6);b=lerp(b,img[up+2],sm6);}
+    const o=(j*cols+i)*3;cr[o]=r;cr[o+1]=g;cr[o+2]=b;}}
+  if(RS.sort>0){const Ls=Math.max(2,Math.floor(hyRow*RS.sort)),key=new Float64Array(Ls),idx=new Array(Ls),tmp=new Float32Array(Ls*3);
+    for(let i=0;i<cols;i++){for(let j=0;j<Ls;j++){const o=(j*cols+i)*3;key[j]=cr[o]*0.3+cr[o+1]*0.59+cr[o+2]*0.11;idx[j]=j;tmp[3*j]=cr[o];tmp[3*j+1]=cr[o+1];tmp[3*j+2]=cr[o+2];}
+      idx.sort((p,q)=>key[p]-key[q]);for(let j=0;j<Ls;j++){const o=(j*cols+i)*3,s=3*idx[j];cr[o]=tmp[s];cr[o+1]=tmp[s+1];cr[o+2]=tmp[s+2];}}}
   physics(C,cr,cols,rows,hyRow,t);seasonLayer(C,cr,cols,rows,hyRow,t,cs);
   const eMid=C.hr<1?C.hr*3600:-1,falling=st.rmode==='mix'&&eMid>=0&&eMid<85;if(falling)pixelFall(cr,cols,rows,hyRow,eMid,t);
-  const Wi=Math.ceil(W),Hi=Math.ceil(H);
-  if(!buf||buf.width!==Wi||buf.height!==Hi){buf=document.createElement('canvas');buf.width=Wi;buf.height=Hi;bufCtx=buf.getContext('2d');bufImg=bufCtx.createImageData(Wi,Hi);bufU=new Uint32Array(bufImg.data.buffer);}
-  const lx=C.lx,ly=C.dayMode?Math.min(C.sunY,C.hy):C.moonY,bg=RS.oneBit?[10,11,16]:mix(C.S.top,[0,0,0],0.72);bufU.fill((255<<24)|((bg[2]|0)<<16)|((bg[1]|0)<<8)|(bg[0]|0));
+  // Eine Farbe pro Rasterzelle; die Grafikkarte vergrößert danach auf Bildschirmgröße
+  if(!buf||buf.width!==cols||buf.height!==rows){buf=document.createElement('canvas');buf.width=cols;buf.height=rows;bufCtx=buf.getContext('2d');bufImg=bufCtx.createImageData(cols,rows);bufU=new Uint32Array(bufImg.data.buffer);}
+  const lx=C.lx,ly=C.dayMode?Math.min(C.sunY,C.hy):C.moonY,bg=RS.oneBit?[10,11,16]:mix(C.S.top,[0,0,0],0.72);
   let avg=0.5;if(RS.oneBit){let sm=0;for(let q=0;q<cr.length;q+=3)sm+=(0.3*cr[q]+0.59*cr[q+1]+0.11*cr[q+2])/255;avg=sm/(cr.length/3);}
   const bu=C.baroU||0,bup=0.4*Math.max(0,bu),bua=0.1*bu; // Barometer: schnelleres und stärkeres Flirren bei fallendem Druck
-  const tens=st.rmode==='mix'?smooth(23,24,C.hr):0,pal=RS.silver?PAL_S:PAL_N,nAmt=(st.rmode==='mix'&&C.hr>=12)?0:clamp((C.night-0.25)/0.6,0,1),scan=RS.boot>=0?Math.floor(rows*RS.boot):-1,sz=Math.max(1,cs-RS.gap);
-  for(let j=0;j<rows;j++){const y=j*cs+cs/2,dyb=y>C.hy?(y-C.hy)*1.6+(C.hy-ly):y-ly,na=scan>=0?(j>scan?1:0):nAmt;
-    for(let i=0;i<cols;i++){const o=(j*cols+i)*3;let r=cr[o],g=cr[o+1],b=cr[o+2];const lum=(0.3*r+0.59*g+0.11*b)/255,bt=BAYER[(i&3)+((j&3)<<2)]/16,mk=falling&&MASK[j*cols+i];
+  const tens=st.rmode==='mix'?smooth(23,24,C.hr):0,pal=RS.silver?PAL_S:PAL_N,nAmt=(st.rmode==='mix'&&C.hr>=12)?0:clamp((C.night-0.25)/0.6,0,1),scan=RS.boot>=0?Math.floor(rows*RS.boot):-1;
+  const ph=t*1.4*(1+3*tens+bup),amp=0.2+0.25*tens+bua,oneBit=RS.oneBit,inv=RS.invert; // für alle Zellen gleich
+  // Lichtwellen: sin(ph − Abstand/16) = sin(ph)·cos(Abstand/16) − cos(ph)·sin(Abstand/16), cos/sin je Zelle vorberechnet
+  const WF=waveField(cols,rows,cs,C.hy,lx,ly),WC=WF.c,WS=WF.s,sp=Math.sin(ph),cp=Math.cos(ph);
+  for(let j=0;j<rows;j++){const na=scan>=0?(j>scan?1:0):nAmt,row=j*cols;
+    for(let i=0;i<cols;i++){const o=(row+i)*3;let r=cr[o],g=cr[o+1],b=cr[o+2];const lum=(0.3*r+0.59*g+0.11*b)/255,bt=BAYER[(i&3)+((j&3)<<2)]/16,mk=falling&&MASK[row+i];
       if(mk){if(eMid>=55){r=2;g=3;b=8;}}else{
-      if(RS.oneBit){const v=lum+(bt-0.5)*0.22>avg;r=v?228:24;g=v?224:28;b=v?210:40;}
+      if(oneBit){const v=lum+(bt-0.5)*0.22>avg;r=v?228:24;g=v?224:28;b=v?210:40;}
       else if(bt<na&&!(r>b+50&&lum>0.3)){const b2=BAYER[((i+2)&3)+(((j+1)&3)<<2)]/16,lv=clamp(Math.floor(lum*4.4+b2*0.9-0.25),0,4),p=pal[lv];r=p[0];g=p[1];b=p[2];}
-      if(RS.invert){r=lerp(r,255-r,0.85);g=lerp(g,255-g,0.85);b=lerp(b,255-b,0.85);}
+      if(inv){r=lerp(r,255-r,0.85);g=lerp(g,255-g,0.85);b=lerp(b,255-b,0.85);}
       if(j===scan){r=lerp(r,255,0.5);g=lerp(g,255,0.5);b=lerp(b,255,0.5);}}
-      const x=i*cs+cs/2,w=0.5+0.5*Math.sin(t*1.4*(1+3*tens+bup)-Math.hypot(x-lx,dyb)/16),f=(RS.oneBit||mk)?1:0.9+(0.2+0.25*tens+bua)*w*(0.4+0.6*Math.sqrt(lum)),
-        val=(255<<24)|(Math.min(255,b*f)<<16)|(Math.min(255,g*f)<<8)|Math.min(255,r*f),x0=i*cs,y0=j*cs;
-      if(x0>=Wi)continue;const x1=Math.min(x0+sz,Wi);for(let yy=y0;yy<y0+sz&&yy<Hi;yy++){const rs=yy*Wi;bufU.fill(val,rs+x0,rs+x1);}}}
-  bufCtx.putImageData(bufImg,0,0);ctx.setTransform(DPR,0,0,DPR,0,0);ctx.imageSmoothingEnabled=false;ctx.drawImage(buf,0,0,Wi,Hi);ctx.imageSmoothingEnabled=true;
+      const w=0.5+0.5*(sp*WC[row+i]-cp*WS[row+i]),f=(oneBit||mk)?1:0.9+amp*w*(0.4+0.6*Math.sqrt(lum));
+      bufU[row+i]=(255<<24)|(Math.min(255,b*f)<<16)|(Math.min(255,g*f)<<8)|Math.min(255,r*f);}}
+  bufCtx.putImageData(bufImg,0,0);
+  // Zellen ohne Weichzeichnen auf Bildschirmgröße ziehen, dann die dunklen Rasterlinien. Deren Breite wird so verteilt,
+  // dass ihr Flächenanteil auf jedem Bildschirm gleich bleibt (z. B. abwechselnd 1 und 2 Pixel bei 1,5).
+  const csP=cs*DPR,gP=RS.gap*DPR;ctx.setTransform(1,0,0,1,0,0);ctx.imageSmoothingEnabled=false;ctx.drawImage(buf,0,0,cols*csP,rows*csP);ctx.imageSmoothingEnabled=true;
+  if(gP>0){ctx.fillStyle=`rgb(${bg[0]|0},${bg[1]|0},${bg[2]|0})`;
+    for(let i=1;i<=cols;i++){const e=Math.round(i*csP),w=Math.round(i*gP)-Math.round((i-1)*gP);if(w>0)ctx.fillRect(e-w,0,w,cv.height);}
+    for(let j=1;j<=rows;j++){const e=Math.round(j*csP),w=Math.round(j*gP)-Math.round((j-1)*gP);if(w>0)ctx.fillRect(0,e-w,cv.width,w);}}
+  ctx.setTransform(DPR,0,0,DPR,0,0);
   rasterClock(C,cs,RS.gap,t,A);extrasLayer(C,cs,t);familyLayer(C,cs,t);}
+// Zufallsversatz für "Nebel löst auf" und Unruhe: ändert sich dreimal pro Sekunde. Pro Takt einmal berechnen, den nächsten Takt schon vorab in Stücken.
+const JM={cols:0,rows:0,tq:NaN,a:null,b:null,next:NaN,fill:0};
+function jitterMap(cols,rows,tq){const N=cols*rows;
+  if(JM.cols!==cols||JM.rows!==rows){JM.cols=cols;JM.rows=rows;JM.a=new Float64Array(2*N);JM.b=new Float64Array(2*N);JM.tq=NaN;JM.next=NaN;}
+  const fill=(arr,q,from,to)=>{for(let k=from;k<to;k++){const i=k%cols,j=(k-i)/cols;arr[2*k]=hsh(i,j,q);arr[2*k+1]=hsh(j,i,q);}};
+  if(JM.tq!==tq){if(JM.next===tq){fill(JM.b,tq,JM.fill,N);const s=JM.a;JM.a=JM.b;JM.b=s;}else fill(JM.a,tq,0,N);JM.tq=tq;JM.next=tq+1;JM.fill=0;}
+  const to=Math.min(N,JM.fill+Math.ceil(N/6));fill(JM.b,JM.next,JM.fill,to);JM.fill=to;return JM.a;}
+// Abstand jeder Zelle zu Sonne/Mond (im Wasser gestreckt) als cos/sin vorberechnen. Die Sonne wandert nur etwa 0,03 Bildpunkte
+// pro Sekunde: Das Feld gilt, bis sie 0,25 Bildpunkte weiter ist, und wird vorher stückweise im Hintergrund erneuert. Bei Sprüngen sofort.
+const WV={key:'',lx:0,ly:0,c:null,s:null,nc:null,ns:null,nlx:0,nly:0,fill:-1};
+function waveField(cols,rows,cs,hy,lx,ly){const N=cols*rows,key=cols+'|'+rows+'|'+cs+'|'+hy;
+  const build=(c,s,x0,y0,from,to)=>{for(let q=from;q<to;q++){const i=q%cols,j=(q-i)/cols,y=j*cs+cs/2,dyb=y>hy?(y-hy)*1.6+(hy-y0):y-y0,dx=i*cs+cs/2-x0,dd=Math.sqrt(dx*dx+dyb*dyb)/16;c[q]=Math.cos(dd);s[q]=Math.sin(dd);}};
+  if(WV.key!==key){WV.key=key;WV.c=new Float64Array(N);WV.s=new Float64Array(N);WV.nc=new Float64Array(N);WV.ns=new Float64Array(N);WV.fill=-1;WV.lx=NaN;}
+  const dev=Math.max(Math.abs(lx-WV.lx),Math.abs(ly-WV.ly));
+  if(!(dev<=0.25)){build(WV.c,WV.s,lx,ly,0,N);WV.lx=lx;WV.ly=ly;WV.fill=-1;return WV;}
+  if(dev>0.1&&WV.fill<0){WV.fill=0;WV.nlx=lx;WV.nly=ly;}
+  if(WV.fill>=0){const to=Math.min(N,WV.fill+Math.ceil(N/8));build(WV.nc,WV.ns,WV.nlx,WV.nly,WV.fill,to);WV.fill=to;
+    if(to===N){let x=WV.c;WV.c=WV.nc;WV.nc=x;x=WV.s;WV.s=WV.ns;WV.ns=x;WV.lx=WV.nlx;WV.ly=WV.nly;WV.fill=-1;}}
+  return WV;}
+// Szene-Pixel in einen wiederverwendeten Speicher lesen (über WebGL). getImageData legt jedes Mal neuen Speicher an; das zwingt den
+// Browser alle paar hundert Millisekunden zum Aufräumen, und genau dann stockt die Bewegung. Ohne WebGL: Rückfall auf getImageData.
+let RB=null;
+function readScene(src,w,h){
+  if(!RB){RB={gl:null};try{const gl=document.createElement('canvas').getContext('webgl',{antialias:false,depth:false,stencil:false,premultipliedAlpha:false,preserveDrawingBuffer:false});
+    if(gl){const tx=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,tx);for(const p of [gl.TEXTURE_MIN_FILTER,gl.TEXTURE_MAG_FILTER])gl.texParameteri(gl.TEXTURE_2D,p,gl.NEAREST);
+      for(const p of [gl.TEXTURE_WRAP_S,gl.TEXTURE_WRAP_T])gl.texParameteri(gl.TEXTURE_2D,p,gl.CLAMP_TO_EDGE);
+      gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL,false);gl.pixelStorei(gl.UNPACK_COLORSPACE_CONVERSION_WEBGL,gl.NONE);
+      const fb=gl.createFramebuffer();gl.bindFramebuffer(gl.FRAMEBUFFER,fb);RB={gl,tx,fb,buf:null};}}catch(e){}}
+  const gl=RB.gl;
+  if(gl&&!gl.isContextLost())try{gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,src);gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,RB.tx,0);
+    if(!RB.buf||RB.buf.length!==w*h*4)RB.buf=new Uint8Array(w*h*4);gl.readPixels(0,0,w,h,gl.RGBA,gl.UNSIGNED_BYTE,RB.buf);if(gl.getError()===gl.NO_ERROR)return RB.buf;}catch(e){}
+  RB.gl=null;return src.getContext('2d').getImageData(0,0,w,h).data;}
+let SMC=null;function smearCols(cols){if(!SMC||SMC.length!==cols){SMC=new Uint8Array(cols);for(let i=0;i<cols;i++)SMC[i]=1+Math.floor(hsh(i,3,0)*3);}return SMC;}
 
 // ---------- Zeichnen ----------
 function drawChiemsee(t,A,d,st){drawRaster(t,A,d,st);}
@@ -744,7 +817,7 @@ function parseT(s){s=s.trim();let m=/^(\d{4})-(\d{1,2})-(\d{1,2})(?:[T ](\d{1,2}
   if(m)return fromWall(+m[1],m[2]-1,+m[3],m[4]!==undefined?+m[4]:12,m[5]!==undefined?+m[5]:0,m[6]!==undefined?+m[6]:0);
   m=/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/.exec(s);if(m){const n=wall(nowT());return fromWall(n.getFullYear(),n.getMonth(),n.getDate(),+m[1],+m[2],+(m[3]||0));}return null;}
 let T_SIM=null;{const s=Q.get('t');if(s){const v=parseT(s);if(v===null||isNaN(v))URL_INFO.push('?t='+s+' nicht erkannt');else T_SIM={at:v,dev:Date.now()};}}
-let speed=3600,study=0,mode='live',manualT=0,playing=false,playT=0,last=performance.now(),lastDraw=0;
+let speed=3600,study=0,mode='live',manualT=0,playing=false,playT=0,last=performance.now(),lastDraw=0,fpsN=0,fpsW=0,fpsT=0;
 const curT=()=>playing?playT:(mode==='manual'?manualT:T_SIM?T_SIM.at+(Date.now()-T_SIM.dev):nowT());
 function midnight(off){const n=wall(nowT());return fromWall(n.getFullYear(),n.getMonth(),n.getDate()+off);}
 function fromSliders(){const n=wall(nowT());return fromWall(n.getFullYear(),n.getMonth(),n.getDate()+(+$('day').value),0,+$('min').value);}
@@ -780,11 +853,16 @@ function readout(d,A){
 function frame(now){
   requestAnimationFrame(frame);
   const dt=Math.min(0.1,(now-last)/1000);last=now;if(playing)playT+=dt*1000*speed;
-  if(now-lastDraw<32)return;lastDraw=now;
-  const T=curT(),d=wall(T),A=astro(new Date(T));
+  // Gleichmäßiger Takt bis zur eingestellten Höchst-Bildrate (Standard 30); wer zu spät dran ist, zeichnet sofort
+  const iv=1000/ANZ.max_fps;if(now-lastDraw<iv-4)return;lastDraw=now-lastDraw<2*iv?lastDraw+iv:now;
+  const T=curT(),d=wall(T),A=astro(new Date(T)),w0=performance.now();
   ctx.setTransform(DPR,0,0,DPR,0,0);ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';
   drawChiemsee(now/1000,A,d,STYLES[study]);
-  if(!DEV)return; // Steuerleiste und Info-Zeile nur im Test-Modus
+  const work=performance.now()-w0;autoTune(now,work);
+  if(!DEV)return; // Steuerleiste, Info-Zeile und FPS-Anzeige nur im Test-Modus
+  fpsN++;fpsW+=work;if(now-fpsT>=1000){if(fpsT){const au=GROSS&&!(ANZ.raster_px>0&&ANZ.aufl>0)?(AUTO.fertig?' · Automatik fertig':' · Automatik misst …'):'';
+    $('fps').textContent=Math.round(fpsN*1000/(now-fpsT))+' Bilder/s (max. '+ANZ.max_fps+') · '+(fpsW/fpsN).toFixed(1)+' ms Rechenzeit\nRaster '+(+RPX.toFixed(2))+' px'+(ANZ.raster_px>0?'':' (auto)')+' = '+(off?off.width+'×'+off.height:'?')+' Zellen\nintern '+cv.width+'×'+cv.height+' px ('+Math.round(AUFL*100)+' %'+(ANZ.aufl>0?'':', auto')+')'+au;}
+    fpsN=0;fpsW=0;fpsT=now;}
   if(mode!=='manual'||playing)toSliders(T);
   readout(d,A);
   {const el=$('cd');let txt='';if(playing&&speed===1){const hr=d.getHours()*3600+d.getMinutes()*60+d.getSeconds();if(hr>=86380)txt='Mitternacht in '+(86400-hr)+' s';else if(hr<85)txt='Pixelsturz';}if(el.textContent!==txt){el.textContent=txt;el.classList.toggle('on',!!txt);}}
@@ -794,7 +872,7 @@ function frame(now){
 // Wird beim Start geladen. Fehlt ein Eintrag, gilt der eingebaute Standard. Ist einer fehlerhaft, ebenfalls, mit Hinweis in der Info-Zeile.
 // Einträge, die mit "_" beginnen, sind Notizen und werden ignoriert.
 let ORT='Chiemsee',WETTER={echt:true,min:15},CFG_INFO='',started=false;
-const CFG_KEYS=['ort','familie','hochzeitstag','feuerwehrboot','eisvogel','wetter'];
+const CFG_KEYS=['ort','familie','hochzeitstag','feuerwehrboot','eisvogel','wetter','anzeige'];
 const pMMDD=v=>{const m=/^(\d{1,2})-(\d{1,2})$/.exec(String(v).trim());if(!m)return null;const a=+m[1],b=+m[2];return a>=1&&a<=12&&b>=1&&b<=31?String(a).padStart(2,'0')+'-'+String(b).padStart(2,'0'):null;};
 const pDatum=v=>v===''?'':pMMDD(v); // leer = kein Goldtag
 const pUhr=v=>{const m=/^(\d{1,2}):(\d{2})$/.exec(String(v).trim());if(!m)return null;const a=+m[1],b=+m[2];return b<60&&a*60+b<=1440?a*60+b:null;};
@@ -816,6 +894,9 @@ function applyConfig(j){const bad=[],notes=[],obj=v=>!!v&&typeof v==='object'&&!
   part('feuerwehrboot',f=>{const n={von:or(take(f.von,pUhr,'feuerwehrboot von'),FW.von),bis:or(take(f.bis,pUhr,'feuerwehrboot bis'),FW.bis),min:or(take(f.minuten,pZahl(1,60,true),'feuerwehrboot minuten'),FW.min)};
     if(n.bis-n.von>=n.min)FW=n;else bad.push('feuerwehrboot (Zeitfenster kürzer als die Dauer)');});
   part('eisvogel',e=>{KF={n:or(take(e.pro_tag,pZahl(0,12,true),'eisvogel pro_tag'),KF.n),min:or(take(e.minuten,pZahl(1,30,true),'eisvogel minuten'),KF.min)};});
+  const autoOr=p=>v=>v==='auto'?0:p(v); // "auto" = automatisch (intern 0)
+  part('anzeige',a=>{ANZ={raster_px:or(take(a.raster_px,autoOr(pZahl(2,40)),'anzeige raster_px'),ANZ.raster_px),max_fps:or(take(a.max_fps,pZahl(5,120),'anzeige max_fps'),ANZ.max_fps),
+    aufl:or(take(a.interne_aufloesung,autoOr(pZahl(0.25,1)),'anzeige interne_aufloesung'),ANZ.aufl)};});
   part('wetter',w=>{WETTER={echt:or(take(w.echt,pJaNein,'wetter echt'),WETTER.echt),min:or(take(w.aktualisieren_minuten,pZahl(5,180),'wetter aktualisieren_minuten'),WETTER.min)};});
   const unk=Object.keys(j).filter(k=>k[0]!=='_'&&!CFG_KEYS.includes(k));if(unk.length)notes.push('unbekannt: '+unk.join(', '));
   const msg=[];if(bad.length)msg.push('ungültig: '+bad.join(', ')+' (dort gilt der Standard)');CFG_INFO=msg.concat(notes).length?'config.json: '+msg.concat(notes).join('; '):'';}
@@ -904,7 +985,7 @@ function wxFetch(){if(!WETTER.echt)return Promise.resolve();let tm=0;
       .catch(fail).then(done);}
   catch(e){fail(e);done();return Promise.resolve();}}
 
-function start(){if(started)return;started=true;$('sname').textContent=ORT;document.title='Lichtzeit – '+ORT;toSliders(curT());setMode();keepAwake();requestAnimationFrame(frame);}
+function start(){if(started)return;started=true;if(ANZ.raster_px||ANZ.aufl)resize();$('sname').textContent=ORT;document.title='Lichtzeit – '+ORT;toSliders(curT());setMode();keepAwake();requestAnimationFrame(frame);}
 // Start: erst die Einstellungen, dann das Wetter (gespeicherter Stand sofort, neuen Abruf höchstens 3 s abwarten)
 function boot(){if(WX_FORCE)return null;wxLoad();const f=wxFetch();return WX&&wxAt(nowT())?null:Promise.race([f,new Promise(r=>setTimeout(r,3000))]);}
 setTimeout(start,8000); // Sicherheitsnetz: das Bild startet auf jeden Fall

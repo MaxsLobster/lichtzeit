@@ -62,6 +62,7 @@ Alle veränderbaren Daten stehen in `config.json`. So änderst du sie:
 | `feuerwehrboot` | Zeitfenster (`von`, `bis`) und Dauer in `minuten`. Die genaue Uhrzeit wird jeden Tag neu ausgelost. |
 | `eisvogel` | Wie oft am Tag (`pro_tag`, zwischen 7 und 19 Uhr) und wie lange (`minuten`). |
 | `wetter` | `echt`: echtes Wetter an (`true`) oder aus (`false`). `aktualisieren_minuten`: wie oft das Wetter abgerufen wird (mindestens 5). |
+| `anzeige` | Rastergröße, Bildrate und interne Auflösung, siehe unten. `"auto"` passt sich dem Bildschirm an. |
 
 Regeln, damit nichts schiefgeht:
 
@@ -70,6 +71,32 @@ Regeln, damit nichts schiefgeht:
 - Anführungszeichen und Kommas stehen lassen wie im Beispiel.
 - Einträge, deren Name mit `_` beginnt (z. B. `"_notiz"`), sind Notizen und werden ignoriert.
 - Ist ein Wert fehlerhaft, gilt dafür der eingebaute Standard. Das Bild läuft also immer weiter. Im Test-Modus (`?dev=1`) steht in der Info-Zeile, welcher Eintrag nicht passt.
+
+## Anzeige und Leistung
+
+Unter `"anzeige"` in `config.json`:
+
+| Eintrag | Bedeutung |
+|---|---|
+| `raster_px` | Größe einer Rasterzelle in echten Bildschirmpixeln. Kleiner = feiner, aber mehr Rechenarbeit. `"auto"`: am Handy wie gewohnt, auf großen 4K-Bildschirmen wählt Lichtzeit selbst 6, 8 oder 10. Gleichmäßige Rasterlinien gibt es bei 4, 6 und 8. |
+| `max_fps` | Höchste Bildrate (Bilder pro Sekunde), Standard 30. |
+| `interne_aufloesung` | Mit welchem Anteil der echten Bildschirmpixel gerechnet wird: 1 = volle Auflösung, 0.5 = halbe (wird hochskaliert). `"auto"` = volle Auflösung, nur bei überlasteter Grafik weniger. |
+
+Auf großen Bildschirmen misst Lichtzeit in den ersten Sekunden nach dem Start,
+wie schnell das Gerät ist, und wählt dann das feinste Raster, das flüssig
+läuft. Feste Zahlen in `config.json` schalten diese Automatik ab.
+
+Mit `?dev=1` zeigt die Seite oben rechts, wie viele Bilder pro Sekunde
+tatsächlich gezeichnet werden, wie lange die Rechnung dauert und welches Raster
+gerade aktiv ist. So lässt sich am Muse Frame direkt nachsehen, ob alles
+flüssig läuft.
+
+## Uhrzeit
+
+Lichtzeit rechnet immer in Berliner Zeit, auch wenn am Gerät eine andere
+Zeitzone eingestellt ist. Geht die Uhr des Geräts mehr als eine Minute falsch,
+korrigiert Lichtzeit sie anhand der Serveruhr. Beides steht im Test-Modus in
+der Info-Zeile.
 
 ## Ausstellungsmodus
 
@@ -88,7 +115,7 @@ Parameter werden an die Adresse angehängt: der erste mit `?`, weitere mit `&`.
 
 | Parameter | Wirkung |
 |---|---|
-| `?dev=1` | Test-Modus: Steuerleiste (Tag, Uhrzeit, Zeitraffer, Lesehilfe, Mitternacht ansehen, Seltenheit finden) und Info-Zeile mit Wetter und Luftdruck-Trend. Ein Tipp aufs Bild blendet die Steuerung aus. |
+| `?dev=1` | Test-Modus: Steuerleiste (Tag, Uhrzeit, Zeitraffer, Lesehilfe, Mitternacht ansehen, Seltenheit finden), Info-Zeile mit Wetter und Luftdruck-Trend, oben rechts die Bildrate. Ein Tipp aufs Bild blendet die Steuerung aus. |
 | `?t=2026-12-24T17:30` | Zeit simulieren. Die Uhr läuft ab diesem Moment weiter. Auch möglich: `?t=17:30` (heute) oder `?t=0:00:20`. |
 | `?wetter=gewitter` | Wetter erzwingen: `gewitter`, `regen`, `nebel`, `klar` oder `schnee`. Gewitter kommt mit stark fallendem Luftdruck, Regen mit fallendem. |
 
