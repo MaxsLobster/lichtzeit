@@ -44,6 +44,9 @@ canvas{position:fixed;inset:0;display:block;width:100%;height:100%}
 body.clean #panel{opacity:0;pointer-events:none;transform:translate(-50%,16px)}
 body.clean #title{opacity:0}
 body.clean{cursor:none}
+/* Ausstellungsmodus (Standard): nur das Bild, keine Steuerung, kein Mauszeiger, keine Berührungsgesten. Test-Modus mit ?dev=1 */
+body:not(.dev) #panel,body:not(.dev) #title,body:not(.dev) #cd{display:none}
+body:not(.dev){cursor:none;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 .tabs{display:flex;gap:4px;background:var(--chip);border-radius:12px;padding:3px}
 .tabs button{flex:1;border:0;background:transparent;color:var(--ink-soft);font:600 13px/1 Figtree,system-ui,sans-serif;padding:9px 4px;border-radius:9px;cursor:pointer}
 .tabs button.on{background:var(--ink);color:#15161e}
@@ -718,28 +721,43 @@ function drawChiemsee(t,A,d,st){drawRaster(t,A,d,st);}
 const $=id=>document.getElementById(id);
 const NAMES=['Chiemsee'];
 const STYLES=[{rmode:'mix',variant:'raster',mode:'weather',tex:0.42,shimmer:0.4,gl:0.8,cloudSoft:true,hazeAdd:0.18,wash:'hor',washA:0.14,sat:0.18,rip:0.4,vig:0.24,star:0.6,paper:true}];
+// Adresse: ?dev=1 Test-Modus mit Steuerleiste, ?t=2026-12-24T17:30 Zeit simulieren, ?wetter=gewitter|regen|nebel|klar|schnee Wetter erzwingen
+const Q=new URLSearchParams(location.search),DEV=['1','true','ja'].includes(Q.get('dev')),URL_INFO=[];
+if(DEV)document.body.classList.add('dev');
+// ?t= versteht "2026-12-24T17:30", "2026-12-24 17:30:20", "2026-12-24" (dann 12 Uhr) und "17:30" (heute). Die Zeit läuft von dort aus weiter.
+function parseT(s){s=s.trim();let m=/^(\d{4})-(\d{1,2})-(\d{1,2})(?:[T ](\d{1,2}):(\d{2})(?::(\d{2}))?)?$/.exec(s);
+  if(m)return new Date(+m[1],m[2]-1,+m[3],m[4]!==undefined?+m[4]:12,m[5]!==undefined?+m[5]:0,m[6]!==undefined?+m[6]:0).getTime();
+  m=/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/.exec(s);if(m){const n=new Date();return new Date(n.getFullYear(),n.getMonth(),n.getDate(),+m[1],+m[2],+(m[3]||0)).getTime();}return null;}
+let T_OFF=0;{const s=Q.get('t');if(s){const v=parseT(s);if(v===null||isNaN(v))URL_INFO.push('?t='+s+' nicht erkannt');else T_OFF=v-Date.now();}}
 let speed=3600,study=0,mode='live',manualT=0,playing=false,playT=0,last=performance.now(),lastDraw=0;
-const curT=()=>playing?playT:(mode==='manual'?manualT:Date.now());
+const curT=()=>playing?playT:(mode==='manual'?manualT:Date.now()+T_OFF);
 function midnight(off){const n=new Date();return new Date(n.getFullYear(),n.getMonth(),n.getDate()+off);}
 function fromSliders(){const b=midnight(+$('day').value);b.setMinutes(+$('min').value);return b.getTime();}
 function toSliders(ts){const d=new Date(ts),n=new Date(),a=new Date(d.getFullYear(),d.getMonth(),d.getDate()),b=new Date(n.getFullYear(),n.getMonth(),n.getDate());$('day').value=Math.round((a-b)/864e5);$('min').value=d.getHours()*60+d.getMinutes();}
 function setMode(m){$('now').classList.toggle('on',m==='live'&&!playing);$('play').classList.toggle('on',playing);$('play').textContent=playing?'Anhalten':'Zeitraffer';}
 document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{study=+b.dataset.s;document.querySelectorAll('.tabs button').forEach(x=>x.classList.toggle('on',x===b));$('sname').textContent=NAMES[study];});
 $('day').oninput=$('min').oninput=()=>{playing=false;mode='manual';manualT=fromSliders();setMode();};
-$('now').onclick=()=>{playing=false;mode='live';setMode();};
+$('now').onclick=()=>{playing=false;mode='live';T_OFF=0;setMode();};
 $('play').onclick=()=>{if(playing){playing=false;mode='manual';manualT=playT;}else{speed=3600;playT=curT();playing=true;}setMode();};
 $('mid').onclick=()=>{const n=new Date();speed=1;playT=new Date(n.getFullYear(),n.getMonth(),n.getDate()+1,0,0,0).getTime()-15000;playing=true;setMode();document.body.classList.add('clean');};
 $('fm').onclick=()=>{let best=0,bf=-1;const from=curT();for(let h=24;h<24*33;h++){const ts=from+h*36e5,f=astro(new Date(ts)).fraction;if(f>bf){bf=f;best=ts;}}const d=new Date(best);playing=false;mode='manual';manualT=new Date(d.getFullYear(),d.getMonth(),d.getDate(),21,30).getTime();setMode();};
 const _mf=()=>{const n=new Date();let m=new Date(n.getFullYear(),9,4,18,40);if(m.getTime()<Date.now()-864e5)m=new Date(n.getFullYear()+1,9,4,18,40);playing=false;mode='manual';manualT=m.getTime();setMode();};
 $('help').onclick=()=>{HELP=!HELP;$('help').classList.toggle('on',HELP);};
 $('rare').onclick=()=>{const from=new Date(curT());for(let o=1;o<400;o++){const d=new Date(from.getFullYear(),from.getMonth(),from.getDate()+o);const ev=dayRare(d).find(e=>e.r);if(ev){const h=ev.b>24?ev.a+0.6:(ev.a+ev.b)/2;playing=false;mode='manual';manualT=new Date(d.getFullYear(),d.getMonth(),d.getDate(),0,Math.round(h*60)).getTime();setMode();return;}}};
+// Bildschirm wach halten (Wake Lock, wenn der Browser es kann). Nach dem Zurückkehren auf die Seite erneut anfordern.
 let wake=null;
-cv.addEventListener('click',()=>{document.body.classList.toggle('clean');try{if(!wake&&navigator.wakeLock)navigator.wakeLock.request('screen').then(w=>{wake=w;w.addEventListener('release',()=>wake=null);}).catch(()=>{});}catch(e){}});
+function keepAwake(){try{if(!wake&&navigator.wakeLock&&document.visibilityState==='visible')navigator.wakeLock.request('screen').then(w=>{wake=w;w.addEventListener('release',()=>{wake=null;});}).catch(()=>{});}catch(e){}}
+document.addEventListener('visibilitychange',keepAwake);addEventListener('pointerdown',keepAwake);setInterval(keepAwake,6e4);
+// Tipp aufs Bild blendet die Steuerung aus, nur im Test-Modus. Im Ausstellungsmodus passiert bei Berührung nichts.
+if(DEV)cv.addEventListener('click',()=>document.body.classList.toggle('clean'));else addEventListener('contextmenu',e=>e.preventDefault());
+// Einmal täglich um 4:00 neu laden, damit Updates ankommen, aber nur, wenn die Seite gerade erreichbar ist (sonst in 10 Minuten wieder versuchen)
+let reloadAt=(()=>{const n=new Date(),r=new Date(n.getFullYear(),n.getMonth(),n.getDate(),4,0,0);if(r<=n)r.setDate(r.getDate()+1);return r.getTime();})();
+setInterval(()=>{if(Date.now()<reloadAt)return;reloadAt=Date.now()+10*6e4;fetch(location.href,{method:'HEAD',cache:'no-store'}).then(r=>{if(r.ok)location.reload();}).catch(()=>{});},3e4);
 let lastTxt='';
 function readout(d,A){
   const ds=d.toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'}),ts=d.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
   const wx=dayWeather(d),cel=[];
-  cel.push(wxText(d));if(A.fraction>0.985)cel.push('Vollmond');if(isMesse(d))cel.push('Messetag');if(wx.shoot)cel.push('Sternschnuppennacht');for(const p of FAMILIE)if(isBday(p,d))cel.push('Geburtstag: '+p.name);if(isAnniv(d))cel.push('Hochzeitstag');{const V=visitorTimes(d);cel.push('Feuerwehr '+fmtM(V.fw)+', Eisvogel '+V.kf.map(fmtM).join(' / '));}if(adventLit(d))cel.push(adventLit(d)+'. Advent');if(STATE)cel.push(STATE);for(const ev of dayRare(d))cel.push(ev.n+' ('+Math.floor(ev.a)+'–'+(Math.floor(ev.b)%24)+' Uhr)');if(CFG_INFO)cel.push(CFG_INFO);
+  cel.push(wxText(d));if(A.fraction>0.985)cel.push('Vollmond');if(isMesse(d))cel.push('Messetag');if(wx.shoot)cel.push('Sternschnuppennacht');for(const p of FAMILIE)if(isBday(p,d))cel.push('Geburtstag: '+p.name);if(isAnniv(d))cel.push('Hochzeitstag');{const V=visitorTimes(d);cel.push('Feuerwehr '+fmtM(V.fw)+', Eisvogel '+V.kf.map(fmtM).join(' / '));}if(adventLit(d))cel.push(adventLit(d)+'. Advent');if(STATE)cel.push(STATE);for(const ev of dayRare(d))cel.push(ev.n+' ('+Math.floor(ev.a)+'–'+(Math.floor(ev.b)%24)+' Uhr)');if(CFG_INFO)cel.push(CFG_INFO);if(T_OFF&&mode==='live'&&!playing)cel.push('Zeit simuliert mit ?t=');if(URL_INFO.length)cel.push(URL_INFO.join(', '));
   const txt=`${ds}, ${ts} Uhr. Mond ${Math.round(A.fraction*100)} % ${A.phase<0.5?'zunehmend':'abnehmend'}, Sonne ${Math.round(A.sun.alt/rad)}°`+(cel.length?` <span class="cel">${cel.join(', ')}</span>`:'');
   if(txt!==lastTxt){$('readout').innerHTML=txt;lastTxt=txt;}
 }
@@ -750,6 +768,7 @@ function frame(now){
   const T=curT(),d=new Date(T),A=astro(d);
   ctx.setTransform(DPR,0,0,DPR,0,0);ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';
   drawChiemsee(now/1000,A,d,STYLES[study]);
+  if(!DEV)return; // Steuerleiste und Info-Zeile nur im Test-Modus
   if(mode!=='manual'||playing)toSliders(T);
   readout(d,A);
   {const el=$('cd');let txt='';if(playing&&speed===1){const hr=d.getHours()*3600+d.getMinutes()*60+d.getSeconds();if(hr>=86380)txt='Mitternacht in '+(86400-hr)+' s';else if(hr<85)txt='Pixelsturz';}if(el.textContent!==txt){el.textContent=txt;el.classList.toggle('on',!!txt);}}
@@ -825,23 +844,31 @@ function wxBuild(j){const h=j&&j.hourly,c=j&&j.current;if(!h||!Array.isArray(h.t
 // Zwischen zwei Messwerten weich überblenden, damit sich das Bild nicht sprunghaft ändert
 function wxSeg(ts){const S=WX.S;if(ts<S[0].t||ts>S[S.length-1].t)return null;let i=0;while(i<S.length-2&&S[i+1].t<ts)i++;const a=S[i],b=S[Math.min(i+1,S.length-1)];return{a,b,u:b.t>a.t?clamp((ts-a.t)/(b.t-a.t),0,1):0};}
 const wxNum=(g,k)=>g.a[k]===null?g.b[k]:g.b[k]===null?g.a[k]:lerp(g.a[k],g.b[k],g.u);
-function wxCalc(ts){if(!WX||!WETTER.echt||WX.lat!==LAT||WX.lng!==LNG||Date.now()-WX.fetched>WX_MAX_ALTER_H*36e5)return null;
+function wxCalc(ts){if(WX_FORCE)return WX_FORCE;if(!WX||!WETTER.echt||WX.lat!==LAT||WX.lng!==LNG||Date.now()-WX.fetched>WX_MAX_ALTER_H*36e5)return null;
   const g=wxSeg(ts);if(!g)return null;const n=g.u<0.5?g.a:g.b,o={code:n.code,wtype:n.wtype};
   for(const k of['cloud','rain','snow','mm','storm','mist','wind','kmh','th','temp','p'])o[k]=wxNum(g,k);
   // Barometer: Luftdruck jetzt minus Luftdruck vor 3 Stunden
-  const g0=wxSeg(ts-BARO.stunden*36e5),p0=g0?wxNum(g0,'p'):null,dp=o.dp=o.p!==null&&p0!==null?o.p-p0:null;
-  o.trend=dp===null?'':dp>BARO.steigt?'steigend':dp<BARO.stark?'stark fallend':dp<BARO.faellt?'fallend':'stabil';
-  o.baro=dp===null?0:BARO.unruhe*smooth(-BARO.faellt,0.5-BARO.faellt,-dp)+(BARO.sturm-BARO.unruhe)*smooth(-BARO.stark,0.5-BARO.stark,-dp)-BARO.ruhe*smooth(BARO.steigt,BARO.steigt+0.5,dp);
+  const g0=wxSeg(ts-BARO.stunden*36e5),p0=g0?wxNum(g0,'p'):null;o.dp=o.p!==null&&p0!==null?o.p-p0:null;
   // Regenbogen: nur wenn es gerade aufgehört hat zu regnen und nicht zu bewölkt ist (Sonnenstand prüft scene)
   let bow=0;if(o.rain<0.05&&o.snow<0.05){for(let h=1/12;h<=REGENBOGEN.nach_regen_h;h+=1/12){const q=wxSeg(ts-h*36e5);if(!q)break;if(wxNum(q,'rain')>=0.05){bow=1-smooth(REGENBOGEN.nach_regen_h*0.2,REGENBOGEN.nach_regen_h,h);break;}}
     bow*=1-smooth(REGENBOGEN.wolken_max-10,REGENBOGEN.wolken_max+5,o.cloud);}
-  o.bow=bow;o.tempK=o.temp===null?0:clamp((o.temp-(SEE_TEMP.kalt+SEE_TEMP.warm)/2)/((SEE_TEMP.warm-SEE_TEMP.kalt)/2),-1,1);
+  o.bow=bow;return wxExtras(o);}
+// Druck-Trend, Unruhe des Rasters und See-Farbton
+function wxExtras(o){const dp=o.dp;
+  o.trend=dp===null?'':dp>BARO.steigt?'steigend':dp<BARO.stark?'stark fallend':dp<BARO.faellt?'fallend':'stabil';
+  o.baro=dp===null?0:BARO.unruhe*smooth(-BARO.faellt,0.5-BARO.faellt,-dp)+(BARO.sturm-BARO.unruhe)*smooth(-BARO.stark,0.5-BARO.stark,-dp)-BARO.ruhe*smooth(BARO.steigt,BARO.steigt+0.5,dp);
+  o.tempK=o.temp===null?0:clamp((o.temp-(SEE_TEMP.kalt+SEE_TEMP.warm)/2)/((SEE_TEMP.warm-SEE_TEMP.kalt)/2),-1,1);
   return o;}
+// Wetter erzwingen (Test): ?wetter=gewitter|regen|nebel|klar|schnee – feste Werte mit typischem Luftdruck-Trend
+const WX_PRESETS={klar:{code:0,cloud:0,wind:6,temp:18,p:1022,vis:40000,dp:0},gewitter:{code:95,cloud:95,rain:6,wind:30,temp:22,p:1006,vis:15000,dp:-3.5},
+  regen:{code:63,cloud:100,rain:3,wind:15,temp:10,p:1008,vis:8000,dp:-1.5},nebel:{code:45,cloud:90,wind:2,temp:6,p:1024,vis:300,dp:0},schnee:{code:73,cloud:100,snow:1.2,wind:8,temp:-2,p:1012,vis:3000,dp:0}};
+const WX_FORCE=(()=>{const k=(Q.get('wetter')||'').trim().toLowerCase(),x=WX_PRESETS[k];if(!k)return null;if(!x){URL_INFO.push('?wetter='+k+' unbekannt');return null;}
+  const o=wxDerive({t:0,code:x.code,cloud:x.cloud,pr:null,rain:x.rain||0,sh:0,snow:x.snow||0,wind:x.wind,temp:x.temp,p:x.p,vis:x.vis},1);o.dp=x.dp;o.bow=0;o.name=k;return wxExtras(o);})();
 function wxAt(ts){if(ts!==WXM.ts){WXM.ts=ts;WXM.v=wxCalc(ts);}return WXM.v;}
 function wxText(d){const w=wxAt(d.getTime()),f=(v,n=0)=>v===null?'?':v.toFixed(n).replace('.',',');
   if(!w)return 'Wetter: '+WT[wtypeOf(d)]+' (simuliert'+(!WETTER.echt?', echtes Wetter aus':WX_ERR?', '+WX_ERR:'')+')';
   const name=w.wtype===3?'Gewitter':w.snow>0.05?'Schnee':w.rain>0.05?'Regen':(w.code===45||w.code===48)?'Nebel':WT[w.wtype];
-  return 'Wetter (echt, Stand '+new Date(WX.fetched).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})+(WX_ERR?', '+WX_ERR:'')+'): '+name+', '+f(w.temp)+' °C, Wolken '+f(w.cloud)+' %, '+(w.mm>0.05?'Niederschlag '+f(w.mm,1)+' mm/h, ':'')+'Wind '+f(w.kmh)+' km/h, Luftdruck '+f(w.p)+' hPa'+(w.dp!==null?', '+w.trend+' ('+(w.dp>0?'+':'')+f(w.dp,1)+' hPa in '+BARO.stunden+' h)':'');}
+  return (WX_FORCE?'Wetter (erzwungen mit ?wetter='+WX_FORCE.name+')':'Wetter (echt, Stand '+new Date(WX.fetched).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})+(WX_ERR?', '+WX_ERR:'')+')')+': '+name+', '+f(w.temp)+' °C, Wolken '+f(w.cloud)+' %, '+(w.mm>0.05?'Niederschlag '+f(w.mm,1)+' mm/h, ':'')+'Wind '+f(w.kmh)+' km/h, Luftdruck '+f(w.p)+' hPa'+(w.dp!==null?', '+w.trend+' ('+(w.dp>0?'+':'')+f(w.dp,1)+' hPa in '+BARO.stunden+' h)':'');}
 function wxLoad(){try{const c=JSON.parse(localStorage.getItem(WX_KEY)||'null');if(c&&c.lat===LAT&&c.lng===LNG&&c.j){WX={fetched:c.fetched,lat:LAT,lng:LNG,S:wxBuild(c.j)};WXM.ts=NaN;}}catch(e){}}
 function wxFetch(){if(!WETTER.echt)return Promise.resolve();let tm=0;
   const done=()=>{clearTimeout(tm);setTimeout(wxFetch,(WX_ERR?Math.min(5,WETTER.min):WETTER.min)*6e4);},fail=e=>{WX_ERR='Abruf fehlgeschlagen: '+(e.name==='AbortError'?'Zeitüberschreitung':e instanceof TypeError?'keine Verbindung':e.message);console.warn(WX_ERR);};
@@ -853,9 +880,9 @@ function wxFetch(){if(!WETTER.echt)return Promise.resolve();let tm=0;
       .catch(fail).then(done);}
   catch(e){fail(e);done();return Promise.resolve();}}
 
-function start(){if(started)return;started=true;$('sname').textContent=ORT;document.title='Lichtzeit – '+ORT;toSliders(Date.now());setMode();requestAnimationFrame(frame);}
+function start(){if(started)return;started=true;$('sname').textContent=ORT;document.title='Lichtzeit – '+ORT;toSliders(curT());setMode();keepAwake();requestAnimationFrame(frame);}
 // Start: erst die Einstellungen, dann das Wetter (gespeicherter Stand sofort, neuen Abruf höchstens 3 s abwarten)
-function boot(){wxLoad();const f=wxFetch();return WX&&wxAt(Date.now())?null:Promise.race([f,new Promise(r=>setTimeout(r,3000))]);}
+function boot(){if(WX_FORCE)return null;wxLoad();const f=wxFetch();return WX&&wxAt(Date.now())?null:Promise.race([f,new Promise(r=>setTimeout(r,3000))]);}
 setTimeout(start,8000); // Sicherheitsnetz: das Bild startet auf jeden Fall
 try{loadConfig().then(boot).then(start,start);}catch(e){start();}
 </script>

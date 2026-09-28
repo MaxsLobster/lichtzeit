@@ -20,7 +20,7 @@ Lichtzeit holt alle 15 Minuten das echte Wetter am Chiemsee von
 [Open-Meteo](https://open-meteo.com) (kostenlos, ohne Anmeldung) und übersetzt
 es ins Bild:
 
-- **Wolken** – je mehr Bewölkung, desto mehr und größere Wolken
+- **Wolken** – je mehr Bewölkung, desto mehr und größere Wolken; unter 10 % ist der Himmel ganz klar
 - **Regen** – Pixelregen und Regenschleier, Pixel „tropfen“
 - **Schnee** – fallende Flocken
 - **Wind** – Pixel verwehen, Böenfelder auf dem See, Schilf wiegt sich
@@ -69,6 +69,31 @@ Regeln, damit nichts schiefgeht:
 - Uhrzeiten als `"HH:MM"`, z. B. `"14:00"`.
 - Anführungszeichen und Kommas stehen lassen wie im Beispiel.
 - Einträge, deren Name mit `_` beginnt (z. B. `"_notiz"`), sind Notizen und werden ignoriert.
-- Ist ein Wert fehlerhaft, gilt dafür der eingebaute Standard. Das Bild läuft also immer weiter. In der Info-Zeile der Steuerleiste steht dann, welcher Eintrag nicht passt.
+- Ist ein Wert fehlerhaft, gilt dafür der eingebaute Standard. Das Bild läuft also immer weiter. Im Test-Modus (`?dev=1`) steht in der Info-Zeile, welcher Eintrag nicht passt.
 
-*Wird ergänzt: welche Test-Parameter es gibt.*
+## Ausstellungsmodus
+
+Die normale Adresse **https://maxslobster.github.io/lichtzeit/** zeigt nur das
+Bild: keine Steuerleiste, kein Titel, kein Mauszeiger. Berührungen bewirken
+nichts. Außerdem:
+
+- Der Bildschirm wird wach gehalten, wenn der Browser das unterstützt.
+- Jeden Tag um 4:00 Uhr lädt sich die Seite neu, damit Änderungen ankommen.
+  Das passiert nur, wenn die Seite gerade erreichbar ist. Ohne Internet läuft
+  das Bild einfach weiter.
+
+## Test-Parameter
+
+Parameter werden an die Adresse angehängt: der erste mit `?`, weitere mit `&`.
+
+| Parameter | Wirkung |
+|---|---|
+| `?dev=1` | Test-Modus: Steuerleiste (Tag, Uhrzeit, Zeitraffer, Lesehilfe, Mitternacht ansehen, Seltenheit finden) und Info-Zeile mit Wetter und Luftdruck-Trend. Ein Tipp aufs Bild blendet die Steuerung aus. |
+| `?t=2026-12-24T17:30` | Zeit simulieren. Die Uhr läuft ab diesem Moment weiter. Auch möglich: `?t=17:30` (heute) oder `?t=0:00:20`. |
+| `?wetter=gewitter` | Wetter erzwingen: `gewitter`, `regen`, `nebel`, `klar` oder `schnee`. Gewitter kommt mit stark fallendem Luftdruck, Regen mit fallendem. |
+
+Beispiele:
+
+- `https://maxslobster.github.io/lichtzeit/?dev=1`
+- `https://maxslobster.github.io/lichtzeit/?t=2026-12-24T18:00&wetter=schnee`
+- `https://maxslobster.github.io/lichtzeit/?t=23:58&dev=1` – zwei Minuten vor dem Pixelsturz
