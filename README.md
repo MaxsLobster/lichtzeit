@@ -20,4 +20,29 @@ für einen 32-Zoll Muse Frame im Hochformat.
 - `config.json` – Einstellungen (Ort, Familie, Termine, Wetter)
 - `README.md` – diese Anleitung
 
-*Wird ergänzt: wie man die Einstellungen ändert und welche Test-Parameter es gibt.*
+## Einstellungen ändern
+
+Alle veränderbaren Daten stehen in `config.json`. So änderst du sie:
+
+1. Auf GitHub die Datei `config.json` öffnen und auf das Stift-Symbol klicken.
+2. Werte ändern, dann unten auf **Commit changes** klicken.
+3. Nach ein bis zwei Minuten ist die Änderung online. Seite neu laden.
+
+| Eintrag | Bedeutung |
+|---|---|
+| `ort` | Name und Koordinaten. Bestimmen Sonnen- und Mondstand. |
+| `familie` | Die drei Sterne. Die ersten beiden rücken am Hochzeitstag zusammen. Der dritte ist der kleine Stern: Mit `geburtsjahr` wächst er bis zum 18. Geburtstag. Am Geburtstag leuchtet der Stern golden. |
+| `hochzeitstag` | An diesem Tag leuchten die ersten beiden Sterne golden. |
+| `feuerwehrboot` | Zeitfenster (`von`, `bis`) und Dauer in `minuten`. Die genaue Uhrzeit wird jeden Tag neu ausgelost. |
+| `eisvogel` | Wie oft am Tag (`pro_tag`, zwischen 7 und 19 Uhr) und wie lange (`minuten`). |
+| `wetter` | Echtes Wetter an/aus und wie oft es abgerufen wird. Wird mit dem Wetter-Schritt aktiv. |
+
+Regeln, damit nichts schiefgeht:
+
+- Datumsangaben als `"MM-TT"`, z. B. `"06-19"` für den 19. Juni. Leer (`""`) heißt: kein Goldtag.
+- Uhrzeiten als `"HH:MM"`, z. B. `"14:00"`.
+- Anführungszeichen und Kommas stehen lassen wie im Beispiel.
+- Einträge, deren Name mit `_` beginnt (z. B. `"_notiz"`), sind Notizen und werden ignoriert.
+- Ist ein Wert fehlerhaft, gilt dafür der eingebaute Standard. Das Bild läuft also immer weiter. In der Info-Zeile der Steuerleiste steht dann, welcher Eintrag nicht passt.
+
+*Wird ergänzt: welche Test-Parameter es gibt.*

@@ -81,7 +81,7 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--gold);outline-o
 </div>
 <script>
 // ---------- Grundlagen ----------
-const LAT=47.87, LNG=12.43; // Chiemsee
+let LAT=47.87, LNG=12.43; // Chiemsee (Standard, config.json kann das ändern)
 const rad=Math.PI/180, TAU=Math.PI*2;
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const lerp=(a,b,t)=>a+(b-a)*t;
@@ -558,9 +558,9 @@ function physics(C,cr,cols,rows,hyRow,t){
       put(x,y,bc,0.85);put(x-1,y-(up?1:0),bc,0.6);put(x+1,y-(up?1:0),bc,0.6);}}
 }
 // ---------- Familie: drei Sterne, tagsüber blass, nachts klar ----------
-// Geburtstage hier eintragen als 'MM-TT', z. B. '03-14'. Leer lassen = kein Goldtag.
-const FAMILIE=[{name:'Stern 1',geburtstag:'06-19'},{name:'Stern 2',geburtstag:'05-17'},{name:'Stern 3',geburtstag:'02-07',geburtsjahr:2023}];
-const HOCHZEITSTAG='01-20';
+// Standardwerte. Die eigentlichen Daten stehen in config.json (Geburtstage als 'MM-TT', leer = kein Goldtag).
+let FAMILIE=[{name:'Stern 1',geburtstag:'06-19'},{name:'Stern 2',geburtstag:'05-17'},{name:'Stern 3',geburtstag:'02-07',geburtsjahr:2023}];
+let HOCHZEITSTAG='01-20';
 const isAnniv=d=>HOCHZEITSTAG===String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
 const vBirth=()=>{const p=FAMILIE[2],[m,dd]=p.geburtstag.split('-').map(Number);return new Date(p.geburtsjahr||2023,(m||3)-1,dd||1);};
 const isBday=(p,d)=>!!p.geburtstag&&p.geburtstag===String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
@@ -576,9 +576,11 @@ function familyLayer(C,cs,t){const {d,sa,hy,night,L,S,hr}=C,snap=x=>Math.floor(x
 }
 
 // ---------- Besucher: Eisvogel und Feuerwehrboot, Dezember ----------
+// Zeitfenster in Minuten seit Mitternacht (Standard, config.json kann das ändern)
+let FW={von:14*60,bis:19*60,min:5},KF={n:3,min:5};
 function visitorTimes(d){const r=rng(dayKey(d)*61+5),ev=[];
-  const fw=14*60+Math.floor(r()*(5*60-5));
-  const kf=[];let guard=0;while(kf.length<3&&guard++<50){const m=7*60+Math.floor(r()*(12*60-5));if(kf.every(x=>Math.abs(x-m)>30))kf.push(m);}kf.sort((a,b)=>a-b);
+  const fw=FW.von+Math.floor(r()*(FW.bis-FW.von-FW.min));
+  const kf=[];let guard=0;while(kf.length<KF.n&&guard++<Math.max(50,KF.n*15)){const m=7*60+Math.floor(r()*(12*60-KF.min));if(kf.every(x=>Math.abs(x-m)>Math.max(30,KF.min)))kf.push(m);}kf.sort((a,b)=>a-b);
   return{fw,kf};}
 const fmtM=m=>String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0');
 function adventLit(d){if(d.getMonth()!==11&&!(d.getMonth()===10&&d.getDate()>=27))return 0;const y=d.getFullYear(),xmas=new Date(y,11,25),a4=new Date(y,11,25-((xmas.getDay()+6)%7)-1);let n=0;
@@ -587,19 +589,19 @@ function extrasLayer(C,cs,t){const {d,sa,hy,night,L,S,iy,rowY,pc}=C,snap=x=>Math
   const px=(x,y,c,a=1)=>{ctx.fillStyle=rgba(c,a);ctx.fillRect(x+cs*0.06,y+cs*0.06,cs*0.88,cs*0.88);};
   const V=visitorTimes(d);
   // Eisvogel: 3x am Tag je 5 Minuten im Schilf
-  for(const k of V.kf){if(m<k||m>=k+5)continue;const e=(m-k)*60+sec,x=snap(W*0.2),y=snap(H*0.905),blue=[40,150,225],org=[235,130,50],dk=[30,30,36];
-    const fly=e<2?(2-e)/2:e>298?(e-298)/2:0,dx=snap(fly*W*0.3*(e<2?-1:1));
+  for(const k of V.kf){if(m<k||m>=k+KF.min)continue;const e=(m-k)*60+sec,x=snap(W*0.2),y=snap(H*0.905),blue=[40,150,225],org=[235,130,50],dk=[30,30,36],eEnd=KF.min*60-2;
+    const fly=e<2?(2-e)/2:e>eEnd?(e-eEnd)/2:0,dx=snap(fly*W*0.3*(e<2?-1:1));
     if(fly<=0){for(let j=1;j<=4;j++)px(x,y+j*cs,mix(pc,[120,110,60],0.4));}
     const X=x+dx,Y=y-(fly>0?snap(fly*H*0.05):0),gl=0.8+0.2*Math.sin(t*3);
     px(X,Y-2*cs,blue,gl);px(X+cs,Y-2*cs,dk);px(X+2*cs,Y-2*cs,dk);px(X-cs,Y-cs,blue);px(X,Y-cs,[70,200,240],gl);px(X-cs,Y,blue);px(X,Y,org);px(X-2*cs,Y+cs,blue);}
   // Feuerwehrboot: täglich 5 Minuten zwischen 14 und 19 Uhr
-  if(m>=V.fw&&m<V.fw+5){const e=(m-V.fw)*60+sec,p=e/300,x=snap(lerp(W*1.08,-W*0.12,p)),y=snap(hy+(rowY-hy)*0.55),red=mix([210,40,40],[0,0,0],(1-L)*0.4),wh=mix([240,240,236],[0,0,0],(1-L)*0.4),blink=Math.floor(t*4)%2===0;
+  if(m>=V.fw&&m<V.fw+FW.min){const e=(m-V.fw)*60+sec,p=e/(FW.min*60),x=snap(lerp(W*1.08,-W*0.12,p)),y=snap(hy+(rowY-hy)*0.55),red=mix([210,40,40],[0,0,0],(1-L)*0.4),wh=mix([240,240,236],[0,0,0],(1-L)*0.4),blink=Math.floor(t*4)%2===0;
     for(let k=1;k<=12;k++){const a=0.35*(1-k/13);px(x+(k+5)*cs,y+Math.round(k*0.3)*cs,mix(S.hor,[255,255,255],0.4),a);px(x+(k+5)*cs,y-Math.round(k*0.1)*cs,mix(S.hor,[255,255,255],0.4),a*0.6);}
     for(let i=-5;i<=5;i++)px(x+i*cs,y,red);for(let i=-4;i<=4;i++)px(x+i*cs,y+cs,mix(red,[0,0,0],0.3));
     for(let i=-1;i<=3;i++)px(x+i*cs,y-cs,wh);px(x,y-2*cs,wh);px(x+cs,y-2*cs,wh);
     px(x,y-3*cs,blink?[60,120,255]:[20,30,70]);px(x+cs,y-3*cs,blink?[20,30,70]:[60,120,255]);
     if(blink){ctx.save();ctx.globalCompositeOperation='lighter';softEllipse(x+cs,y-3*cs,cs*4,cs*4,[60,120,255],0.35);ctx.restore();}
-    if(e>100&&e<180){for(let k=1;k<=7;k++){const sx=x-(3+k)*cs,sy=y-2*cs-Math.round(Math.sin(k/7*Math.PI)*3)*cs;px(sx,sy,[230,240,255],0.7*(0.6+0.4*Math.sin(t*10+k)));}}}
+    if(e>FW.min*20&&e<FW.min*36){for(let k=1;k<=7;k++){const sx=x-(3+k)*cs,sy=y-2*cs-Math.round(Math.sin(k/7*Math.PI)*3)*cs;px(sx,sy,[230,240,255],0.7*(0.6+0.4*Math.sin(t*10+k)));}}}
   // Dezember: Adventslichter am Ufer, Christbaum an Heiligabend
   const n=adventLit(d);if(n>0){for(let k=0;k<4;k++){const x=snap(W*(0.08+k*0.028)),y=snap(hy-2);px(x,y,[235,225,205],0.9);if(k<n){const f=0.75+0.25*Math.sin(t*6+k*1.7);px(x,y-cs,[255,190,90],f);ctx.save();ctx.globalCompositeOperation='lighter';softEllipse(x+cs/2,y-cs/2,cs*3,cs*3,[255,190,110],0.35*f*(0.4+0.6*night));ctx.restore();}}}
   if(d.getMonth()===11&&d.getDate()>=24&&d.getDate()<=26){const x=snap(W*0.455),y=snap(iy),g=mix([40,110,60],[0,0,0],(1-L)*0.5);
@@ -726,7 +728,7 @@ let lastTxt='';
 function readout(d,A){
   const ds=d.toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'}),ts=d.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
   const wx=dayWeather(d),cel=[];
-  cel.push('Wetter: '+WT[wtypeOf(d)]);if(A.fraction>0.985)cel.push('Vollmond');if(isMesse(d))cel.push('Messetag');if(wx.shoot)cel.push('Sternschnuppennacht');for(const p of FAMILIE)if(isBday(p,d))cel.push('Geburtstag: '+p.name);if(isAnniv(d))cel.push('Hochzeitstag');{const V=visitorTimes(d);cel.push('Feuerwehr '+fmtM(V.fw)+', Eisvogel '+V.kf.map(fmtM).join(' / '));}if(adventLit(d))cel.push(adventLit(d)+'. Advent');if(STATE)cel.push(STATE);for(const ev of dayRare(d))cel.push(ev.n+' ('+Math.floor(ev.a)+'–'+(Math.floor(ev.b)%24)+' Uhr)');
+  cel.push('Wetter: '+WT[wtypeOf(d)]);if(A.fraction>0.985)cel.push('Vollmond');if(isMesse(d))cel.push('Messetag');if(wx.shoot)cel.push('Sternschnuppennacht');for(const p of FAMILIE)if(isBday(p,d))cel.push('Geburtstag: '+p.name);if(isAnniv(d))cel.push('Hochzeitstag');{const V=visitorTimes(d);cel.push('Feuerwehr '+fmtM(V.fw)+', Eisvogel '+V.kf.map(fmtM).join(' / '));}if(adventLit(d))cel.push(adventLit(d)+'. Advent');if(STATE)cel.push(STATE);for(const ev of dayRare(d))cel.push(ev.n+' ('+Math.floor(ev.a)+'–'+(Math.floor(ev.b)%24)+' Uhr)');if(CFG_INFO)cel.push(CFG_INFO);
   const txt=`${ds}, ${ts} Uhr. Mond ${Math.round(A.fraction*100)} % ${A.phase<0.5?'zunehmend':'abnehmend'}, Sonne ${Math.round(A.sun.alt/rad)}°`+(cel.length?` <span class="cel">${cel.join(', ')}</span>`:'');
   if(txt!==lastTxt){$('readout').innerHTML=txt;lastTxt=txt;}
 }
@@ -741,7 +743,45 @@ function frame(now){
   readout(d,A);
   {const el=$('cd');let txt='';if(playing&&speed===1){const hr=d.getHours()*3600+d.getMinutes()*60+d.getSeconds();if(hr>=86380)txt='Mitternacht in '+(86400-hr)+' s';else if(hr<85)txt='Pixelsturz';}if(el.textContent!==txt){el.textContent=txt;el.classList.toggle('on',!!txt);}}
 }
-toSliders(Date.now());setMode();requestAnimationFrame(frame);
+
+// ---------- Einstellungen (config.json) ----------
+// Wird beim Start geladen. Fehlt ein Eintrag, gilt der eingebaute Standard. Ist einer fehlerhaft, ebenfalls, mit Hinweis in der Info-Zeile.
+// Einträge, die mit "_" beginnen, sind Notizen und werden ignoriert.
+let ORT='Chiemsee',WETTER={echt:true,min:15},CFG_INFO='',started=false;
+const CFG_KEYS=['ort','familie','hochzeitstag','feuerwehrboot','eisvogel','wetter'];
+const pMMDD=v=>{const m=/^(\d{1,2})-(\d{1,2})$/.exec(String(v).trim());if(!m)return null;const a=+m[1],b=+m[2];return a>=1&&a<=12&&b>=1&&b<=31?String(a).padStart(2,'0')+'-'+String(b).padStart(2,'0'):null;};
+const pDatum=v=>v===''?'':pMMDD(v); // leer = kein Goldtag
+const pUhr=v=>{const m=/^(\d{1,2}):(\d{2})$/.exec(String(v).trim());if(!m)return null;const a=+m[1],b=+m[2];return b<60&&a*60+b<=1440?a*60+b:null;};
+const pZahl=(a,b,ganz)=>v=>typeof v==='number'&&isFinite(v)&&v>=a&&v<=b&&(!ganz||Number.isInteger(v))?v:null;
+const pText=v=>typeof v==='string'&&v.trim()?v.trim():null;
+const pJaNein=v=>typeof v==='boolean'?v:null;
+function applyConfig(j){const bad=[],notes=[],obj=v=>!!v&&typeof v==='object'&&!Array.isArray(v),or=(v,d)=>v!==undefined?v:d;
+  // take: fehlt = undefined (Standard bleibt), ungültig = undefined plus Hinweis
+  const take=(v,parse,name)=>{if(v===undefined)return undefined;const p=parse(v);if(p===null){bad.push(name);return undefined;}return p;};
+  const part=(k,fn)=>{if(j[k]===undefined)return;if(!obj(j[k])){bad.push(k);return;}fn(j[k]);};
+  if(!obj(j)){CFG_INFO='config.json hat nicht das erwartete Format, Standardwerte aktiv';return;}
+  part('ort',o=>{ORT=or(take(o.name,pText,'ort.name'),ORT);LAT=or(take(o.breite,pZahl(-90,90),'ort.breite'),LAT);LNG=or(take(o.laenge,pZahl(-180,180),'ort.laenge'),LNG);});
+  if(j.familie!==undefined){if(!Array.isArray(j.familie))bad.push('familie');else{
+    FAMILIE=FAMILIE.map((def,k)=>{const p=j.familie[k],nm='familie '+(k+1);if(p===undefined)return def;if(!obj(p)){bad.push(nm);return def;}
+      const q={...def};q.name=or(take(p.name,pText,nm+' name'),q.name);q.geburtstag=or(take(p.geburtstag,pDatum,nm+' geburtstag'),q.geburtstag);
+      const y=take(p.geburtsjahr,pZahl(1900,2100,true),nm+' geburtsjahr');if(y!==undefined)q.geburtsjahr=y;return q;});
+    if(j.familie.length>3)notes.push('nur die ersten drei Familieneinträge werden Sterne');}}
+  HOCHZEITSTAG=or(take(j.hochzeitstag,pDatum,'hochzeitstag'),HOCHZEITSTAG);
+  part('feuerwehrboot',f=>{const n={von:or(take(f.von,pUhr,'feuerwehrboot von'),FW.von),bis:or(take(f.bis,pUhr,'feuerwehrboot bis'),FW.bis),min:or(take(f.minuten,pZahl(1,60,true),'feuerwehrboot minuten'),FW.min)};
+    if(n.bis-n.von>=n.min)FW=n;else bad.push('feuerwehrboot (Zeitfenster kürzer als die Dauer)');});
+  part('eisvogel',e=>{KF={n:or(take(e.pro_tag,pZahl(0,12,true),'eisvogel pro_tag'),KF.n),min:or(take(e.minuten,pZahl(1,30,true),'eisvogel minuten'),KF.min)};});
+  part('wetter',w=>{WETTER={echt:or(take(w.echt,pJaNein,'wetter echt'),WETTER.echt),min:or(take(w.aktualisieren_minuten,pZahl(5,180),'wetter aktualisieren_minuten'),WETTER.min)};});
+  const unk=Object.keys(j).filter(k=>k[0]!=='_'&&!CFG_KEYS.includes(k));if(unk.length)notes.push('unbekannt: '+unk.join(', '));
+  const msg=[];if(bad.length)msg.push('ungültig: '+bad.join(', ')+' (dort gilt der Standard)');CFG_INFO=msg.concat(notes).length?'config.json: '+msg.concat(notes).join('; '):'';}
+function loadConfig(){const ctl=window.AbortController?new AbortController():null,tm=setTimeout(()=>{if(ctl)ctl.abort();},4000);
+  return fetch('config.json',{cache:'no-store',signal:ctl?ctl.signal:undefined})
+    .then(r=>{if(!r.ok)throw new Error(r.status===404?'Datei fehlt':'HTTP '+r.status);return r.text();})
+    .then(s=>{let j;try{j=JSON.parse(s);}catch(e){throw new Error('Tippfehler in der Datei');}if(!started)applyConfig(j);})
+    .catch(e=>{CFG_INFO='config.json nicht geladen ('+(e.name==='AbortError'?'Zeitüberschreitung':e instanceof TypeError?'keine Verbindung':e.message)+'), Standardwerte aktiv';})
+    .then(()=>{clearTimeout(tm);if(CFG_INFO)console.warn(CFG_INFO);});}
+function start(){if(started)return;started=true;$('sname').textContent=ORT;document.title='Lichtzeit – '+ORT;toSliders(Date.now());setMode();requestAnimationFrame(frame);}
+setTimeout(start,5000); // Sicherheitsnetz: das Bild startet auf jeden Fall
+try{loadConfig().then(start,start);}catch(e){start();}
 </script>
 </body>
 </html>
