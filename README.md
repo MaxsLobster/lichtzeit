@@ -78,18 +78,38 @@ Unter `"anzeige"` in `config.json`:
 
 | Eintrag | Bedeutung |
 |---|---|
-| `raster_px` | Größe einer Rasterzelle in echten Bildschirmpixeln. Kleiner = feiner, aber mehr Rechenarbeit. `"auto"`: am Handy wie gewohnt, auf großen 4K-Bildschirmen wählt Lichtzeit selbst 6, 8 oder 10. Gleichmäßige Rasterlinien gibt es bei 4, 6 und 8. |
+| `raster_px` | Größe einer Rasterzelle in Bildpunkten des Browsers. Kleiner = feiner, aber mehr Rechenarbeit. `"auto"` beginnt mit dem feinsten Raster (am Handy wie gewohnt, auf 4K-Bildschirmen 6) und wird gröber, wenn das Gerät nicht mitkommt. Gleichmäßige Rasterlinien gibt es bei 4, 6 und 8. |
 | `max_fps` | Höchste Bildrate (Bilder pro Sekunde), Standard 30. |
-| `interne_aufloesung` | Mit welchem Anteil der echten Bildschirmpixel gerechnet wird: 1 = volle Auflösung, 0.5 = halbe (wird hochskaliert). `"auto"` = volle Auflösung, nur bei überlasteter Grafik weniger. |
+| `interne_aufloesung` | Mit welchem Anteil der Bildpunkte gerechnet wird: 1 = volle Auflösung, 0.5 = halbe (wird hochskaliert). `"auto"` = volle Auflösung, auf 4K-Bildschirmen bei überlasteter Grafik weniger. |
 
-Auf großen Bildschirmen misst Lichtzeit in den ersten Sekunden nach dem Start,
-wie schnell das Gerät ist, und wählt dann das feinste Raster, das flüssig
-läuft. Feste Zahlen in `config.json` schalten diese Automatik ab.
+**Automatik:** Steht die Rastergröße auf `"auto"`, misst Lichtzeit alle
+5 Sekunden, wie viele Bilder tatsächlich gezeichnet werden. Sind es weniger
+als etwa 25 pro Sekunde, wechselt sie auf das nächstgröbere Raster. Feiner wird
+es erst wieder nach dem Neuladen (spätestens um 4:00 Uhr). Feste Zahlen schalten
+die Automatik ab.
+
+**Grafikeinheit:** Die Endfarbe jeder Rasterzelle rechnet die Grafikeinheit
+(WebGL2), das ist auf schwachen Geräten viel schneller. Grafikchips rechnen mit
+etwas weniger Nachkommastellen: Im Pixelvergleich mit dem Original sind die
+meisten Momente identisch, sonst weichen einzelne Zellen um eine Farbstufe ab
+(unsichtbar). Ohne WebGL2 rechnet automatisch der Prozessor, dann exakt wie das
+Original.
+
+**Pro Gerät per Adresse:** Die Einstellungen lassen sich an der Adresse
+überschreiben, ohne `config.json` für alle zu ändern. Beispiel für den Muse:
+`https://maxslobster.github.io/lichtzeit/?raster=6&fps=30`
+
+| Parameter | Wirkung |
+|---|---|
+| `raster=6` | Rastergröße (oder `auto`) |
+| `fps=30` | höchste Bildrate |
+| `aufloesung=0.5` | interne Auflösung (oder `auto`) |
+| `gpu=0` | Farben im Prozessor statt in der Grafikeinheit (`gpu=1` = Grafikeinheit) |
 
 Mit `?dev=1` zeigt die Seite oben rechts, wie viele Bilder pro Sekunde
-tatsächlich gezeichnet werden, wie lange die Rechnung dauert und welches Raster
-gerade aktiv ist. So lässt sich am Muse Frame direkt nachsehen, ob alles
-flüssig läuft.
+tatsächlich gezeichnet werden, wie viele Millisekunden jeder Teil braucht
+(Szene, Auslesen, Zellen, Farben, Rest), welches Raster aktiv ist, ob die
+Grafikeinheit rechnet und mit welcher Auflösung der Browser des Geräts arbeitet.
 
 ## Uhrzeit
 
@@ -117,6 +137,7 @@ Parameter werden an die Adresse angehängt: der erste mit `?`, weitere mit `&`.
 |---|---|
 | `?dev=1` | Test-Modus: Steuerleiste (Tag, Uhrzeit, Zeitraffer, Lesehilfe, Mitternacht ansehen, Seltenheit finden), Info-Zeile mit Wetter und Luftdruck-Trend, oben rechts die Bildrate. Ein Tipp aufs Bild blendet die Steuerung aus. |
 | `?t=2026-12-24T17:30` | Zeit simulieren. Die Uhr läuft ab diesem Moment weiter. Auch möglich: `?t=17:30` (heute) oder `?t=0:00:20`. |
+| `?raster=`, `?fps=`, `?aufloesung=`, `?gpu=` | Anzeige für dieses Gerät, siehe „Anzeige und Leistung“. |
 | `?wetter=gewitter` | Wetter erzwingen: `gewitter`, `regen`, `nebel`, `klar` oder `schnee`. Gewitter kommt mit stark fallendem Luftdruck, Regen mit fallendem. |
 
 Beispiele:

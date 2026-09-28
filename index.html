@@ -166,26 +166,25 @@ function buildAq(){texAq=document.createElement('canvas');texAq.width=W;texAq.he
   for(let i=0;i<Math.round(W*H/40);i++){const v=r()<0.5?255:0;c.fillStyle=`rgba(${v},${v},${v},${0.05+r()*0.07})`;c.fillRect(r()*W,r()*H,1,1);}}
 // Anzeige (einstellbar in config.json unter "anzeige", 0 = automatisch):
 // raster_px = Größe einer normalen Rasterzelle in echten Bildschirmpixeln, aufl = interne Auflösung als Anteil der echten Pixel, max_fps = höchste Bildrate
-let ANZ={raster_px:0,max_fps:30,aufl:0},GROSS=false,PW=0,PH=0,RPX=0,AUFL=1;
-// Automatik für große Bildschirme (nur wenn raster_px bzw. interne_aufloesung auf "auto" stehen): misst nach dem Start einige Sekunden,
-// wie schnell das Gerät rechnet, und wählt das feinste Raster, das flüssig läuft. Kommt die Grafikkarte nicht mit, wird die interne Auflösung gesenkt.
-const AUTO={rpx:6,aufl:1,stufen:[6,8,10],runde:0, // nur Stufen mit gleichmäßigen Rasterlinien (bei 5 oder 7 px wäre jede vierte Linie anders breit)
-start:0,pro:[],abst:[],last:0,fertig:false};
-function autoTune(now,work){if(AUTO.fertig||!GROSS||(ANZ.raster_px>0&&ANZ.aufl>0)||!off)return;
-  if(!AUTO.start||now-AUTO.last>500){AUTO.start=now+3000;AUTO.pro=[];AUTO.abst=[];AUTO.last=now;return;} // Aufwärmen bzw. nach einer Pause neu messen
-  if(now>=AUTO.start){AUTO.pro.push(work/(off.width*off.height));AUTO.abst.push(now-AUTO.last);}AUTO.last=now;if(now-AUTO.start<4000)return;
-  const med=a=>a.sort((x,y)=>x-y)[a.length>>1],pro=med(AUTO.pro),abst=med(AUTO.abst),iv=1000/ANZ.max_fps,budget=0.55*iv; // gut die Hälfte der Bildzeit für die Rechnung
-  const zellen=r=>Math.ceil(PW/r)*Math.ceil(PH/r)*1.3; // normales Raster, 30 % Reserve für klare Tage mit feineren Zellen
-  let rpx=AUTO.rpx,aufl=AUTO.aufl;
-  if(!(ANZ.raster_px>0))rpx=AUTO.stufen.find(r=>pro*zellen(r)<=budget)||AUTO.stufen[AUTO.stufen.length-1];
-  if(!(ANZ.aufl>0)&&abst>1.2*iv&&pro*off.width*off.height<0.5*iv)aufl=aufl>0.75?0.75:0.5; // Rechnung schnell genug, Bilder trotzdem dauerhaft zu spät: Grafikkarte entlasten
-  AUTO.runde++;if((rpx===AUTO.rpx&&aufl===AUTO.aufl)||AUTO.runde>=3){AUTO.fertig=true;}
-  if(rpx!==AUTO.rpx||aufl!==AUTO.aufl){AUTO.rpx=rpx;AUTO.aufl=aufl;resize();AUTO.start=0;}}
+let ANZ={raster_px:0,max_fps:30,aufl:0},ANZ_SRC={},GROSS=false,PW=0,PH=0,RPX=0,AUFL=1;
+// Automatik (nur wenn die Rastergröße auf "auto" steht, auf jedem Bildschirm): beginnt mit dem feinsten Raster und misst laufend
+// alle 5 Sekunden die tatsächliche Bildrate. Liegt sie unter AUTO_MIN_FPS, wechselt sie auf die nächstgröbere Stufe (feiner erst wieder nach dem Neuladen).
+// Auf großen 4K-Bildschirmen senkt sie danach notfalls die interne Auflösung.
+const AUTO_MIN_FPS=25;
+const AUTO={stufe:0,aufl:1,start:0,n:0,last:0,fps:0};
+const autoStufen=dpr=>GROSS?[6,8,10]:[4,6,8].map(x=>x*dpr); // nur Stufen mit gleichmäßigen Rasterlinien
+function autoTune(now){const rAuto=!(ANZ.raster_px>0),aAuto=!(ANZ.aufl>0)&&GROSS;if(!rAuto&&!aAuto)return;
+  if(!AUTO.start||now-AUTO.last>500){AUTO.start=now+3000;AUTO.n=0;AUTO.last=now;return;} // Aufwärmen bzw. nach einer Pause neu messen
+  AUTO.last=now;if(now<AUTO.start)return;AUTO.n++;if(now-AUTO.start<5000)return;
+  AUTO.fps=AUTO.n*1000/(now-AUTO.start);AUTO.start=now;AUTO.n=0;
+  if(AUTO.fps>=Math.min(AUTO_MIN_FPS,0.83*ANZ.max_fps))return;
+  if(rAuto&&AUTO.stufe<autoStufen(window.devicePixelRatio||1).length-1){AUTO.stufe++;resize();AUTO.start=0;}
+  else if(aAuto&&AUTO.aufl>0.5){AUTO.aufl=AUTO.aufl>0.75?0.75:0.5;resize();AUTO.start=0;}}
 // Papiertextur einmal auf die benötigte Größe verkleinern statt in jedem Bild neu (gleiches Ergebnis, viel schneller)
 let TEXS=null;
 function texFor(src,w,h){if(!TEXS||TEXS.src!==src||TEXS.w!==w||TEXS.h!==h){const c=document.createElement('canvas');c.width=w;c.height=h;c.getContext('2d',{willReadFrequently:true}).drawImage(src,0,0,w,h);TEXS={src,w,h,c};}return TEXS.c;} // willReadFrequently: sonst mischt Chrome minimal anders
 function resize(){const dpr=window.devicePixelRatio||1;PW=innerWidth*dpr;PH=innerHeight*dpr;GROSS=Math.min(PW,PH)>=2000; // 4K-Bildschirm wie der Muse Frame
-  const rpx=RPX=ANZ.raster_px>0?ANZ.raster_px:GROSS?AUTO.rpx:4*dpr,aufl=AUFL=ANZ.aufl>0?ANZ.aufl:GROSS?AUTO.aufl:Math.min(1,2/dpr),U=rpx/4; // U = Bildschirmpixel pro Bildpunkt
+  const rpx=RPX=ANZ.raster_px>0?ANZ.raster_px:autoStufen(dpr)[AUTO.stufe],aufl=AUFL=ANZ.aufl>0?ANZ.aufl:GROSS?AUTO.aufl:Math.min(1,2/dpr),U=rpx/4; // U = Bildschirmpixel pro Bildpunkt
   W=PW/U;H=PH/U;if(Math.abs(W-Math.round(W))<1e-6)W=Math.round(W);if(Math.abs(H-Math.round(H))<1e-6)H=Math.round(H);
   cv.width=Math.round(PW*aufl);cv.height=Math.round(PH*aufl);DPR=cv.width/W;cv.style.imageRendering=GROSS||ANZ.aufl>0?'pixelated':'';buildTexture();buildAq();}
 addEventListener('resize',resize);resize();
@@ -711,7 +710,7 @@ function rasterClock(C,cs,gap,t,A){const snap=x=>Math.floor(x/cs)*cs,g=Math.max(
     const sm=mix(S.hor,[215,215,220],0.4);for(let i=1;i<=4;i++)cell(bx-(i-1)*cs,by-(4+i)*cs,sm,(0.45/i)*(0.6+0.4*Math.sin(t*2-i))*(1-0.5*night));if(dark)for(const i of[-3,-1,1])cell(bx+i*cs,by-2*cs,[255,215,140],0.95);}
   else{for(let i=-3;i<=3;i++)cell(bx+i*cs,by,hull);for(let i=-2;i<=1;i++)cell(bx+i*cs,by-cs,cab,dark?0.9:1);cell(bx,by-2*cs,chim);cell(bx-3*cs,by-2*cs,messe?[232,168,56]:mix([80,120,180],[0,0,0],1-L));}
   if(HELP){ctx.fillStyle='rgba(245,238,222,0.6)';for(let k=0;k<=12;k+=3)ctx.fillText(String(k*5),snap(xv(k))+cs/2,by+cs*(big?4:3));}}
-function drawRaster(t,A,d,st){
+function drawRaster(t,A,d,st){const p0=performance.now();
   const C=scene(t,A,d,st),RS=rasterState(C,st);STATE=RS.label;
   const cs=clamp(RS.cs,3,12),cols=Math.ceil(W/cs),rows=Math.ceil(H/cs),rare=activeRare(d);
   if(!off||off.width!==cols||off.height!==rows){off=document.createElement('canvas');off.width=cols;off.height=rows;offCtx=off.getContext('2d',{willReadFrequently:true});}
@@ -721,8 +720,8 @@ function drawRaster(t,A,d,st){
     L_clouds(c);L_far(c);if(rare.sonnwend)R_sonnwend(c,rare.sonnwend);W_rainbow(c);W_rain(c);L_mid(c);L_lake(c);if(rare.ice)R_ice(c,rare.ice);
     if(rare.aurora)softEllipse(W/2,c.hy+(H-c.hy)*0.12,W*0.6,(H-c.hy)*0.12,[70,230,140],0.1*rare.aurora*c.night);
     L_islands(c);if(rare.advent)R_advent(c,rare.advent);L_mist(c);if(rare.fire)R_fire(c,rare.fire);if(rare.glut)R_glut(c,rare.glut);
-    R_bells(c);L_beam(c);L_shore(c);L_finish(c,{...st,tex:0,vig:st.vig*0.7});W_lightning(c);img=readScene(off,cols,rows);}
-  finally{ctx=sc;W=sW;H=sH;LS=1;}
+    R_bells(c);L_beam(c);L_shore(c);L_finish(c,{...st,tex:0,vig:st.vig*0.7});W_lightning(c);var p1=performance.now();img=readScene(off,cols,rows);}
+  finally{ctx=sc;W=sW;H=sH;LS=1;}const p2=performance.now();
   const N=cols*rows;if(!CR||CR.length!==N*3)CR=new Float32Array(N*3);const cr=CR,hyRow=Math.floor(C.hy/cs),tq=Math.floor(t*3);
   // Schnell: was nur von Zeile, Spalte oder dem Drittelsekunden-Takt abhängt, wird einmal berechnet statt für jede Zelle (gleiches Ergebnis)
   const jit=RS.jitter>0?jitterMap(cols,rows,tq):null,smc=RS.smear>0?smearCols(cols):null,jA=RS.jitter,sm6=RS.smear*0.6;
@@ -741,6 +740,7 @@ function drawRaster(t,A,d,st){
       idx.sort((p,q)=>key[p]-key[q]);for(let j=0;j<Ls;j++){const o=(j*cols+i)*3,s=3*idx[j];cr[o]=tmp[s];cr[o+1]=tmp[s+1];cr[o+2]=tmp[s+2];}}}
   physics(C,cr,cols,rows,hyRow,t);seasonLayer(C,cr,cols,rows,hyRow,t,cs);
   const eMid=C.hr<1?C.hr*3600:-1,falling=st.rmode==='mix'&&eMid>=0&&eMid<85;if(falling)pixelFall(cr,cols,rows,hyRow,eMid,t);
+  const p3=performance.now();
   // Eine Farbe pro Rasterzelle; die Grafikkarte vergrößert danach auf Bildschirmgröße
   if(!buf||buf.width!==cols||buf.height!==rows){buf=document.createElement('canvas');buf.width=cols;buf.height=rows;bufCtx=buf.getContext('2d');bufImg=bufCtx.createImageData(cols,rows);bufU=new Uint32Array(bufImg.data.buffer);}
   const lx=C.lx,ly=C.dayMode?Math.min(C.sunY,C.hy):C.moonY,bg=RS.oneBit?[10,11,16]:mix(C.S.top,[0,0,0],0.72);
@@ -750,6 +750,9 @@ function drawRaster(t,A,d,st){
   const ph=t*1.4*(1+3*tens+bup),amp=0.2+0.25*tens+bua,oneBit=RS.oneBit,inv=RS.invert; // für alle Zellen gleich
   // Lichtwellen: sin(ph − Abstand/16) = sin(ph)·cos(Abstand/16) − cos(ph)·sin(Abstand/16), cos/sin je Zelle vorberechnet
   const WF=waveField(cols,rows,cs,C.hy,lx,ly),WC=WF.c,WS=WF.s,sp=Math.sin(ph),cp=Math.cos(ph);
+  // Auf der Grafikeinheit (WebGL2), wenn möglich; sonst die gleiche Rechnung hier im Prozessor
+  let src=GPU_WUNSCH?glCells(cols,rows,cr,WF,sp,cp,amp,oneBit,inv,avg,nAmt,scan,falling,eMid,pal):null;PERF.gpu=!!src;
+  if(!src){
   for(let j=0;j<rows;j++){const na=scan>=0?(j>scan?1:0):nAmt,row=j*cols;
     for(let i=0;i<cols;i++){const o=(row+i)*3;let r=cr[o],g=cr[o+1],b=cr[o+2];const lum=(0.3*r+0.59*g+0.11*b)/255,bt=BAYER[(i&3)+((j&3)<<2)]/16,mk=falling&&MASK[row+i];
       if(mk){if(eMid>=55){r=2;g=3;b=8;}}else{
@@ -759,15 +762,17 @@ function drawRaster(t,A,d,st){
       if(j===scan){r=lerp(r,255,0.5);g=lerp(g,255,0.5);b=lerp(b,255,0.5);}}
       const w=0.5+0.5*(sp*WC[row+i]-cp*WS[row+i]),f=(oneBit||mk)?1:0.9+amp*w*(0.4+0.6*Math.sqrt(lum));
       bufU[row+i]=(255<<24)|(Math.min(255,b*f)<<16)|(Math.min(255,g*f)<<8)|Math.min(255,r*f);}}
-  bufCtx.putImageData(bufImg,0,0);
+  bufCtx.putImageData(bufImg,0,0);src=buf;}
   // Zellen ohne Weichzeichnen auf Bildschirmgröße ziehen, dann die dunklen Rasterlinien. Deren Breite wird so verteilt,
   // dass ihr Flächenanteil auf jedem Bildschirm gleich bleibt (z. B. abwechselnd 1 und 2 Pixel bei 1,5).
-  const csP=cs*DPR,gP=RS.gap*DPR;ctx.setTransform(1,0,0,1,0,0);ctx.imageSmoothingEnabled=false;ctx.drawImage(buf,0,0,cols*csP,rows*csP);ctx.imageSmoothingEnabled=true;
+  const csP=cs*DPR,gP=RS.gap*DPR;ctx.setTransform(1,0,0,1,0,0);ctx.imageSmoothingEnabled=false;ctx.drawImage(src,0,0,cols*csP,rows*csP);ctx.imageSmoothingEnabled=true;
   if(gP>0){ctx.fillStyle=`rgb(${bg[0]|0},${bg[1]|0},${bg[2]|0})`;
     for(let i=1;i<=cols;i++){const e=Math.round(i*csP),w=Math.round(i*gP)-Math.round((i-1)*gP);if(w>0)ctx.fillRect(e-w,0,w,cv.height);}
     for(let j=1;j<=rows;j++){const e=Math.round(j*csP),w=Math.round(j*gP)-Math.round((j-1)*gP);if(w>0)ctx.fillRect(0,e-w,cv.width,w);}}
-  ctx.setTransform(DPR,0,0,DPR,0,0);
-  rasterClock(C,cs,RS.gap,t,A);extrasLayer(C,cs,t);familyLayer(C,cs,t);}
+  const p4=performance.now();ctx.setTransform(DPR,0,0,DPR,0,0);
+  rasterClock(C,cs,RS.gap,t,A);extrasLayer(C,cs,t);familyLayer(C,cs,t);
+  PERF.szene+=p1-p0;PERF.lesen+=p2-p1;PERF.zellen+=p3-p2;PERF.farben+=p4-p3;PERF.rest+=performance.now()-p4;}
+const PERF={szene:0,lesen:0,zellen:0,farben:0,rest:0,gpu:false}; // Zeitaufschlüsselung für die FPS-Anzeige
 // Zufallsversatz für "Nebel löst auf" und Unruhe: ändert sich dreimal pro Sekunde. Pro Takt einmal berechnen, den nächsten Takt schon vorab in Stücken.
 const JM={cols:0,rows:0,tq:NaN,a:null,b:null,next:NaN,fill:0};
 function jitterMap(cols,rows,tq){const N=cols*rows;
@@ -777,15 +782,15 @@ function jitterMap(cols,rows,tq){const N=cols*rows;
   const to=Math.min(N,JM.fill+Math.ceil(N/6));fill(JM.b,JM.next,JM.fill,to);JM.fill=to;return JM.a;}
 // Abstand jeder Zelle zu Sonne/Mond (im Wasser gestreckt) als cos/sin vorberechnen. Die Sonne wandert nur etwa 0,03 Bildpunkte
 // pro Sekunde: Das Feld gilt, bis sie 0,25 Bildpunkte weiter ist, und wird vorher stückweise im Hintergrund erneuert. Bei Sprüngen sofort.
-const WV={key:'',lx:0,ly:0,c:null,s:null,nc:null,ns:null,nlx:0,nly:0,fill:-1};
+const WV={ver:0,key:'',lx:0,ly:0,c:null,s:null,nc:null,ns:null,nlx:0,nly:0,fill:-1};
 function waveField(cols,rows,cs,hy,lx,ly){const N=cols*rows,key=cols+'|'+rows+'|'+cs+'|'+hy;
   const build=(c,s,x0,y0,from,to)=>{for(let q=from;q<to;q++){const i=q%cols,j=(q-i)/cols,y=j*cs+cs/2,dyb=y>hy?(y-hy)*1.6+(hy-y0):y-y0,dx=i*cs+cs/2-x0,dd=Math.sqrt(dx*dx+dyb*dyb)/16;c[q]=Math.cos(dd);s[q]=Math.sin(dd);}};
   if(WV.key!==key){WV.key=key;WV.c=new Float64Array(N);WV.s=new Float64Array(N);WV.nc=new Float64Array(N);WV.ns=new Float64Array(N);WV.fill=-1;WV.lx=NaN;}
   const dev=Math.max(Math.abs(lx-WV.lx),Math.abs(ly-WV.ly));
-  if(!(dev<=0.25)){build(WV.c,WV.s,lx,ly,0,N);WV.lx=lx;WV.ly=ly;WV.fill=-1;return WV;}
+  if(!(dev<=0.25)){build(WV.c,WV.s,lx,ly,0,N);WV.lx=lx;WV.ly=ly;WV.fill=-1;WV.ver++;return WV;}
   if(dev>0.1&&WV.fill<0){WV.fill=0;WV.nlx=lx;WV.nly=ly;}
   if(WV.fill>=0){const to=Math.min(N,WV.fill+Math.ceil(N/8));build(WV.nc,WV.ns,WV.nlx,WV.nly,WV.fill,to);WV.fill=to;
-    if(to===N){let x=WV.c;WV.c=WV.nc;WV.nc=x;x=WV.s;WV.s=WV.ns;WV.ns=x;WV.lx=WV.nlx;WV.ly=WV.nly;WV.fill=-1;}}
+    if(to===N){let x=WV.c;WV.c=WV.nc;WV.nc=x;x=WV.s;WV.s=WV.ns;WV.ns=x;WV.lx=WV.nlx;WV.ly=WV.nly;WV.fill=-1;WV.ver++;}}
   return WV;}
 // Szene-Pixel in einen wiederverwendeten Speicher lesen (über WebGL). getImageData legt jedes Mal neuen Speicher an; das zwingt den
 // Browser alle paar hundert Millisekunden zum Aufräumen, und genau dann stockt die Bewegung. Ohne WebGL: Rückfall auf getImageData.
@@ -800,6 +805,43 @@ function readScene(src,w,h){
   if(gl&&!gl.isContextLost())try{gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,src);gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,RB.tx,0);
     if(!RB.buf||RB.buf.length!==w*h*4)RB.buf=new Uint8Array(w*h*4);gl.readPixels(0,0,w,h,gl.RGBA,gl.UNSIGNED_BYTE,RB.buf);if(gl.getError()===gl.NO_ERROR)return RB.buf;}catch(e){}
   RB.gl=null;return src.getContext('2d').getImageData(0,0,w,h).data;}
+
+// ---------- Farben auf der Grafikeinheit (WebGL2) ----------
+// Rechnet die Endfarbe jeder Zelle (Nacht-Dither, 1-Bit, Negativ, Lichtwellen) im Grafikchip mit denselben Formeln wie die Schleife in drawRaster.
+// Grafikchips rechnen mit 32-Bit- statt 64-Bit-Zahlen: selten weicht eine Farbe um 1 von 255 Stufen ab. Ohne WebGL2 oder bei Fehlern: bisheriger Weg.
+let GPU_WUNSCH=true,GL=null;
+const GL_FS=`#version 300 es
+precision highp float;precision highp int;precision highp sampler2D;
+uniform sampler2D uCr,uWave,uMask;uniform float uSp,uCp,uAmp,uAvg,uEMid;uniform int uNaK,uScan,uOneBit,uInv,uFalling,uRows;uniform vec3 uPal[5];out vec4 o;
+const float BY[16]=float[16](0.,8.,2.,10.,12.,4.,14.,6.,3.,11.,1.,9.,15.,7.,13.,5.);
+void main(){int i=int(gl_FragCoord.x),j=uRows-1-int(gl_FragCoord.y);vec3 c=texelFetch(uCr,ivec2(i,j),0).rgb;float r=c.r,g=c.g,b=c.b;
+  float lum=(0.3*r+0.59*g+0.11*b)/255.,bt=BY[(i&3)+((j&3)<<2)]/16.;bool mk=uFalling==1&&texelFetch(uMask,ivec2(i,j),0).r>0.;
+  if(mk){if(uEMid>=55.){r=2.;g=3.;b=8.;}}else{int bk=int(BY[(i&3)+((j&3)<<2)]);bool dith=uScan>=0?j>uScan:bk<uNaK; // Dither-Schwelle als ganze Zahl: exakt wie im Prozessor
+    if(uOneBit==1){bool v=lum+(bt-0.5)*0.22>uAvg;r=v?228.:24.;g=v?224.:28.;b=v?210.:40.;}
+    else if(dith&&!(r>b+50.&&lum>0.3)){float b2=BY[((i+2)&3)+(((j+1)&3)<<2)]/16.;vec3 q=uPal[clamp(int(floor(lum*4.4+b2*0.9-0.25)),0,4)];r=q.r;g=q.g;b=q.b;}
+    if(uInv==1){r=r+(255.-r-r)*0.85;g=g+(255.-g-g)*0.85;b=b+(255.-b-b)*0.85;}
+    if(j==uScan){r=r+(255.-r)*0.5;g=g+(255.-g)*0.5;b=b+(255.-b)*0.5;}}
+  vec2 wv=texelFetch(uWave,ivec2(i,j),0).rg;float w=0.5+0.5*(uSp*wv.x-uCp*wv.y),f=(uOneBit==1||mk)?1.:0.9+uAmp*w*(0.4+0.6*sqrt(lum));
+  o=vec4(floor(min(vec3(255.),vec3(r,g,b)*f))/255.,1.);}`;
+function glInit(){GL={ok:false};try{const c=document.createElement('canvas'),gl=c.getContext('webgl2',{antialias:false,depth:false,stencil:false,alpha:false,preserveDrawingBuffer:false});if(!gl)return;
+  const sh=(t,src)=>{const x=gl.createShader(t);gl.shaderSource(x,src);gl.compileShader(x);if(!gl.getShaderParameter(x,gl.COMPILE_STATUS))throw new Error(gl.getShaderInfoLog(x));return x;};
+  const pr=gl.createProgram();gl.attachShader(pr,sh(gl.VERTEX_SHADER,'#version 300 es\nvoid main(){vec2 p=vec2(float((gl_VertexID<<1)&2),float(gl_VertexID&2));gl_Position=vec4(p*2.-1.,0.,1.);}'));
+  gl.attachShader(pr,sh(gl.FRAGMENT_SHADER,GL_FS));gl.linkProgram(pr);if(!gl.getProgramParameter(pr,gl.LINK_STATUS))throw new Error(gl.getProgramInfoLog(pr));gl.useProgram(pr);
+  const tex=unit=>{const t=gl.createTexture();gl.activeTexture(gl.TEXTURE0+unit);gl.bindTexture(gl.TEXTURE_2D,t);for(const p of [gl.TEXTURE_MIN_FILTER,gl.TEXTURE_MAG_FILTER])gl.texParameteri(gl.TEXTURE_2D,p,gl.NEAREST);
+    for(const p of [gl.TEXTURE_WRAP_S,gl.TEXTURE_WRAP_T])gl.texParameteri(gl.TEXTURE_2D,p,gl.CLAMP_TO_EDGE);return t;};
+  const U={};for(const n of ['uCr','uWave','uMask','uSp','uCp','uAmp','uAvg','uNaK','uEMid','uScan','uOneBit','uInv','uFalling','uRows','uPal'])U[n]=gl.getUniformLocation(pr,n);
+  gl.pixelStorei(gl.UNPACK_ALIGNMENT,1);GL={ok:true,c,gl,U,tCr:tex(0),tWave:tex(1),tMask:tex(2),w:0,h:0,wv:-1,wkey:'',wbuf:null};
+  gl.uniform1i(U.uCr,0);gl.uniform1i(U.uWave,1);gl.uniform1i(U.uMask,2);c.addEventListener('webglcontextlost',()=>{GL.ok=false;});}catch(e){console.warn('WebGL2 nicht nutzbar:',e.message);GL={ok:false};}}
+function glCells(cols,rows,cr,WF,sp,cp,amp,oneBit,inv,avg,nAmt,scan,falling,eMid,pal){if(!GL)glInit();if(!GL.ok)return null;const {gl,U,c}=GL;
+  try{const N=cols*rows,neu=GL.w!==cols||GL.h!==rows;if(neu){c.width=cols;c.height=rows;GL.w=cols;GL.h=rows;gl.viewport(0,0,cols,rows);GL.wv=-1;}
+    gl.activeTexture(gl.TEXTURE0);if(neu)gl.texImage2D(gl.TEXTURE_2D,0,gl.RGB32F,cols,rows,0,gl.RGB,gl.FLOAT,cr);else gl.texSubImage2D(gl.TEXTURE_2D,0,0,0,cols,rows,gl.RGB,gl.FLOAT,cr);
+    if(GL.wv!==WF.ver||GL.wkey!==WF.key){if(!GL.wbuf||GL.wbuf.length!==2*N)GL.wbuf=new Float32Array(2*N);const wb=GL.wbuf;for(let q=0;q<N;q++){wb[2*q]=WF.c[q];wb[2*q+1]=WF.s[q];}
+      gl.activeTexture(gl.TEXTURE1);gl.texImage2D(gl.TEXTURE_2D,0,gl.RG32F,cols,rows,0,gl.RG,gl.FLOAT,wb);GL.wv=WF.ver;GL.wkey=WF.key;}
+    if(falling){gl.activeTexture(gl.TEXTURE2);gl.texImage2D(gl.TEXTURE_2D,0,gl.R8,cols,rows,0,gl.RED,gl.UNSIGNED_BYTE,MASK);}
+    gl.uniform1f(U.uSp,sp);gl.uniform1f(U.uCp,cp);gl.uniform1f(U.uAmp,amp);gl.uniform1f(U.uAvg,avg);let naK=0;while(naK<16&&naK/16<nAmt)naK++;gl.uniform1i(U.uNaK,naK);gl.uniform1f(U.uEMid,eMid);
+    gl.uniform1i(U.uScan,scan);gl.uniform1i(U.uOneBit,oneBit?1:0);gl.uniform1i(U.uInv,inv?1:0);gl.uniform1i(U.uFalling,falling?1:0);gl.uniform1i(U.uRows,rows);gl.uniform3fv(U.uPal,pal.flat());
+    gl.drawArrays(gl.TRIANGLES,0,3);if(gl.isContextLost())throw new Error('Kontext verloren');return c;}
+  catch(e){console.warn('Grafikeinheit fällt aus, weiter im Prozessor:',e.message);GL.ok=false;return null;}}
 let SMC=null;function smearCols(cols){if(!SMC||SMC.length!==cols){SMC=new Uint8Array(cols);for(let i=0;i<cols;i++)SMC[i]=1+Math.floor(hsh(i,3,0)*3);}return SMC;}
 
 // ---------- Zeichnen ----------
@@ -860,9 +902,13 @@ function frame(now){
   drawChiemsee(now/1000,A,d,STYLES[study]);
   const work=performance.now()-w0;autoTune(now,work);
   if(!DEV)return; // Steuerleiste, Info-Zeile und FPS-Anzeige nur im Test-Modus
-  fpsN++;fpsW+=work;if(now-fpsT>=1000){if(fpsT){const au=GROSS&&!(ANZ.raster_px>0&&ANZ.aufl>0)?(AUTO.fertig?' · Automatik fertig':' · Automatik misst …'):'';
-    $('fps').textContent=Math.round(fpsN*1000/(now-fpsT))+' Bilder/s (max. '+ANZ.max_fps+') · '+(fpsW/fpsN).toFixed(1)+' ms Rechenzeit\nRaster '+(+RPX.toFixed(2))+' px'+(ANZ.raster_px>0?'':' (auto)')+' = '+(off?off.width+'×'+off.height:'?')+' Zellen\nintern '+cv.width+'×'+cv.height+' px ('+Math.round(AUFL*100)+' %'+(ANZ.aufl>0?'':', auto')+')'+au;}
-    fpsN=0;fpsW=0;fpsT=now;}
+  fpsN++;fpsW+=work;if(now-fpsT>=1000){if(fpsT){const q=k=>(PERF[k]/fpsN).toFixed(1),src=k=>ANZ_SRC[k]?' ('+ANZ_SRC[k]+')':' (auto)';
+    $('fps').textContent=Math.round(fpsN*1000/(now-fpsT))+' Bilder/s (max. '+ANZ.max_fps+(ANZ_SRC.max_fps?', '+ANZ_SRC.max_fps:'')+') · '+(fpsW/fpsN).toFixed(1)+' ms Rechenzeit\n'
+      +'Szene '+q('szene')+' · Auslesen '+q('lesen')+' · Zellen '+q('zellen')+' · Farben '+q('farben')+' · Rest '+q('rest')+' ms\n'
+      +'Raster '+(+RPX.toFixed(2))+' px'+src('raster_px')+' = '+(off?off.width+'×'+off.height:'?')+' Zellen · Farben per '+(PERF.gpu?'Grafikeinheit':'Prozessor')+'\n'
+      +'intern '+cv.width+'×'+cv.height+' px, '+Math.round(AUFL*100)+' %'+src('aufl')+' · Gerät '+innerWidth+'×'+innerHeight+' bei Pixeldichte '+(+(window.devicePixelRatio||1).toFixed(2))
+      +(AUTO.fps?' · gemessen '+Math.round(AUTO.fps)+' Bilder/s':'');}
+    fpsN=0;fpsW=0;fpsT=now;for(const k of ['szene','lesen','zellen','farben','rest'])PERF[k]=0;}
   if(mode!=='manual'||playing)toSliders(T);
   readout(d,A);
   {const el=$('cd');let txt='';if(playing&&speed===1){const hr=d.getHours()*3600+d.getMinutes()*60+d.getSeconds();if(hr>=86380)txt='Mitternacht in '+(86400-hr)+' s';else if(hr<85)txt='Pixelsturz';}if(el.textContent!==txt){el.textContent=txt;el.classList.toggle('on',!!txt);}}
@@ -895,8 +941,8 @@ function applyConfig(j){const bad=[],notes=[],obj=v=>!!v&&typeof v==='object'&&!
     if(n.bis-n.von>=n.min)FW=n;else bad.push('feuerwehrboot (Zeitfenster kürzer als die Dauer)');});
   part('eisvogel',e=>{KF={n:or(take(e.pro_tag,pZahl(0,12,true),'eisvogel pro_tag'),KF.n),min:or(take(e.minuten,pZahl(1,30,true),'eisvogel minuten'),KF.min)};});
   const autoOr=p=>v=>v==='auto'?0:p(v); // "auto" = automatisch (intern 0)
-  part('anzeige',a=>{ANZ={raster_px:or(take(a.raster_px,autoOr(pZahl(2,40)),'anzeige raster_px'),ANZ.raster_px),max_fps:or(take(a.max_fps,pZahl(5,120),'anzeige max_fps'),ANZ.max_fps),
-    aufl:or(take(a.interne_aufloesung,autoOr(pZahl(0.25,1)),'anzeige interne_aufloesung'),ANZ.aufl)};});
+  part('anzeige',a=>{const setA=(key,v,p,name)=>{const x=take(v,p,name);if(x!==undefined){ANZ[key]=x;if(x>0&&!(key==='max_fps'&&x===30))ANZ_SRC[key]='config.json';}};
+    setA('raster_px',a.raster_px,autoOr(pZahl(2,40)),'anzeige raster_px');setA('max_fps',a.max_fps,pZahl(5,120),'anzeige max_fps');setA('aufl',a.interne_aufloesung,autoOr(pZahl(0.25,1)),'anzeige interne_aufloesung');});
   part('wetter',w=>{WETTER={echt:or(take(w.echt,pJaNein,'wetter echt'),WETTER.echt),min:or(take(w.aktualisieren_minuten,pZahl(5,180),'wetter aktualisieren_minuten'),WETTER.min)};});
   const unk=Object.keys(j).filter(k=>k[0]!=='_'&&!CFG_KEYS.includes(k));if(unk.length)notes.push('unbekannt: '+unk.join(', '));
   const msg=[];if(bad.length)msg.push('ungültig: '+bad.join(', ')+' (dort gilt der Standard)');CFG_INFO=msg.concat(notes).length?'config.json: '+msg.concat(notes).join('; '):'';}
@@ -985,7 +1031,12 @@ function wxFetch(){if(!WETTER.echt)return Promise.resolve();let tm=0;
       .catch(fail).then(done);}
   catch(e){fail(e);done();return Promise.resolve();}}
 
-function start(){if(started)return;started=true;if(ANZ.raster_px||ANZ.aufl)resize();$('sname').textContent=ORT;document.title='Lichtzeit – '+ORT;toSliders(curT());setMode();keepAwake();requestAnimationFrame(frame);}
+// Die Adresse überschreibt die Anzeige-Einstellungen nur für dieses Gerät: ?raster=6&fps=30&aufloesung=0.5 (jeweils auch "auto"), ?gpu=0 oder 1
+function urlAnzeige(){const set=(k,key,p,auto)=>{const v=Q.get(k);if(v===null)return;const t=v.trim().toLowerCase(),x=t==='auto'?auto:p(+t.replace(',','.'));
+    if(x===null||t==='')URL_INFO.push('?'+k+'='+v+' ungültig');else{ANZ[key]=x;if(t==='auto')delete ANZ_SRC[key];else ANZ_SRC[key]='Adresse';}};
+  set('raster','raster_px',pZahl(2,40),0);set('fps','max_fps',pZahl(5,120),30);set('aufloesung','aufl',pZahl(0.25,1),0);
+  const g=Q.get('gpu');if(g!==null){if(['0','1','aus','an'].includes(g))GPU_WUNSCH=g==='1'||g==='an';else URL_INFO.push('?gpu='+g+' ungültig');}}
+function start(){if(started)return;started=true;urlAnzeige();if(ANZ.raster_px||ANZ.aufl)resize();$('sname').textContent=ORT;document.title='Lichtzeit – '+ORT;toSliders(curT());setMode();keepAwake();requestAnimationFrame(frame);}
 // Start: erst die Einstellungen, dann das Wetter (gespeicherter Stand sofort, neuen Abruf höchstens 3 s abwarten)
 function boot(){if(WX_FORCE)return null;wxLoad();const f=wxFetch();return WX&&wxAt(nowT())?null:Promise.race([f,new Promise(r=>setTimeout(r,3000))]);}
 setTimeout(start,8000); // Sicherheitsnetz: das Bild startet auf jeden Fall
