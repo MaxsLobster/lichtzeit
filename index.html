@@ -231,16 +231,21 @@ function scene(t,A,d,st){
     C.rainbow=(C.wtype===3?smooth(17,17.4,C.hr)*(1-smooth(18.2,18.6,C.hr)):(C.wtype===2&&C.wseed<0.4)?smooth(15.5,15.9,C.hr)*(1-smooth(16.8,17.2,C.hr)):0)*smooth(3,8,C.sa)*(C.sa<40?1:0);
     C.windStr=(0.25+0.75*C.wind)*(0.3+0.7*smooth(11,14,C.hr))*(1-smooth(18,20,C.hr))*(C.wtype===0?0.6:1);
   }else C.cloudList=cloudsAll(dayKey(d)).slice(0,1+Math.round(C.wx.cloud*6));
+  // Echtes Wetter ersetzt die simulierten Werte, sobald Daten für diesen Zeitpunkt vorliegen
+  const LW=st.mode==='weather'?wxAt(d.getTime()):null;C.live=LW;
+  if(LW){const grow=smooth(9,16,C.hr);C.wtype=LW.wtype;C.cgrow=lerp(LW.wtype===1?grow:0.3,1,LW.th);C.cscale=(0.85+C.cgrow*(0.45+0.45*LW.th))*lerp(0.9,1.2,LW.cloud/100);
+    C.cloudList=cloudsAll(dayKey(d)*5+1).slice(0,1+Math.round(clamp(LW.cloud/100,0.05,1)*6));C.storm=LW.storm;C.rain=LW.rain;C.windStr=LW.wind;
+    C.rainbow=LW.bow*smooth(REGENBOGEN.sonne_min,REGENBOGEN.sonne_min+5,C.sa)*(C.sa<REGENBOGEN.sonne_max?1:0);C.baroU=LW.baro;C.tempK=LW.tempK;}
   C.L=Math.max(0.22+0.78*smooth(-10,14,C.sa),0.22+0.22*C.S.lift)*(1-0.28*C.storm);
   if(C.storm>0){C.S={...C.S,top:mix(C.S.top,[88,92,104],C.storm*0.6),hor:mix(C.S.hor,[140,142,150],C.storm*0.5)};}
   C.haze=(C.wx.foehn&&st.mode!=='weather')?0.22:0.42+C.wx.haze*0.25;
-  C.mist=C.wx.mist*(C.hr<12?1-smooth(2,13,C.sa):0);C.hz=Math.min(0.95,C.haze+C.mist*0.5+st.hazeAdd+C.rain*0.15);
+  C.mist=LW?LW.mist:C.wx.mist*(C.hr<12?1-smooth(2,13,C.sa):0);C.hz=Math.min(0.95,C.haze+C.mist*0.5+st.hazeAdd+C.rain*0.15);
   C.farSc=H*0.17*(W<H?0.8:1);C.midSc=H*0.07;
   C.farCol=mix(mix([118,128,158],C.S.hor,C.hz),[0,0,0],1-C.L);C.midCol=mix(mix([48,66,60],C.S.hor,C.hz*0.6),[0,0,0],1-C.L);
   C.iy=C.hy+H*0.008;C.silh=mix(mix([22,30,30],C.S.hor,0.18),[0,0,0],(1-C.L)*0.6);C.hn=C.hr<12?C.hr+24:C.hr;C.rowY=C.hy+(H-C.hy)*0.4;
   C.pc=mix(mix([40,32,26],C.S.hor,0.15),[0,0,0],(1-C.L)*0.5);C.sunCol=mix([255,190,120],[255,245,225],smooth(0,15,C.sa));
   C.beamCol=C.dayMode?mix([255,180,110],[255,245,225],smooth(0,15,C.sa)):[212,222,242];
-  C.snowFall=(d.getMonth()===11&&d.getDate()>=24&&d.getDate()<=26)?0.55:(d.getMonth()===11&&C.hr>=17&&C.hr<22&&hsh(dayKey(d),1,2)<0.35)?0.3:0;
+  C.snowFall=Math.max((d.getMonth()===11&&d.getDate()>=24&&d.getDate()<=26)?0.55:(d.getMonth()===11&&C.hr>=17&&C.hr<22&&hsh(dayKey(d),1,2)<0.35)?0.3:0,LW?LW.snow:0);
   C.beamStr=(C.dayMode?Math.max(0.32,sStrOf(C.sa))*(1-0.4*C.storm):0.3+0.4*A.fraction);
   return C;
 }
@@ -283,7 +288,8 @@ function L_far(C){const {d,sa,S,hy,farSc,farCol,L}=C;
 function L_mid(C){ridgePath(MID,C.hy,C.midSc,1);ctx.fillStyle=rgba(C.midCol);ctx.fill();}
 function L_lake(C){const {t,sa,S,hy,L,farSc,midSc,farCol,midCol,st}=C;
   const lakeTop=mix(S.hor,S.top,0.25),lakeMid=mix(mix(S.top,[38,78,82],0.35*L),[0,0,0],0.15),lakeBot=mix(mix(S.top,[12,30,34],0.55),[0,0,0],0.3);
-  const g=ctx.createLinearGradient(0,hy,0,H);g.addColorStop(0,rgba(lakeTop));g.addColorStop(0.3,rgba(lakeMid));g.addColorStop(1,rgba(lakeBot));ctx.fillStyle=g;ctx.fillRect(0,hy,W,H-hy);
+  const tk=C.tempK||0,tint=c=>tk?mix(c,tk>0?[255,190,140]:[140,180,255],SEE_TEMP.staerke*Math.abs(tk)):c; // Temperatur färbt den See ganz leicht
+  const g=ctx.createLinearGradient(0,hy,0,H);g.addColorStop(0,rgba(tint(lakeTop)));g.addColorStop(0.3,rgba(tint(lakeMid)));g.addColorStop(1,rgba(tint(lakeBot)));ctx.fillStyle=g;ctx.fillRect(0,hy,W,H-hy);
   ctx.save();ctx.globalAlpha=0.26*(0.4+0.6*L);ridgePath(FAR,hy,farSc*0.55,-1);ctx.fillStyle=rgba(farCol);ctx.fill();ctx.globalAlpha=0.4*(0.4+0.6*L);ridgePath(MID,hy,midSc*0.6,-1);ctx.fillStyle=rgba(midCol);ctx.fill();ctx.restore();
   if(st.mode==='weather'&&C.dayMode&&sa>2){for(const c of C.cloudList){const {X,s}=cloudPos(C,c);softEllipse(X+W*0.06,hy+(H-hy)*(0.1+0.55*c.y),s*2.1,(H-hy)*0.07*(0.6+c.y),[14,28,38],0.22*smooth(2,12,sa));}}
   const flirr=1+0.7*smooth(25,40,sa)+C.windStr*0.6;
@@ -356,7 +362,7 @@ function W_rainbow(C){if(C.rainbow<0.02)return;const {hy,sa,lx}=C,ax=W-lx,ay=hy+
   ctx.save();ctx.beginPath();ctx.rect(0,0,W,hy);ctx.clip();const cols=[[255,80,70],[255,150,60],[255,225,90],[100,200,110],[80,140,255],[130,95,220]];
   cols.forEach((c,i)=>{ctx.strokeStyle=rgba(c,0.14*C.rainbow);ctx.lineWidth=R*0.02;ctx.beginPath();ctx.arc(ax,ay,R*(1-i*0.019),Math.PI,TAU);ctx.stroke();});ctx.restore();
 }
-function W_lightning(C){if(C.wtype!==3)return;const act=smooth(15.3,15.8,C.hr)*(1-smooth(17.4,17.9,C.hr));if(act<0.01)return;
+function W_lightning(C){if(C.wtype!==3)return;const act=C.live?C.live.th:smooth(15.3,15.8,C.hr)*(1-smooth(17.4,17.9,C.hr));if(act<0.01)return;
   const cyc=Math.floor(C.t/13),ph=C.t%13;if(ph>0.35)return;const r=rng(cyc*7+dayKey(C.d)),k=ph<0.08?1:ph<0.15?0.3:ph<0.22?0.8:0.2;
   ctx.fillStyle=`rgba(235,235,255,${0.16*k*act})`;ctx.fillRect(0,0,W,H);
   let x=W*(0.1+0.8*r()),y=C.hy*0.3;ctx.strokeStyle=`rgba(250,250,255,${0.75*k*act})`;ctx.lineWidth=1.4;ctx.beginPath();ctx.moveTo(x,y);
@@ -516,10 +522,14 @@ const BAYER=[0,8,2,10,12,4,14,6,3,11,1,9,15,7,13,5];
 const hsh=(a,b,c)=>{const x=Math.sin(a*127.1+b*311.7+c*74.7)*43758.5453;return x-Math.floor(x);};
 const PAL_N=[[6,8,20],[20,28,56],[44,58,100],[96,110,152],[196,204,222]],PAL_S=[[10,12,18],[40,46,60],[90,100,120],[170,180,195],[240,242,248]];
 function rasterState(C,st){const R={cs:4,gap:1,oneBit:false,silver:C.full,sort:0,invert:0,boot:-1,glitch:0,smear:0,jitter:0,drift:C.windStr*0.6,label:''},f=C.A.fraction;
-  if(st.rmode==='mix'){const w=wtypeOf(C.d),sa=C.sa,hr=C.hr,L=[];
-    if(w===4){R.smear=0.6;L.push('Regen: Pixel tropfen');}else if(w===3){R.glitch=Math.max(0.15,C.storm);L.push('Gewitter: Glitch');}
+  if(st.rmode==='mix'){const w=C.wtype!==undefined?C.wtype:wtypeOf(C.d),sa=C.sa,hr=C.hr,L=[];
+    if(w===4){R.smear=C.live?0.6*Math.min(1,C.rain/0.7):0.6;L.push('Regen: Pixel tropfen');}else if(w===3){R.glitch=Math.max(0.15,C.storm);L.push('Gewitter: Glitch');}
+    else if(w===2&&C.live&&C.live.snow>0.05)L.push('Schnee: Flocken fallen');
     else if(w===2){R.drift=Math.max(R.drift,0.8);L.push('Wechselhaft: Pixel verwehen');}else if(w===0){R.cs=3;R.gap=0;L.push('Klar: gestochen scharf');}else L.push('Heiter');
     if(C.mist>0.05){R.jitter=C.mist;L.push('Nebel löst auf');}
+    // Barometer: steigender Druck beruhigt, fallender Druck macht unruhig (nur mit echtem Wetter)
+    const bu=C.baroU||0;if(bu>0){R.jitter+=0.35*bu;R.drift+=0.5*bu;}else if(bu<0){R.jitter*=1+bu;R.drift*=1+bu;}
+    if(C.live&&C.live.trend&&C.live.trend!=='stabil')L.push('Luftdruck '+C.live.trend+(C.live.trend==='steigend'?': Raster beruhigt sich':C.live.trend==='fallend'?': Raster wird unruhig':': Sturmwarnung'));
     if(f>0.97){R.cs=3;R.gap=0;R.silver=true;L.push('Vollmond: Klarsicht und Silbernacht');}else if(f<0.04){R.cs=10;R.gap=1;R.oneBit=true;L.push('Neumond: 1-Bit');}
     if(hr<1){R.invert=1;if(!R.oneBit)R.cs=6;L.push('Geisterstunde: Negativ');}
     else if(hr<12&&sa>-8&&sa<3){R.boot=smooth(-8,3,sa);L.push('Morgen: Bild fährt hoch');}
@@ -544,7 +554,7 @@ function rasterState(C,st){const R={cs:4,gap:1,oneBit:false,silver:C.full,sort:0
   return R;}
 function physics(C,cr,cols,rows,hyRow,t){
   const put=(i,j,c,a)=>{if(i<0||j<0||i>=cols||j>=rows)return;const k=(j*cols+i)*3;cr[k]=lerp(cr[k],c[0],a);cr[k+1]=lerp(cr[k+1],c[1],a);cr[k+2]=lerp(cr[k+2],c[2],a);};
-  const sf=C.snowFall||0,winter=[11,0,1].includes(C.d.getMonth())||sf>0,amt=Math.max(C.rain,sf);
+  const sf=C.snowFall||0,winter=(!C.live&&[11,0,1].includes(C.d.getMonth()))||sf>0,amt=Math.max(C.rain,sf); // bei echtem Wetter: Schnee nur, wenn es wirklich schneit
   if(amt>0.05){const n=Math.round(amt*cols*(winter?1.2:0.9));
     for(let q=0;q<n;q++){const col=Math.floor(hsh(q,1,0)*cols),land=hyRow+1+Math.floor(hsh(q,3,0)*(rows-hyRow-2)),sp=winter?(6+hsh(q,4,0)*4):(28+hsh(q,2,0)*18),per=(land+8)/sp,ph=((t+hsh(q,5,0)*per)%per)/per,y=Math.floor(ph*(land+8))-8;
       if(winter){if(y>=0&&y<land)put(col+Math.round(Math.sin(t*0.8+q)*1.5),y,[245,245,250],0.85);}
@@ -686,6 +696,7 @@ function drawRaster(t,A,d,st){
   if(!buf||buf.width!==Wi||buf.height!==Hi){buf=document.createElement('canvas');buf.width=Wi;buf.height=Hi;bufCtx=buf.getContext('2d');bufImg=bufCtx.createImageData(Wi,Hi);bufU=new Uint32Array(bufImg.data.buffer);}
   const lx=C.lx,ly=C.dayMode?Math.min(C.sunY,C.hy):C.moonY,bg=RS.oneBit?[10,11,16]:mix(C.S.top,[0,0,0],0.72);bufU.fill((255<<24)|((bg[2]|0)<<16)|((bg[1]|0)<<8)|(bg[0]|0));
   let avg=0.5;if(RS.oneBit){let sm=0;for(let q=0;q<cr.length;q+=3)sm+=(0.3*cr[q]+0.59*cr[q+1]+0.11*cr[q+2])/255;avg=sm/(cr.length/3);}
+  const bu=C.baroU||0,bup=0.4*Math.max(0,bu),bua=0.1*bu; // Barometer: schnelleres und stärkeres Flirren bei fallendem Druck
   const tens=st.rmode==='mix'?smooth(23,24,C.hr):0,pal=RS.silver?PAL_S:PAL_N,nAmt=(st.rmode==='mix'&&C.hr>=12)?0:clamp((C.night-0.25)/0.6,0,1),scan=RS.boot>=0?Math.floor(rows*RS.boot):-1,sz=Math.max(1,cs-RS.gap);
   for(let j=0;j<rows;j++){const y=j*cs+cs/2,dyb=y>C.hy?(y-C.hy)*1.6+(C.hy-ly):y-ly,na=scan>=0?(j>scan?1:0):nAmt;
     for(let i=0;i<cols;i++){const o=(j*cols+i)*3;let r=cr[o],g=cr[o+1],b=cr[o+2];const lum=(0.3*r+0.59*g+0.11*b)/255,bt=BAYER[(i&3)+((j&3)<<2)]/16,mk=falling&&MASK[j*cols+i];
@@ -694,7 +705,7 @@ function drawRaster(t,A,d,st){
       else if(bt<na&&!(r>b+50&&lum>0.3)){const b2=BAYER[((i+2)&3)+(((j+1)&3)<<2)]/16,lv=clamp(Math.floor(lum*4.4+b2*0.9-0.25),0,4),p=pal[lv];r=p[0];g=p[1];b=p[2];}
       if(RS.invert){r=lerp(r,255-r,0.85);g=lerp(g,255-g,0.85);b=lerp(b,255-b,0.85);}
       if(j===scan){r=lerp(r,255,0.5);g=lerp(g,255,0.5);b=lerp(b,255,0.5);}}
-      const x=i*cs+cs/2,w=0.5+0.5*Math.sin(t*1.4*(1+3*tens)-Math.hypot(x-lx,dyb)/16),f=(RS.oneBit||mk)?1:0.9+(0.2+0.25*tens)*w*(0.4+0.6*Math.sqrt(lum)),
+      const x=i*cs+cs/2,w=0.5+0.5*Math.sin(t*1.4*(1+3*tens+bup)-Math.hypot(x-lx,dyb)/16),f=(RS.oneBit||mk)?1:0.9+(0.2+0.25*tens+bua)*w*(0.4+0.6*Math.sqrt(lum)),
         val=(255<<24)|(Math.min(255,b*f)<<16)|(Math.min(255,g*f)<<8)|Math.min(255,r*f),x0=i*cs,y0=j*cs;
       if(x0>=Wi)continue;const x1=Math.min(x0+sz,Wi);for(let yy=y0;yy<y0+sz&&yy<Hi;yy++){const rs=yy*Wi;bufU.fill(val,rs+x0,rs+x1);}}}
   bufCtx.putImageData(bufImg,0,0);ctx.setTransform(DPR,0,0,DPR,0,0);ctx.imageSmoothingEnabled=false;ctx.drawImage(buf,0,0,Wi,Hi);ctx.imageSmoothingEnabled=true;
@@ -728,7 +739,7 @@ let lastTxt='';
 function readout(d,A){
   const ds=d.toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'}),ts=d.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
   const wx=dayWeather(d),cel=[];
-  cel.push('Wetter: '+WT[wtypeOf(d)]);if(A.fraction>0.985)cel.push('Vollmond');if(isMesse(d))cel.push('Messetag');if(wx.shoot)cel.push('Sternschnuppennacht');for(const p of FAMILIE)if(isBday(p,d))cel.push('Geburtstag: '+p.name);if(isAnniv(d))cel.push('Hochzeitstag');{const V=visitorTimes(d);cel.push('Feuerwehr '+fmtM(V.fw)+', Eisvogel '+V.kf.map(fmtM).join(' / '));}if(adventLit(d))cel.push(adventLit(d)+'. Advent');if(STATE)cel.push(STATE);for(const ev of dayRare(d))cel.push(ev.n+' ('+Math.floor(ev.a)+'–'+(Math.floor(ev.b)%24)+' Uhr)');if(CFG_INFO)cel.push(CFG_INFO);
+  cel.push(wxText(d));if(A.fraction>0.985)cel.push('Vollmond');if(isMesse(d))cel.push('Messetag');if(wx.shoot)cel.push('Sternschnuppennacht');for(const p of FAMILIE)if(isBday(p,d))cel.push('Geburtstag: '+p.name);if(isAnniv(d))cel.push('Hochzeitstag');{const V=visitorTimes(d);cel.push('Feuerwehr '+fmtM(V.fw)+', Eisvogel '+V.kf.map(fmtM).join(' / '));}if(adventLit(d))cel.push(adventLit(d)+'. Advent');if(STATE)cel.push(STATE);for(const ev of dayRare(d))cel.push(ev.n+' ('+Math.floor(ev.a)+'–'+(Math.floor(ev.b)%24)+' Uhr)');if(CFG_INFO)cel.push(CFG_INFO);
   const txt=`${ds}, ${ts} Uhr. Mond ${Math.round(A.fraction*100)} % ${A.phase<0.5?'zunehmend':'abnehmend'}, Sonne ${Math.round(A.sun.alt/rad)}°`+(cel.length?` <span class="cel">${cel.join(', ')}</span>`:'');
   if(txt!==lastTxt){$('readout').innerHTML=txt;lastTxt=txt;}
 }
@@ -779,9 +790,73 @@ function loadConfig(){const ctl=window.AbortController?new AbortController():nul
     .then(s=>{let j;try{j=JSON.parse(s);}catch(e){throw new Error('Tippfehler in der Datei');}if(!started)applyConfig(j);})
     .catch(e=>{CFG_INFO='config.json nicht geladen ('+(e.name==='AbortError'?'Zeitüberschreitung':e instanceof TypeError?'keine Verbindung':e.message)+'), Standardwerte aktiv';})
     .then(()=>{clearTimeout(tm);if(CFG_INFO)console.warn(CFG_INFO);});}
+
+// ---------- Echtes Wetter (Open-Meteo) ----------
+// Holt regelmäßig das Wetter am Ort aus config.json und speichert den letzten Stand im Browser.
+// Ohne Daten (kein Internet, Abruf fehlgeschlagen, Stand zu alt) läuft das simulierte Wetter weiter.
+// Grenzwerte zum Anpassen:
+const WX_MAX_ALTER_H=6;                // so viele Stunden gilt ein gespeicherter Stand ohne neuen Abruf
+const WIND_RUHIG=5,WIND_STURM=35;      // km/h: darunter kein Wind im Bild, ab hier voller Wind
+const BARO={stunden:3,steigt:1,faellt:-1,stark:-3,ruhe:0.4,unruhe:0.35,sturm:0.8}; // Druckänderung in hPa über 3 h; ruhe/unruhe/sturm = wie stark das Raster reagiert
+const REGENBOGEN={sonne_min:3,sonne_max:40,wolken_max:70,nach_regen_h:1.25};      // Sonnenhöhe in Grad, Bewölkung in %, wie lange nach dem Regen
+const SEE_TEMP={kalt:0,warm:25,staerke:0.05};                                      // °C; staerke = wie deutlich der See kühler oder wärmer wirkt
+const WX_VARS='weather_code,cloud_cover,precipitation,rain,showers,snowfall,wind_speed_10m,temperature_2m,pressure_msl,visibility',WX_KEY='lichtzeit_wetter';
+let WX=null,WX_ERR='',WXM={ts:NaN,v:null};
+// Ein Messwert -> Bildwerte. per = Faktor auf "pro Stunde" (aktuelle Werte gelten für 15 Minuten, stündliche für eine Stunde)
+function wxDerive(r,per){const code=r.code;if(code===null||!isFinite(r.t))return null;
+  const thunder=code>=95,fog=code===45||code===48,snowC=(code>=71&&code<=77)||code===85||code===86,rainC=(code>=51&&code<=67)||(code>=80&&code<=82);
+  const snowCm=(r.snow||0)*per,liq=(r.rain!==null||r.sh!==null)?((r.rain||0)+(r.sh||0))*per:(snowCm>0?0:(r.pr||0)*per);
+  const cloud=r.cloud!==null?r.cloud:(code>=3?90:code>=1?40:5);
+  const rain=Math.max(liq>0.05?clamp(0.25+0.45*Math.sqrt(liq/3),0,1):0,rainC?0.3:0);        // mm/h -> Regenstärke
+  const snow=Math.max(snowCm>0.02?clamp(0.25+0.4*Math.sqrt(snowCm),0,1):0,snowC?0.3:0);      // cm/h -> Schneefall
+  const wtype=thunder?3:rainC?4:(snowC||fog||code===3)?2:(code===1||code===2)?1:code===0?0:cloud<20?0:cloud<60?1:2;
+  const mistV=r.vis===null?0:1-smooth(1000,6000,r.vis);                                       // schlechte Sicht -> Nebel
+  return{t:r.t,code,wtype,cloud,rain,snow,mm:liq,
+    storm:thunder?0.7:wtype===4?0.35+0.25*rain:snow>0?0.3:wtype===2?0.15:0,
+    mist:Math.max(fog?0.75:0,mistV*(rain>0.1||snow>0.1?0.5:1)),
+    wind:r.wind===null?0:clamp((r.wind-WIND_RUHIG)/(WIND_STURM-WIND_RUHIG),0,1),kmh:r.wind,th:thunder?1:0,temp:r.temp,p:r.p};}
+function wxBuild(j){const h=j&&j.hourly,c=j&&j.current;if(!h||!Array.isArray(h.time)||!h.time.length)throw new Error('unerwartete Antwort');
+  const num=v=>typeof v==='number'&&isFinite(v)?v:null;
+  const raw=(g,t)=>({t,code:g('weather_code'),cloud:g('cloud_cover'),pr:g('precipitation'),rain:g('rain'),sh:g('showers'),snow:g('snowfall'),wind:g('wind_speed_10m'),temp:g('temperature_2m'),p:g('pressure_msl'),vis:g('visibility')});
+  let S=h.time.map((t,i)=>wxDerive(raw(k=>num((h[k]||[])[i]),t*1000),1));
+  if(c&&num(c.time)!==null){const s=wxDerive(raw(k=>num(c[k]),c.time*1000),3600/(num(c.interval)||900));if(s)S=S.filter(q=>q&&Math.abs(q.t-s.t)>=6e5).concat(s);}
+  S=S.filter(Boolean).sort((a,b)=>a.t-b.t);if(!S.length)throw new Error('keine Wetterdaten');return S;}
+// Zwischen zwei Messwerten weich überblenden, damit sich das Bild nicht sprunghaft ändert
+function wxSeg(ts){const S=WX.S;if(ts<S[0].t||ts>S[S.length-1].t)return null;let i=0;while(i<S.length-2&&S[i+1].t<ts)i++;const a=S[i],b=S[Math.min(i+1,S.length-1)];return{a,b,u:b.t>a.t?clamp((ts-a.t)/(b.t-a.t),0,1):0};}
+const wxNum=(g,k)=>g.a[k]===null?g.b[k]:g.b[k]===null?g.a[k]:lerp(g.a[k],g.b[k],g.u);
+function wxCalc(ts){if(!WX||!WETTER.echt||WX.lat!==LAT||WX.lng!==LNG||Date.now()-WX.fetched>WX_MAX_ALTER_H*36e5)return null;
+  const g=wxSeg(ts);if(!g)return null;const n=g.u<0.5?g.a:g.b,o={code:n.code,wtype:n.wtype};
+  for(const k of['cloud','rain','snow','mm','storm','mist','wind','kmh','th','temp','p'])o[k]=wxNum(g,k);
+  // Barometer: Luftdruck jetzt minus Luftdruck vor 3 Stunden
+  const g0=wxSeg(ts-BARO.stunden*36e5),p0=g0?wxNum(g0,'p'):null,dp=o.dp=o.p!==null&&p0!==null?o.p-p0:null;
+  o.trend=dp===null?'':dp>BARO.steigt?'steigend':dp<BARO.stark?'stark fallend':dp<BARO.faellt?'fallend':'stabil';
+  o.baro=dp===null?0:BARO.unruhe*smooth(-BARO.faellt,0.5-BARO.faellt,-dp)+(BARO.sturm-BARO.unruhe)*smooth(-BARO.stark,0.5-BARO.stark,-dp)-BARO.ruhe*smooth(BARO.steigt,BARO.steigt+0.5,dp);
+  // Regenbogen: nur wenn es gerade aufgehört hat zu regnen und nicht zu bewölkt ist (Sonnenstand prüft scene)
+  let bow=0;if(o.rain<0.05&&o.snow<0.05){for(let h=1/12;h<=REGENBOGEN.nach_regen_h;h+=1/12){const q=wxSeg(ts-h*36e5);if(!q)break;if(wxNum(q,'rain')>=0.05){bow=1-smooth(REGENBOGEN.nach_regen_h*0.2,REGENBOGEN.nach_regen_h,h);break;}}
+    bow*=1-smooth(REGENBOGEN.wolken_max-10,REGENBOGEN.wolken_max+5,o.cloud);}
+  o.bow=bow;o.tempK=o.temp===null?0:clamp((o.temp-(SEE_TEMP.kalt+SEE_TEMP.warm)/2)/((SEE_TEMP.warm-SEE_TEMP.kalt)/2),-1,1);
+  return o;}
+function wxAt(ts){if(ts!==WXM.ts){WXM.ts=ts;WXM.v=wxCalc(ts);}return WXM.v;}
+function wxText(d){const w=wxAt(d.getTime()),f=(v,n=0)=>v===null?'?':v.toFixed(n).replace('.',',');
+  if(!w)return 'Wetter: '+WT[wtypeOf(d)]+' (simuliert'+(!WETTER.echt?', echtes Wetter aus':WX_ERR?', '+WX_ERR:'')+')';
+  const name=w.wtype===3?'Gewitter':w.snow>0.05?'Schnee':w.rain>0.05?'Regen':(w.code===45||w.code===48)?'Nebel':WT[w.wtype];
+  return 'Wetter (echt, Stand '+new Date(WX.fetched).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})+(WX_ERR?', '+WX_ERR:'')+'): '+name+', '+f(w.temp)+' °C, Wolken '+f(w.cloud)+' %, '+(w.mm>0.05?'Niederschlag '+f(w.mm,1)+' mm/h, ':'')+'Wind '+f(w.kmh)+' km/h, Luftdruck '+f(w.p)+' hPa'+(w.dp!==null?', '+w.trend+' ('+(w.dp>0?'+':'')+f(w.dp,1)+' hPa in '+BARO.stunden+' h)':'');}
+function wxLoad(){try{const c=JSON.parse(localStorage.getItem(WX_KEY)||'null');if(c&&c.lat===LAT&&c.lng===LNG&&c.j){WX={fetched:c.fetched,lat:LAT,lng:LNG,S:wxBuild(c.j)};WXM.ts=NaN;}}catch(e){}}
+function wxFetch(){if(!WETTER.echt)return Promise.resolve();let tm=0;
+  const done=()=>{clearTimeout(tm);setTimeout(wxFetch,(WX_ERR?Math.min(5,WETTER.min):WETTER.min)*6e4);},fail=e=>{WX_ERR='Abruf fehlgeschlagen: '+(e.name==='AbortError'?'Zeitüberschreitung':e instanceof TypeError?'keine Verbindung':e.message);console.warn(WX_ERR);};
+  try{const ctl=window.AbortController?new AbortController():null;tm=setTimeout(()=>{if(ctl)ctl.abort();},15000);
+    const url='https://api.open-meteo.com/v1/forecast?latitude='+LAT+'&longitude='+LNG+'&current='+WX_VARS+'&hourly='+WX_VARS+'&past_hours=24&forecast_hours=24&timezone=Europe%2FBerlin&timeformat=unixtime';
+    return fetch(url,{cache:'no-store',signal:ctl?ctl.signal:undefined})
+      .then(r=>{if(!r.ok)throw new Error('HTTP '+r.status);return r.json();})
+      .then(j=>{const S=wxBuild(j),now=Date.now();WX={fetched:now,lat:LAT,lng:LNG,S};WXM.ts=NaN;WX_ERR='';try{localStorage.setItem(WX_KEY,JSON.stringify({fetched:now,lat:LAT,lng:LNG,j}));}catch(e){}})
+      .catch(fail).then(done);}
+  catch(e){fail(e);done();return Promise.resolve();}}
+
 function start(){if(started)return;started=true;$('sname').textContent=ORT;document.title='Lichtzeit – '+ORT;toSliders(Date.now());setMode();requestAnimationFrame(frame);}
-setTimeout(start,5000); // Sicherheitsnetz: das Bild startet auf jeden Fall
-try{loadConfig().then(start,start);}catch(e){start();}
+// Start: erst die Einstellungen, dann das Wetter (gespeicherter Stand sofort, neuen Abruf höchstens 3 s abwarten)
+function boot(){wxLoad();const f=wxFetch();return WX&&wxAt(Date.now())?null:Promise.race([f,new Promise(r=>setTimeout(r,3000))]);}
+setTimeout(start,8000); // Sicherheitsnetz: das Bild startet auf jeden Fall
+try{loadConfig().then(boot).then(start,start);}catch(e){start();}
 </script>
 </body>
 </html>

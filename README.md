@@ -14,6 +14,32 @@ für einen 32-Zoll Muse Frame im Hochformat.
 - **Mond:** Der Mond zeigt seine echte Phase. Bei Vollmond wird das Bild klar
   und silbern, bei Neumond schaltet es auf 1-Bit.
 
+## Wetter und Barometer
+
+Lichtzeit holt alle 15 Minuten das echte Wetter am Chiemsee von
+[Open-Meteo](https://open-meteo.com) (kostenlos, ohne Anmeldung) und übersetzt
+es ins Bild:
+
+- **Wolken** – je mehr Bewölkung, desto mehr und größere Wolken
+- **Regen** – Pixelregen und Regenschleier, Pixel „tropfen“
+- **Schnee** – fallende Flocken
+- **Wind** – Pixel verwehen, Böenfelder auf dem See, Schilf wiegt sich
+- **Nebel, schlechte Sicht** – Pixel lösen sich auf
+- **Gewitter** – Glitch und Blitze. Kündigt sich ein Gewitter an, türmen sich die Wolken schon vorher auf.
+- **Regenbogen** – nur wenn es gerade aufgehört hat zu regnen, die Sonne
+  zwischen 3° und 40° hoch steht und weniger als etwa 70 % bewölkt ist
+- **Temperatur** – der See wirkt bei Kälte ganz leicht kühler, bei Wärme wärmer
+- **Barometer** – der Luftdruck-Trend der letzten 3 Stunden: Steigt er, wird
+  das Raster ruhiger. Fällt er, wird es unruhiger. Fällt er stark (mehr als
+  3 hPa), flirrt es deutlich, wie eine Sturmwarnung.
+
+Der letzte Stand wird im Browser gespeichert. Ist kein Internet da, läuft das
+Bild mit diesem Stand weiter. Ist er älter als 6 Stunden oder gibt es keinen,
+zeigt Lichtzeit das eingebaute, simulierte Wetter. Das Bild ist nie leer.
+
+Die Grenzwerte (Wind, Barometer, Regenbogen, See-Farbton) stehen gesammelt
+oben im Abschnitt „Echtes Wetter“ in `index.html`.
+
 ## Dateien
 
 - `index.html` – das Kunstwerk (eine Datei, ohne Build-Werkzeuge)
@@ -35,7 +61,7 @@ Alle veränderbaren Daten stehen in `config.json`. So änderst du sie:
 | `hochzeitstag` | An diesem Tag leuchten die ersten beiden Sterne golden. |
 | `feuerwehrboot` | Zeitfenster (`von`, `bis`) und Dauer in `minuten`. Die genaue Uhrzeit wird jeden Tag neu ausgelost. |
 | `eisvogel` | Wie oft am Tag (`pro_tag`, zwischen 7 und 19 Uhr) und wie lange (`minuten`). |
-| `wetter` | Echtes Wetter an/aus und wie oft es abgerufen wird. Wird mit dem Wetter-Schritt aktiv. |
+| `wetter` | `echt`: echtes Wetter an (`true`) oder aus (`false`). `aktualisieren_minuten`: wie oft das Wetter abgerufen wird (mindestens 5). |
 
 Regeln, damit nichts schiefgeht:
 
