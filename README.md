@@ -4,6 +4,8 @@ Ein generatives Kunstwerk: ein Pixel-Raster-Bild vom Chiemsee, das zugleich
 **Uhr** und **Mondphasen-Anzeige** ist. Es läuft dauerhaft im Browser, gedacht
 für einen 32-Zoll Muse Frame im Hochformat.
 
+**Adresse:** https://maxslobster.github.io/lichtzeit/
+
 ## So liest man die Uhr
 
 - **Stunde:** Der Lichtstrahl von Sonne (6–18 Uhr) oder Mond (18–6 Uhr) fällt
@@ -43,7 +45,7 @@ oben im Abschnitt „Echtes Wetter“ in `index.html`.
 ## Dateien
 
 - `index.html` – das Kunstwerk (eine Datei, ohne Build-Werkzeuge)
-- `config.json` – Einstellungen (Ort, Familie, Termine, Wetter)
+- `config.json` – Einstellungen (Ort, Familie, Termine, Wetter, Anzeige, Himmel)
 - `README.md` – diese Anleitung
 
 ## Einstellungen ändern
@@ -135,6 +137,32 @@ hellste Element.
 Im Test-Modus (`?dev=1`) nennt die Info-Zeile die sichtbaren Planeten, das
 Zeichen des Mondes und die Kamm-Punkte.
 
+### Geburtsdaten für die Kamm-Punkte nachreichen
+
+Die Geburtsdaten kommen **nie** ins Repo. Berechnet wird lokal auf dem Mac, ins
+Repo kommt nur das Ergebnis (`astro_punkte`). Das Werkzeug dafür liegt neben dem
+Repo im Ordner `gazers/werkzeuge/`.
+
+**Einfachster Weg:** In einer Claude-Code-Sitzung im Ordner `gazers` schreiben:
+„Berechne die Kamm-Punkte für Lichtzeit mit `werkzeuge/linien.js`, die
+Geburtsdaten schreibe ich dir gleich. Nichts davon ins Repo, danach die
+Eingabedatei löschen.“ Dann Datum, Uhrzeit und Ort für Stern 1, 2 und 3 angeben.
+
+**Selbst machen:**
+
+1. `werkzeuge/geburtsdaten.beispiel.json` kopieren, z. B. nach
+   `werkzeuge/geburtsdaten.json` (nicht in den Ordner `lichtzeit`!), und
+   Datum, Uhrzeit und Zeitzone des Geburtsorts eintragen (in Deutschland
+   `Europe/Berlin`, in Österreich `Europe/Vienna`).
+2. Im Terminal: `cd ~/Desktop/gazers/werkzeuge` und
+   `node linien.js geburtsdaten.json 6`
+3. Die ausgegebene Zeile `"astro_punkte": [...]` in `config.json` auf GitHub an
+   Stelle von `"astro_punkte": []` einsetzen (wie unter „Einstellungen ändern“).
+4. `geburtsdaten.json` wieder löschen.
+
+Die Uhrzeit sollte möglichst genau sein: 4 Minuten Unterschied verschieben eine
+Linie um rund 75 km.
+
 ## Uhrzeit
 
 Lichtzeit rechnet immer in Berliner Zeit, auch wenn am Gerät eine andere
@@ -169,3 +197,11 @@ Beispiele:
 - `https://maxslobster.github.io/lichtzeit/?dev=1`
 - `https://maxslobster.github.io/lichtzeit/?t=2026-12-24T18:00&wetter=schnee`
 - `https://maxslobster.github.io/lichtzeit/?t=23:58&dev=1` – zwei Minuten vor dem Pixelsturz
+
+## Stand
+
+Lichtzeit ist fertig und läuft. Die Kontroll-Screenshots der Abnahme (Mittag,
+Sonnenuntergang, 23:50, 0:00:20, Gewitter, Nebel, Schnee, Heiligabend) liegen
+lokal in `gazers/abnahme/`. Auf normalen Bildschirmen ist das Bild pixelgleich
+zum ursprünglichen Prototyp `lichtzeit.html`, wenn die Himmelselemente
+ausgeschaltet sind und der Prozessor rechnet (`?gpu=0`).
