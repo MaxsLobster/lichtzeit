@@ -99,6 +99,21 @@ const dayKey=d=>d.getFullYear()*10000+(d.getMonth()+1)*100+d.getDate();
 const isMesse=d=>false; // Messetag vorerst deaktiviert
 const SYN=29.530588853*864e5, NM0=Date.UTC(2000,0,6,18,14);
 const lunation=ts=>Math.floor((ts-NM0)/SYN);
+// ---------- Zeit: Lichtzeit rechnet immer in Berliner Zeit, egal welche Zeitzone das Gerät eingestellt hat ----------
+const TZ='Europe/Berlin';
+let CLOCK_OFF=0,CLOCK_SRC='';          // Korrektur in ms, falls die Geräteuhr stark falsch geht (aus Server-Zeitstempel oder Wetterdaten)
+const nowT=()=>Date.now()+CLOCK_OFF;
+const TZF=new Intl.DateTimeFormat('en-US',{timeZone:TZ,hourCycle:'h23',year:'numeric',month:'numeric',day:'numeric',hour:'numeric',minute:'numeric',second:'numeric'});
+function bParts(T){const o={};for(const p of TZF.formatToParts(T))o[p.type]=+p.value;o.hour%=24;return o;}
+// Date, dessen Felder (getHours, getDate …) die Berliner Uhrzeit zum Zeitpunkt T zeigen. Der echte Zeitpunkt steht in .T (für Sonne, Mond, Wetter).
+function wall(T){const p=bParts(T),ms=((T%1000)+1000)%1000,off=Date.UTC(p.year,p.month-1,p.day,p.hour,p.minute,p.second)-(T-ms);
+  let d=new Date(T);if(-d.getTimezoneOffset()*6e4!==off)d=new Date(p.year,p.month-1,p.day,p.hour,p.minute,p.second,ms);
+  // Seltener Fall: diese Berliner Uhrzeit gibt es in der Geräte-Zeitzone nicht (deren Sommerzeit-Sprung) – dann die Felder direkt setzen
+  if(d.getHours()!==p.hour||d.getDate()!==p.day){d.getHours=()=>p.hour;d.getDate=()=>p.day;d.getMonth=()=>p.month-1;d.getFullYear=()=>p.year;d.getDay=()=>new Date(Date.UTC(p.year,p.month-1,p.day)).getUTCDay();}
+  d.T=T;return d;}
+// Berliner Uhrzeit -> Zeitpunkt (Monat ab 0; Überlauf wie bei new Date erlaubt)
+function fromWall(y,m,d,h=0,mi=0,s=0){const w=Date.UTC(y,m,d,h,mi,s);let T=w;for(let i=0;i<2;i++){const p=bParts(T);T-=Date.UTC(p.year,p.month-1,p.day,p.hour,p.minute,p.second)-w;}return T;}
+const instant=d=>d.T!==undefined?d.T:d.getTime();
 function snowAmt(d){if(d.getMonth()===11){const doy=(d-new Date(d.getFullYear(),0,1))/864e5;return Math.max(0.75,clamp(Math.cos((doy-40)/365*TAU)*1.3-0.25,0,1));}const doy=(d-new Date(d.getFullYear(),0,1))/864e5;return clamp(Math.cos((doy-40)/365*TAU)*1.3-0.25,0,1);}
 
 // ---------- Astronomie (Sonne & Mond) ----------
@@ -235,7 +250,7 @@ function scene(t,A,d,st){
     C.windStr=(0.25+0.75*C.wind)*(0.3+0.7*smooth(11,14,C.hr))*(1-smooth(18,20,C.hr))*(C.wtype===0?0.6:1);
   }else C.cloudList=cloudsAll(dayKey(d)).slice(0,1+Math.round(C.wx.cloud*6));
   // Echtes Wetter ersetzt die simulierten Werte, sobald Daten für diesen Zeitpunkt vorliegen
-  const LW=st.mode==='weather'?wxAt(d.getTime()):null;C.live=LW;
+  const LW=st.mode==='weather'?wxAt(instant(d)):null;C.live=LW;
   if(LW){const grow=smooth(9,16,C.hr);C.wtype=LW.wtype;C.cgrow=lerp(LW.wtype===1?grow:0.3,1,LW.th);C.cscale=(0.85+C.cgrow*(0.45+0.45*LW.th))*lerp(0.9,1.2,LW.cloud/100);
     C.cloudList=LW.cloud<WOLKEN_KLAR?[]:cloudsAll(dayKey(d)*5+1).slice(0,1+Math.round(clamp((LW.cloud-WOLKEN_KLAR)/(100-WOLKEN_KLAR),0,1)*6));C.storm=LW.storm;C.rain=LW.rain;C.windStr=LW.wind;
     C.rainbow=LW.bow*smooth(REGENBOGEN.sonne_min,REGENBOGEN.sonne_min+5,C.sa)*(C.sa<REGENBOGEN.sonne_max?1:0);C.baroU=LW.baro;C.tempK=LW.tempK;}
@@ -726,24 +741,24 @@ const Q=new URLSearchParams(location.search),DEV=['1','true','ja'].includes(Q.ge
 if(DEV)document.body.classList.add('dev');
 // ?t= versteht "2026-12-24T17:30", "2026-12-24 17:30:20", "2026-12-24" (dann 12 Uhr) und "17:30" (heute). Die Zeit läuft von dort aus weiter.
 function parseT(s){s=s.trim();let m=/^(\d{4})-(\d{1,2})-(\d{1,2})(?:[T ](\d{1,2}):(\d{2})(?::(\d{2}))?)?$/.exec(s);
-  if(m)return new Date(+m[1],m[2]-1,+m[3],m[4]!==undefined?+m[4]:12,m[5]!==undefined?+m[5]:0,m[6]!==undefined?+m[6]:0).getTime();
-  m=/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/.exec(s);if(m){const n=new Date();return new Date(n.getFullYear(),n.getMonth(),n.getDate(),+m[1],+m[2],+(m[3]||0)).getTime();}return null;}
-let T_OFF=0;{const s=Q.get('t');if(s){const v=parseT(s);if(v===null||isNaN(v))URL_INFO.push('?t='+s+' nicht erkannt');else T_OFF=v-Date.now();}}
+  if(m)return fromWall(+m[1],m[2]-1,+m[3],m[4]!==undefined?+m[4]:12,m[5]!==undefined?+m[5]:0,m[6]!==undefined?+m[6]:0);
+  m=/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/.exec(s);if(m){const n=wall(nowT());return fromWall(n.getFullYear(),n.getMonth(),n.getDate(),+m[1],+m[2],+(m[3]||0));}return null;}
+let T_SIM=null;{const s=Q.get('t');if(s){const v=parseT(s);if(v===null||isNaN(v))URL_INFO.push('?t='+s+' nicht erkannt');else T_SIM={at:v,dev:Date.now()};}}
 let speed=3600,study=0,mode='live',manualT=0,playing=false,playT=0,last=performance.now(),lastDraw=0;
-const curT=()=>playing?playT:(mode==='manual'?manualT:Date.now()+T_OFF);
-function midnight(off){const n=new Date();return new Date(n.getFullYear(),n.getMonth(),n.getDate()+off);}
-function fromSliders(){const b=midnight(+$('day').value);b.setMinutes(+$('min').value);return b.getTime();}
-function toSliders(ts){const d=new Date(ts),n=new Date(),a=new Date(d.getFullYear(),d.getMonth(),d.getDate()),b=new Date(n.getFullYear(),n.getMonth(),n.getDate());$('day').value=Math.round((a-b)/864e5);$('min').value=d.getHours()*60+d.getMinutes();}
+const curT=()=>playing?playT:(mode==='manual'?manualT:T_SIM?T_SIM.at+(Date.now()-T_SIM.dev):nowT());
+function midnight(off){const n=wall(nowT());return fromWall(n.getFullYear(),n.getMonth(),n.getDate()+off);}
+function fromSliders(){const n=wall(nowT());return fromWall(n.getFullYear(),n.getMonth(),n.getDate()+(+$('day').value),0,+$('min').value);}
+function toSliders(ts){const d=wall(ts),n=wall(nowT()),a=new Date(d.getFullYear(),d.getMonth(),d.getDate()),b=new Date(n.getFullYear(),n.getMonth(),n.getDate());$('day').value=Math.round((a-b)/864e5);$('min').value=d.getHours()*60+d.getMinutes();}
 function setMode(m){$('now').classList.toggle('on',m==='live'&&!playing);$('play').classList.toggle('on',playing);$('play').textContent=playing?'Anhalten':'Zeitraffer';}
 document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{study=+b.dataset.s;document.querySelectorAll('.tabs button').forEach(x=>x.classList.toggle('on',x===b));$('sname').textContent=NAMES[study];});
 $('day').oninput=$('min').oninput=()=>{playing=false;mode='manual';manualT=fromSliders();setMode();};
-$('now').onclick=()=>{playing=false;mode='live';T_OFF=0;setMode();};
+$('now').onclick=()=>{playing=false;mode='live';T_SIM=null;setMode();};
 $('play').onclick=()=>{if(playing){playing=false;mode='manual';manualT=playT;}else{speed=3600;playT=curT();playing=true;}setMode();};
-$('mid').onclick=()=>{const n=new Date();speed=1;playT=new Date(n.getFullYear(),n.getMonth(),n.getDate()+1,0,0,0).getTime()-15000;playing=true;setMode();document.body.classList.add('clean');};
-$('fm').onclick=()=>{let best=0,bf=-1;const from=curT();for(let h=24;h<24*33;h++){const ts=from+h*36e5,f=astro(new Date(ts)).fraction;if(f>bf){bf=f;best=ts;}}const d=new Date(best);playing=false;mode='manual';manualT=new Date(d.getFullYear(),d.getMonth(),d.getDate(),21,30).getTime();setMode();};
+$('mid').onclick=()=>{speed=1;playT=midnight(1)-15000;playing=true;setMode();document.body.classList.add('clean');};
+$('fm').onclick=()=>{let best=0,bf=-1;const from=curT();for(let h=24;h<24*33;h++){const ts=from+h*36e5,f=astro(new Date(ts)).fraction;if(f>bf){bf=f;best=ts;}}const d=wall(best);playing=false;mode='manual';manualT=fromWall(d.getFullYear(),d.getMonth(),d.getDate(),21,30);setMode();};
 const _mf=()=>{const n=new Date();let m=new Date(n.getFullYear(),9,4,18,40);if(m.getTime()<Date.now()-864e5)m=new Date(n.getFullYear()+1,9,4,18,40);playing=false;mode='manual';manualT=m.getTime();setMode();};
 $('help').onclick=()=>{HELP=!HELP;$('help').classList.toggle('on',HELP);};
-$('rare').onclick=()=>{const from=new Date(curT());for(let o=1;o<400;o++){const d=new Date(from.getFullYear(),from.getMonth(),from.getDate()+o);const ev=dayRare(d).find(e=>e.r);if(ev){const h=ev.b>24?ev.a+0.6:(ev.a+ev.b)/2;playing=false;mode='manual';manualT=new Date(d.getFullYear(),d.getMonth(),d.getDate(),0,Math.round(h*60)).getTime();setMode();return;}}};
+$('rare').onclick=()=>{const from=wall(curT());for(let o=1;o<400;o++){const d=new Date(from.getFullYear(),from.getMonth(),from.getDate()+o);const ev=dayRare(d).find(e=>e.r);if(ev){const h=ev.b>24?ev.a+0.6:(ev.a+ev.b)/2;playing=false;mode='manual';manualT=fromWall(d.getFullYear(),d.getMonth(),d.getDate(),0,Math.round(h*60));setMode();return;}}};
 // Bildschirm wach halten (Wake Lock, wenn der Browser es kann). Nach dem Zurückkehren auf die Seite erneut anfordern.
 let wake=null;
 function keepAwake(){try{if(!wake&&navigator.wakeLock&&document.visibilityState==='visible')navigator.wakeLock.request('screen').then(w=>{wake=w;w.addEventListener('release',()=>{wake=null;});}).catch(()=>{});}catch(e){}}
@@ -751,13 +766,14 @@ document.addEventListener('visibilitychange',keepAwake);addEventListener('pointe
 // Tipp aufs Bild blendet die Steuerung aus, nur im Test-Modus. Im Ausstellungsmodus passiert bei Berührung nichts.
 if(DEV)cv.addEventListener('click',()=>document.body.classList.toggle('clean'));else addEventListener('contextmenu',e=>e.preventDefault());
 // Einmal täglich um 4:00 neu laden, damit Updates ankommen, aber nur, wenn die Seite gerade erreichbar ist (sonst in 10 Minuten wieder versuchen)
-let reloadAt=(()=>{const n=new Date(),r=new Date(n.getFullYear(),n.getMonth(),n.getDate(),4,0,0);if(r<=n)r.setDate(r.getDate()+1);return r.getTime();})();
-setInterval(()=>{if(Date.now()<reloadAt)return;reloadAt=Date.now()+10*6e4;fetch(location.href,{method:'HEAD',cache:'no-store'}).then(r=>{if(r.ok)location.reload();}).catch(()=>{});},3e4);
+let reloadAt=(()=>{const n=wall(nowT());let r=fromWall(n.getFullYear(),n.getMonth(),n.getDate(),4);if(r<=nowT())r=fromWall(n.getFullYear(),n.getMonth(),n.getDate()+1,4);return r;})();
+setInterval(()=>{if(nowT()<reloadAt)return;reloadAt=nowT()+10*6e4;fetch(location.href,{method:'HEAD',cache:'no-store'}).then(r=>{if(r.ok)location.reload();}).catch(()=>{});},3e4);
 let lastTxt='';
 function readout(d,A){
   const ds=d.toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'}),ts=d.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
   const wx=dayWeather(d),cel=[];
-  cel.push(wxText(d));if(A.fraction>0.985)cel.push('Vollmond');if(isMesse(d))cel.push('Messetag');if(wx.shoot)cel.push('Sternschnuppennacht');for(const p of FAMILIE)if(isBday(p,d))cel.push('Geburtstag: '+p.name);if(isAnniv(d))cel.push('Hochzeitstag');{const V=visitorTimes(d);cel.push('Feuerwehr '+fmtM(V.fw)+', Eisvogel '+V.kf.map(fmtM).join(' / '));}if(adventLit(d))cel.push(adventLit(d)+'. Advent');if(STATE)cel.push(STATE);for(const ev of dayRare(d))cel.push(ev.n+' ('+Math.floor(ev.a)+'–'+(Math.floor(ev.b)%24)+' Uhr)');if(CFG_INFO)cel.push(CFG_INFO);if(T_OFF&&mode==='live'&&!playing)cel.push('Zeit simuliert mit ?t=');if(URL_INFO.length)cel.push(URL_INFO.join(', '));
+  cel.push(wxText(d));if(A.fraction>0.985)cel.push('Vollmond');if(isMesse(d))cel.push('Messetag');if(wx.shoot)cel.push('Sternschnuppennacht');for(const p of FAMILIE)if(isBday(p,d))cel.push('Geburtstag: '+p.name);if(isAnniv(d))cel.push('Hochzeitstag');{const V=visitorTimes(d);cel.push('Feuerwehr '+fmtM(V.fw)+', Eisvogel '+V.kf.map(fmtM).join(' / '));}if(adventLit(d))cel.push(adventLit(d)+'. Advent');if(STATE)cel.push(STATE);for(const ev of dayRare(d))cel.push(ev.n+' ('+Math.floor(ev.a)+'–'+(Math.floor(ev.b)%24)+' Uhr)');if(CFG_INFO)cel.push(CFG_INFO);if(T_SIM&&mode==='live'&&!playing)cel.push('Zeit simuliert mit ?t=');if(URL_INFO.length)cel.push(URL_INFO.join(', '));
+  if(CLOCK_OFF)cel.push('Geräteuhr korrigiert um '+Math.round(CLOCK_OFF/6e4)+' min ('+CLOCK_SRC+')');if(DEV_TZ!==TZ)cel.push('Gerät steht auf Zeitzone '+DEV_TZ+', Lichtzeit rechnet in Berliner Zeit');
   const txt=`${ds}, ${ts} Uhr. Mond ${Math.round(A.fraction*100)} % ${A.phase<0.5?'zunehmend':'abnehmend'}, Sonne ${Math.round(A.sun.alt/rad)}°`+(cel.length?` <span class="cel">${cel.join(', ')}</span>`:'');
   if(txt!==lastTxt){$('readout').innerHTML=txt;lastTxt=txt;}
 }
@@ -765,7 +781,7 @@ function frame(now){
   requestAnimationFrame(frame);
   const dt=Math.min(0.1,(now-last)/1000);last=now;if(playing)playT+=dt*1000*speed;
   if(now-lastDraw<32)return;lastDraw=now;
-  const T=curT(),d=new Date(T),A=astro(d);
+  const T=curT(),d=wall(T),A=astro(new Date(T));
   ctx.setTransform(DPR,0,0,DPR,0,0);ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';
   drawChiemsee(now/1000,A,d,STYLES[study]);
   if(!DEV)return; // Steuerleiste und Info-Zeile nur im Test-Modus
@@ -803,9 +819,15 @@ function applyConfig(j){const bad=[],notes=[],obj=v=>!!v&&typeof v==='object'&&!
   part('wetter',w=>{WETTER={echt:or(take(w.echt,pJaNein,'wetter echt'),WETTER.echt),min:or(take(w.aktualisieren_minuten,pZahl(5,180),'wetter aktualisieren_minuten'),WETTER.min)};});
   const unk=Object.keys(j).filter(k=>k[0]!=='_'&&!CFG_KEYS.includes(k));if(unk.length)notes.push('unbekannt: '+unk.join(', '));
   const msg=[];if(bad.length)msg.push('ungültig: '+bad.join(', ')+' (dort gilt der Standard)');CFG_INFO=msg.concat(notes).length?'config.json: '+msg.concat(notes).join('; '):'';}
-function loadConfig(){const ctl=window.AbortController?new AbortController():null,tm=setTimeout(()=>{if(ctl)ctl.abort();},4000);
+// Geräteuhr prüfen: Weicht sie mehr als eine Minute vom Server-Zeitstempel ab, rechnet Lichtzeit mit der Serverzeit
+const CLOCK_MAX=60e3,DEV_TZ=(()=>{try{return Intl.DateTimeFormat().resolvedOptions().timeZone||'?';}catch(e){return '?';}})();
+function clockFromServer(r,t0,t1){const h=r&&r.headers&&r.headers.get('Date'),s=h?Date.parse(h):NaN;if(isNaN(s))return;
+  const off=s+500-(t0+t1)/2;CLOCK_OFF=Math.abs(off)>CLOCK_MAX?off:0;CLOCK_SRC='Server';} // +500: der Zeitstempel ist auf Sekunden abgerundet
+function clockCheck(){const t0=Date.now();fetch(location.href.split('#')[0],{method:'HEAD',cache:'no-store'}).then(r=>clockFromServer(r,t0,Date.now())).catch(()=>{});}
+setInterval(clockCheck,36e5);
+function loadConfig(){const ctl=window.AbortController?new AbortController():null,tm=setTimeout(()=>{if(ctl)ctl.abort();},4000),t0=Date.now();
   return fetch('config.json',{cache:'no-store',signal:ctl?ctl.signal:undefined})
-    .then(r=>{if(!r.ok)throw new Error(r.status===404?'Datei fehlt':'HTTP '+r.status);return r.text();})
+    .then(r=>{clockFromServer(r,t0,Date.now());if(!r.ok)throw new Error(r.status===404?'Datei fehlt':'HTTP '+r.status);return r.text();})
     .then(s=>{let j;try{j=JSON.parse(s);}catch(e){throw new Error('Tippfehler in der Datei');}if(!started)applyConfig(j);})
     .catch(e=>{CFG_INFO='config.json nicht geladen ('+(e.name==='AbortError'?'Zeitüberschreitung':e instanceof TypeError?'keine Verbindung':e.message)+'), Standardwerte aktiv';})
     .then(()=>{clearTimeout(tm);if(CFG_INFO)console.warn(CFG_INFO);});}
@@ -865,10 +887,10 @@ const WX_PRESETS={klar:{code:0,cloud:0,wind:6,temp:18,p:1022,vis:40000,dp:0},gew
 const WX_FORCE=(()=>{const k=(Q.get('wetter')||'').trim().toLowerCase(),x=WX_PRESETS[k];if(!k)return null;if(!x){URL_INFO.push('?wetter='+k+' unbekannt');return null;}
   const o=wxDerive({t:0,code:x.code,cloud:x.cloud,pr:null,rain:x.rain||0,sh:0,snow:x.snow||0,wind:x.wind,temp:x.temp,p:x.p,vis:x.vis},1);o.dp=x.dp;o.bow=0;o.name=k;return wxExtras(o);})();
 function wxAt(ts){if(ts!==WXM.ts){WXM.ts=ts;WXM.v=wxCalc(ts);}return WXM.v;}
-function wxText(d){const w=wxAt(d.getTime()),f=(v,n=0)=>v===null?'?':v.toFixed(n).replace('.',',');
+function wxText(d){const w=wxAt(instant(d)),f=(v,n=0)=>v===null?'?':v.toFixed(n).replace('.',',');
   if(!w)return 'Wetter: '+WT[wtypeOf(d)]+' (simuliert'+(!WETTER.echt?', echtes Wetter aus':WX_ERR?', '+WX_ERR:'')+')';
   const name=w.wtype===3?'Gewitter':w.snow>0.05?'Schnee':w.rain>0.05?'Regen':(w.code===45||w.code===48)?'Nebel':WT[w.wtype];
-  return (WX_FORCE?'Wetter (erzwungen mit ?wetter='+WX_FORCE.name+')':'Wetter (echt, Stand '+new Date(WX.fetched).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})+(WX_ERR?', '+WX_ERR:'')+')')+': '+name+', '+f(w.temp)+' °C, Wolken '+f(w.cloud)+' %, '+(w.mm>0.05?'Niederschlag '+f(w.mm,1)+' mm/h, ':'')+'Wind '+f(w.kmh)+' km/h, Luftdruck '+f(w.p)+' hPa'+(w.dp!==null?', '+w.trend+' ('+(w.dp>0?'+':'')+f(w.dp,1)+' hPa in '+BARO.stunden+' h)':'');}
+  return (WX_FORCE?'Wetter (erzwungen mit ?wetter='+WX_FORCE.name+')':'Wetter (echt, Stand '+new Date(WX.fetched+CLOCK_OFF).toLocaleTimeString('de-DE',{timeZone:TZ,hour:'2-digit',minute:'2-digit'})+(WX_ERR?', '+WX_ERR:'')+')')+': '+name+', '+f(w.temp)+' °C, Wolken '+f(w.cloud)+' %, '+(w.mm>0.05?'Niederschlag '+f(w.mm,1)+' mm/h, ':'')+'Wind '+f(w.kmh)+' km/h, Luftdruck '+f(w.p)+' hPa'+(w.dp!==null?', '+w.trend+' ('+(w.dp>0?'+':'')+f(w.dp,1)+' hPa in '+BARO.stunden+' h)':'');}
 function wxLoad(){try{const c=JSON.parse(localStorage.getItem(WX_KEY)||'null');if(c&&c.lat===LAT&&c.lng===LNG&&c.j){WX={fetched:c.fetched,lat:LAT,lng:LNG,S:wxBuild(c.j)};WXM.ts=NaN;}}catch(e){}}
 function wxFetch(){if(!WETTER.echt)return Promise.resolve();let tm=0;
   const done=()=>{clearTimeout(tm);setTimeout(wxFetch,(WX_ERR?Math.min(5,WETTER.min):WETTER.min)*6e4);},fail=e=>{WX_ERR='Abruf fehlgeschlagen: '+(e.name==='AbortError'?'Zeitüberschreitung':e instanceof TypeError?'keine Verbindung':e.message);console.warn(WX_ERR);};
@@ -876,13 +898,15 @@ function wxFetch(){if(!WETTER.echt)return Promise.resolve();let tm=0;
     const url='https://api.open-meteo.com/v1/forecast?latitude='+LAT+'&longitude='+LNG+'&current='+WX_VARS+'&hourly='+WX_VARS+'&past_hours=24&forecast_hours=24&timezone=Europe%2FBerlin&timeformat=unixtime';
     return fetch(url,{cache:'no-store',signal:ctl?ctl.signal:undefined})
       .then(r=>{if(!r.ok)throw new Error('HTTP '+r.status);return r.json();})
-      .then(j=>{const S=wxBuild(j),now=Date.now();WX={fetched:now,lat:LAT,lng:LNG,S};WXM.ts=NaN;WX_ERR='';try{localStorage.setItem(WX_KEY,JSON.stringify({fetched:now,lat:LAT,lng:LNG,j}));}catch(e){}})
+      .then(j=>{const S=wxBuild(j),now=Date.now();WX={fetched:now,lat:LAT,lng:LNG,S};WXM.ts=NaN;WX_ERR='';
+        // Ohne Server-Zeitstempel: grobe Uhrprüfung über den 15-Minuten-Zeitpunkt der Wetterdaten (nur bei mehr als 20 min Abweichung)
+        const ct=j.current&&j.current.time;if(CLOCK_SRC!=='Server'&&typeof ct==='number'){const off=ct*1000+450e3-now;if(Math.abs(off)>20*6e4){CLOCK_OFF=off;CLOCK_SRC='Wetterdaten';}}try{localStorage.setItem(WX_KEY,JSON.stringify({fetched:now,lat:LAT,lng:LNG,j}));}catch(e){}})
       .catch(fail).then(done);}
   catch(e){fail(e);done();return Promise.resolve();}}
 
 function start(){if(started)return;started=true;$('sname').textContent=ORT;document.title='Lichtzeit – '+ORT;toSliders(curT());setMode();keepAwake();requestAnimationFrame(frame);}
 // Start: erst die Einstellungen, dann das Wetter (gespeicherter Stand sofort, neuen Abruf höchstens 3 s abwarten)
-function boot(){if(WX_FORCE)return null;wxLoad();const f=wxFetch();return WX&&wxAt(Date.now())?null:Promise.race([f,new Promise(r=>setTimeout(r,3000))]);}
+function boot(){if(WX_FORCE)return null;wxLoad();const f=wxFetch();return WX&&wxAt(nowT())?null:Promise.race([f,new Promise(r=>setTimeout(r,3000))]);}
 setTimeout(start,8000); // Sicherheitsnetz: das Bild startet auf jeden Fall
 try{loadConfig().then(boot).then(start,start);}catch(e){start();}
 </script>
