@@ -63,6 +63,8 @@ Alle veränderbaren Daten stehen in `config.json`. So änderst du sie:
 | `eisvogel` | Wie oft am Tag (`pro_tag`, zwischen 7 und 19 Uhr) und wie lange (`minuten`). |
 | `wetter` | `echt`: echtes Wetter an (`true`) oder aus (`false`). `aktualisieren_minuten`: wie oft das Wetter abgerufen wird (mindestens 5). |
 | `anzeige` | Rastergröße, Bildrate und interne Auflösung, siehe unten. `"auto"` passt sich dem Bildschirm an. |
+| `astro` | Schalter für die Himmelselemente: `planeten`, `mond_zeichen`, `kamm_punkte` (je `true` oder `false`). |
+| `astro_punkte` | Die Lichtpunkte auf dem Bergkamm, siehe „Himmel“. |
 
 Regeln, damit nichts schiefgeht:
 
@@ -110,6 +112,28 @@ Mit `?dev=1` zeigt die Seite oben rechts, wie viele Bilder pro Sekunde
 tatsächlich gezeichnet werden, wie viele Millisekunden jeder Teil braucht
 (Szene, Auslesen, Zellen, Farben, Rest), welches Raster aktiv ist, ob die
 Grafikeinheit rechnet und mit welcher Auflösung der Browser des Geräts arbeitet.
+
+## Himmel
+
+Dezente Zusätze, keine Beschriftungen im Bild. Die Uhr bleibt immer das
+hellste Element.
+
+- **Planeten:** Venus (hellweiß), Mars (rötlich), Jupiter (cremefarben) und
+  Saturn (goldgelb) stehen an ihrer echten Stelle über dem Chiemsee, mit Blick
+  nach Süden: Osten links, Westen rechts. Man sieht sie nur, wenn sie über dem
+  Horizont und über den Bergen stehen und der Himmel dunkel genug ist, bei
+  Wolken, Nebel und Gewitter nicht.
+- **Mond in unseren Zeichen:** Steht der Mond im Sonnenzeichen eines
+  Familiensterns, schimmert dieser Stern leise. Das Sonnenzeichen ergibt sich
+  aus dem Geburtstag in `config.json`.
+- **Punkte auf dem Bergkamm:** Kleine Lichter für die nächsten
+  Astrokartographie-Linien der Familie. Osten links, Westen rechts; je näher die
+  Linie am Chiemsee verläuft, desto näher zur Bildmitte und desto heller. Nachts
+  sichtbar, tagsüber kaum. In `config.json` steht pro Punkt nur Stern, Planet,
+  Richtung und Entfernung in km, keine Geburtsdaten.
+
+Im Test-Modus (`?dev=1`) nennt die Info-Zeile die sichtbaren Planeten, das
+Zeichen des Mondes und die Kamm-Punkte.
 
 ## Uhrzeit
 

@@ -140,6 +140,39 @@ function astro(date){
   return{sun,moon,fraction:(1+Math.cos(inc))/2,phase:0.5+0.5*inc*(ang<0?-1:1)/Math.PI};
 }
 
+// ---------- Planeten und Mond im Tierkreis ----------
+// Nach Paul Schlyter, "How to compute planetary positions" (Bahnelemente mit Störungstermen, etwa 1–2 Bogenminuten genau,
+// geprüft gegen astronomy-engine). dd = Tage seit 31.12.1999 0 Uhr Weltzeit.
+const nrm360=x=>((x%360)+360)%360;
+const PLANETEN={venus:{N:[76.6799,2.46590e-5],i:[3.3946,2.75e-8],w:[54.8910,1.38374e-5],a:0.723330,e:[0.006773,-1.302e-9],M:[48.0052,1.6021302244]},
+  mars:{N:[49.5574,2.11081e-5],i:[1.8497,-1.78e-8],w:[286.5016,2.92961e-5],a:1.523688,e:[0.093405,2.516e-9],M:[18.6021,0.5240207766]},
+  jupiter:{N:[100.4542,2.76854e-5],i:[1.3030,-1.557e-7],w:[273.8777,1.64505e-5],a:5.20256,e:[0.048498,4.469e-9],M:[19.8950,0.0830853001]},
+  saturn:{N:[113.6634,2.38980e-5],i:[2.4886,-1.081e-7],w:[339.3939,2.97661e-5],a:9.55475,e:[0.055546,-9.499e-9],M:[316.9670,0.0334442282]}};
+function kepler(M,e){let E=M+e*Math.sin(M)*(1+e*Math.cos(M));for(let k=0;k<8;k++)E-=(E-e*Math.sin(E)-M)/(1-e*Math.cos(E));return E;}
+function bahn(N,i,w,a,e,M){const E=kepler(M,e),xv=a*(Math.cos(E)-e),yv=a*Math.sqrt(1-e*e)*Math.sin(E),v=Math.atan2(yv,xv),r=Math.hypot(xv,yv);
+  return{x:r*(Math.cos(N)*Math.cos(v+w)-Math.sin(N)*Math.sin(v+w)*Math.cos(i)),y:r*(Math.sin(N)*Math.cos(v+w)+Math.cos(N)*Math.sin(v+w)*Math.cos(i)),z:r*Math.sin(v+w)*Math.sin(i)};}
+const planetM=(k,dd)=>nrm360(PLANETEN[k].M[0]+PLANETEN[k].M[1]*dd);
+function planetHelio(k,dd){const p=PLANETEN[k],el=j=>p[j][0]+p[j][1]*dd;let h=bahn(el('N')*rad,el('i')*rad,el('w')*rad,p.a,el('e'),planetM(k,dd)*rad);
+  if(k==='jupiter'||k==='saturn'){const Mj=planetM('jupiter',dd)*rad,Ms=planetM('saturn',dd)*rad,s=x=>Math.sin(x*1),c=x=>Math.cos(x*1),g=rad;let dl=0,db=0;
+    if(k==='jupiter')dl=-0.332*s(2*Mj-5*Ms-67.6*g)-0.056*s(2*Mj-2*Ms+21*g)+0.042*s(3*Mj-5*Ms+21*g)-0.036*s(Mj-2*Ms)+0.022*c(Mj-Ms)+0.023*s(2*Mj-3*Ms+52*g)-0.016*s(Mj-5*Ms-69*g);
+    else{dl=0.812*s(2*Mj-5*Ms-67.6*g)-0.229*c(2*Mj-4*Ms-2*g)+0.119*s(Mj-2*Ms-3*g)+0.046*s(2*Mj-6*Ms-69*g)+0.014*s(Mj-3*Ms+32*g);db=-0.020*c(2*Mj-4*Ms-2*g)+0.018*s(2*Mj-6*Ms-49*g);}
+    const r=Math.hypot(h.x,h.y,h.z),lon=Math.atan2(h.y,h.x)+dl*rad,lat=Math.asin(h.z/r)+db*rad;h={x:r*Math.cos(lat)*Math.cos(lon),y:r*Math.cos(lat)*Math.sin(lon),z:r*Math.sin(lat)};}
+  return h;}
+function sonneGeo(dd){const w=(282.9404+4.70935e-5*dd)*rad,e=0.016709-1.151e-9*dd,M=nrm360(356.0470+0.9856002585*dd)*rad,E=kepler(M,e),xv=Math.cos(E)-e,yv=Math.sqrt(1-e*e)*Math.sin(E),v=Math.atan2(yv,xv),r=Math.hypot(xv,yv);
+  return{x:r*Math.cos(v+w),y:r*Math.sin(v+w)};}
+// Höhe und Himmelsrichtung eines Planeten über dem Chiemsee (Azimut von Norden über Osten, in Grad)
+function planetHimmel(k,T){const dd=T/864e5-10956,h=planetHelio(k,dd),s=sonneGeo(dd),x=h.x+s.x,y=h.y+s.y,z=h.z,ecl=(23.4393-3.563e-7*dd)*rad;
+  const ye=y*Math.cos(ecl)-z*Math.sin(ecl),ze=y*Math.sin(ecl)+z*Math.cos(ecl),ra=Math.atan2(ye,x),dec=Math.atan2(ze,Math.hypot(x,ye));
+  const d0=toDays(new Date(T)),Hh=rad*(280.46061837+360.98564736629*d0)+rad*LNG-ra,phi=rad*LAT; // genaue mittlere Sternzeit (IAU)
+  return{alt:ALT(Hh,phi,dec)/rad,az:nrm360((AZ(Hh,phi,dec)+Math.PI)/rad)};}
+// Ekliptikale Länge des Mondes (tropischer Tierkreis, Frühlingspunkt des Datums), in Grad
+function mondLaenge(T){const dd=T/864e5-10956,N=nrm360(125.1228-0.0529538083*dd),w=nrm360(318.0634+0.1643573223*dd),Mm=nrm360(115.3654+13.0649929509*dd);
+  const m=bahn(N*rad,5.1454*rad,w*rad,60.2666,0.054900,Mm*rad),Ms=nrm360(356.0470+0.9856002585*dd),Ls=Ms+282.9404+4.70935e-5*dd,Lm=Mm+w+N,D=(Lm-Ls)*rad,F=(Lm-N)*rad,mm=Mm*rad,ms=Ms*rad,s=Math.sin;
+  return nrm360(Math.atan2(m.y,m.x)/rad-1.274*s(mm-2*D)+0.658*s(2*D)-0.186*s(ms)-0.059*s(2*mm-2*D)-0.057*s(mm-2*D+ms)+0.053*s(mm+2*D)+0.046*s(2*D-ms)+0.041*s(mm-ms)-0.035*s(D)-0.031*s(mm+ms)-0.015*s(2*F-2*D)+0.011*s(mm-4*D));}
+const ZEICHEN=['Widder','Stier','Zwillinge','Krebs','Löwe','Jungfrau','Waage','Skorpion','Schütze','Steinbock','Wassermann','Fische'];
+// Sonnenzeichen aus dem Geburtstag 'MM-TT' (übliche Grenztage)
+function sonnenzeichen(mmdd){if(!mmdd)return -1;const [m,t]=mmdd.split('-').map(Number),v=m*100+t,G=[[120,10],[219,11],[321,0],[420,1],[521,2],[621,3],[723,4],[823,5],[923,6],[1023,7],[1122,8],[1222,9]];
+  let z=9;for(const [g,k] of G)if(v>=g)z=k;return z;}
 // ---------- Himmel ----------
 const SKY=[[-90,'#060a18','#0d1428'],[-18,'#060a18','#0d1428'],[-12,'#0b1430','#1b2646'],[-7,'#17284f','#3e4167'],[-3,'#28416f','#9c6c79'],[0,'#3b5b8b','#e28d5f'],[3,'#4d71a2','#efac6f'],[8,'#5e87b8','#eac99a'],[18,'#6592c2','#dcdcc8'],[35,'#5d8fc6','#d4e0e3'],[90,'#5389c4','#d0dfe7']].map(([a,t,h])=>[a,hex(t),hex(h)]);
 function sky(A){
@@ -625,9 +658,40 @@ function familyLayer(C,cs,t){const {d,sa,hy,night,L,S,hr}=C,snap=x=>Math.floor(x
   {const pos=[[0.395,0.24],[0.455,0.22],[0.428,0.3]];
     const an=isAnniv(d);FAMILIE.forEach((p,k)=>{const b=isBday(p,d)||(an&&k<2),c=b?gold:[236,238,248],sv2=b?Math.max(sv,0.65):sv,x=snap(W*(an&&k<2?lerp(pos[k][0],0.425,0.6):pos[k][0])),y=snap(hy*pos[k][1]),tw=0.7+0.3*Math.sin(t*(1.1+k*0.3)+k*2),s=cs,small=k===2;
       const ag=clamp((d-vBirth())/(365.25*864e5)/18,0,1);px(x,y,s,c,sv2*tw);if(small&&!b){for(const [dx,dy] of[[1,0],[-1,0],[0,1],[0,-1]])px(x+dx*s,y+dy*s,s,c,sv2*tw*0.35*ag);}if(!small||b){for(const [dx,dy] of[[1,0],[-1,0],[0,1],[0,-1]])px(x+dx*s,y+dy*s,s,c,sv2*tw*(b?0.7:0.35));}
-      if(b){for(const [dx,dy] of[[2,0],[-2,0],[0,2],[0,-2]])px(x+dx*s,y+dy*s,s,c,sv2*tw*0.3);}});}
+      if(b){for(const [dx,dy] of[[2,0],[-2,0],[0,2],[0,-2]])px(x+dx*s,y+dy*s,s,c,sv2*tw*0.3);}
+      if(ASTRO.mondStern[k]){const sh=0.5+0.5*Math.sin(t*0.8+k*1.7);for(const [dx,dy] of[[1,1],[-1,1],[1,-1],[-1,-1]])px(x+dx*s,y+dy*s,s,[214,222,246],sv2*0.22*sh);} // Mond im eigenen Sonnenzeichen: leises Schimmern
+      });}
 }
 
+// ---------- Astro-Ebene: Planeten, Mond im Tierkreis, Punkte auf dem Bergkamm ----------
+// Dezent: je eine Rasterzelle, dunkler als Uhr und Strahl. Keine Beschriftung im Bild (nur in der Info-Zeile bei ?dev=1).
+let ASTRO_AN={planeten:true,mond:true,kamm:true},KAMM=[];
+const PL_FARBE={sonne:[255,214,130],mond:[216,222,238],merkur:[190,198,212],venus:[252,250,242],mars:[232,112,82],jupiter:[240,222,184],saturn:[232,198,112],uranus:[160,220,228],neptun:[124,154,232],pluto:[184,152,172]};
+const PL_NAME={sonne:'Sonne',mond:'Mond',merkur:'Merkur',venus:'Venus',mars:'Mars',jupiter:'Jupiter',saturn:'Saturn',uranus:'Uranus',neptun:'Neptun',pluto:'Pluto'};
+// dunkel = Sonnenhöhe in Grad, ab der der Planet auftaucht (4° tiefer voll sichtbar); hell = höchste Deckkraft; gross = zarter Schein ringsum
+const PL_SICHT={venus:{dunkel:-2,hell:0.8,gross:true},jupiter:{dunkel:-4,hell:0.7,gross:true},mars:{dunkel:-6,hell:0.55},saturn:{dunkel:-6,hell:0.5}};
+const KAMM_MAX_KM=3000; // ab dieser Entfernung sitzt ein Kamm-Punkt ganz außen und ist am schwächsten
+const ASTRO={planeten:[],mondZ:-1,mondStern:[false,false,false],kamm:[]};
+const RICHTUNG8=az=>['N','NO','O','SO','S','SW','W','NW'][Math.round(az/45)%8];
+function astroLayer(C,cs,t){const T=instant(C.d),{hy,night,sa,farSc}=C,snap=x=>Math.floor(x/cs)*cs;
+  const px=(x,y,c,a)=>{if(a<0.01)return;ctx.fillStyle=rgba(c,a);ctx.fillRect(x+cs*0.06,y+cs*0.06,cs*0.88,cs*0.88);};
+  ASTRO.mondZ=Math.floor(mondLaenge(T)/30);ASTRO.mondStern=FAMILIE.map(p=>ASTRO_AN.mond&&sonnenzeichen(p.geburtstag)===ASTRO.mondZ);
+  const mitte=C.hr<1&&C.hr*3600<85?0:1,klar=mitte*(C.live?1-smooth(55,95,C.live.cloud):1)*(1-C.storm)*(1-0.7*C.mist); // beim Pixelsturz, unter Wolken, im Nebel unsichtbar
+  // Planeten an ihrer echten Stelle, Blick nach Süden: Osten links, Westen rechts; Höhe wie bei der Sonne
+  ASTRO.planeten=[];if(ASTRO_AN.planeten)for(const k in PL_SICHT){const p=planetHimmel(k,T),v=PL_SICHT[k],fx=(p.az-90)/180;p.k=k;p.sicht=false;ASTRO.planeten.push(p);
+    const a=v.hell*smooth(v.dunkel,v.dunkel-4,sa)*smooth(0.5,4,p.alt)*klar,y=C.altY(p.alt);
+    if(a<0.05||fx<0||fx>1||y>hy-rv(FAR,fx)*farSc-cs)continue; // unter dem Horizont, im Norden, zu hell oder hinter den Bergen
+    p.sicht=true;const X=snap(fx*W),Y=snap(y),tw=0.9+0.1*Math.sin(t*1.3+p.az);px(X,Y,PL_FARBE[k],a*tw);
+    if(v.gross)for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]])px(X+dx*cs,Y+dy*cs,PL_FARBE[k],a*0.18*tw);}
+  // Punkte auf dem Bergkamm (aus config.json): je näher am Chiemsee, desto näher zur Bildmitte und heller; nachts sichtbar, tagsüber kaum
+  if(ASTRO_AN.kamm){const belegt=new Set();for(const q of KAMM){const n=Math.min(1,q.km/KAMM_MAX_KM),side=q.richtung==='west'?1:-1,fx=0.5+side*(0.04+0.42*Math.sqrt(n));
+    let X=snap(fx*W);while(belegt.has(X))X+=side*cs;belegt.add(X);const fX=(X+cs/2)/W,Y=snap(hy-rv(FAR,fX)*farSc)-cs,a=lerp(0.85,0.3,n)*lerp(0.06,1,night)*mitte;
+    px(X,Y,PL_FARBE[q.planet]||[240,235,220],a*(0.85+0.15*Math.sin(t*0.7+q.km)));}}}
+function astroText(){const t=[];
+  if(ASTRO_AN.planeten){const s=ASTRO.planeten.filter(p=>p.sicht);t.push('Planeten: '+(s.length?s.map(p=>PL_NAME[p.k]+' '+RICHTUNG8(p.az)+' '+Math.round(p.alt)+'°').join(', '):'keiner sichtbar'));}
+  if(ASTRO.mondZ>=0){const st=FAMILIE.filter((p,k)=>ASTRO.mondStern[k]).map(p=>p.name);t.push('Mond in '+ZEICHEN[ASTRO.mondZ]+(st.length?' ('+st.join(', ')+' schimmert)':''));}
+  if(ASTRO_AN.kamm&&KAMM.length)t.push('Kamm: '+KAMM.map(q=>PL_NAME[q.planet]+' ('+(FAMILIE[q.stern-1]?FAMILIE[q.stern-1].name:'Stern '+q.stern)+', '+(q.richtung==='west'?'West':'Ost')+', '+q.km+' km)').join(', '));
+  return t.join(' · ');}
 // ---------- Besucher: Eisvogel und Feuerwehrboot, Dezember ----------
 // Zeitfenster in Minuten seit Mitternacht (Standard, config.json kann das ändern)
 let FW={von:14*60,bis:19*60,min:5},KF={n:3,min:5};
@@ -770,7 +834,7 @@ function drawRaster(t,A,d,st){const p0=performance.now();
     for(let i=1;i<=cols;i++){const e=Math.round(i*csP),w=Math.round(i*gP)-Math.round((i-1)*gP);if(w>0)ctx.fillRect(e-w,0,w,cv.height);}
     for(let j=1;j<=rows;j++){const e=Math.round(j*csP),w=Math.round(j*gP)-Math.round((j-1)*gP);if(w>0)ctx.fillRect(0,e-w,cv.width,w);}}
   const p4=performance.now();ctx.setTransform(DPR,0,0,DPR,0,0);
-  rasterClock(C,cs,RS.gap,t,A);extrasLayer(C,cs,t);familyLayer(C,cs,t);
+  astroLayer(C,cs,t);rasterClock(C,cs,RS.gap,t,A);extrasLayer(C,cs,t);familyLayer(C,cs,t); // Astro zuerst: die Uhr liegt immer obenauf
   PERF.szene+=p1-p0;PERF.lesen+=p2-p1;PERF.zellen+=p3-p2;PERF.farben+=p4-p3;PERF.rest+=performance.now()-p4;}
 const PERF={szene:0,lesen:0,zellen:0,farben:0,rest:0,gpu:false}; // Zeitaufschlüsselung für die FPS-Anzeige
 // Zufallsversatz für "Nebel löst auf" und Unruhe: ändert sich dreimal pro Sekunde. Pro Takt einmal berechnen, den nächsten Takt schon vorab in Stücken.
@@ -887,7 +951,7 @@ let lastTxt='';
 function readout(d,A){
   const ds=d.toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'}),ts=d.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
   const wx=dayWeather(d),cel=[];
-  cel.push(wxText(d));if(A.fraction>0.985)cel.push('Vollmond');if(isMesse(d))cel.push('Messetag');if(wx.shoot)cel.push('Sternschnuppennacht');for(const p of FAMILIE)if(isBday(p,d))cel.push('Geburtstag: '+p.name);if(isAnniv(d))cel.push('Hochzeitstag');{const V=visitorTimes(d);cel.push('Feuerwehr '+fmtM(V.fw)+', Eisvogel '+V.kf.map(fmtM).join(' / '));}if(adventLit(d))cel.push(adventLit(d)+'. Advent');if(STATE)cel.push(STATE);for(const ev of dayRare(d))cel.push(ev.n+' ('+Math.floor(ev.a)+'–'+(Math.floor(ev.b)%24)+' Uhr)');if(CFG_INFO)cel.push(CFG_INFO);if(T_SIM&&mode==='live'&&!playing)cel.push('Zeit simuliert mit ?t=');if(URL_INFO.length)cel.push(URL_INFO.join(', '));
+  cel.push(wxText(d));if(A.fraction>0.985)cel.push('Vollmond');if(isMesse(d))cel.push('Messetag');if(wx.shoot)cel.push('Sternschnuppennacht');for(const p of FAMILIE)if(isBday(p,d))cel.push('Geburtstag: '+p.name);if(isAnniv(d))cel.push('Hochzeitstag');{const V=visitorTimes(d);cel.push('Feuerwehr '+fmtM(V.fw)+', Eisvogel '+V.kf.map(fmtM).join(' / '));}if(adventLit(d))cel.push(adventLit(d)+'. Advent');if(STATE)cel.push(STATE);{const at=astroText();if(at)cel.push(at);}for(const ev of dayRare(d))cel.push(ev.n+' ('+Math.floor(ev.a)+'–'+(Math.floor(ev.b)%24)+' Uhr)');if(CFG_INFO)cel.push(CFG_INFO);if(T_SIM&&mode==='live'&&!playing)cel.push('Zeit simuliert mit ?t=');if(URL_INFO.length)cel.push(URL_INFO.join(', '));
   if(CLOCK_OFF)cel.push('Geräteuhr korrigiert um '+Math.round(CLOCK_OFF/6e4)+' min ('+CLOCK_SRC+')');if(DEV_TZ!==TZ)cel.push('Gerät steht auf Zeitzone '+DEV_TZ+', Lichtzeit rechnet in Berliner Zeit');
   const txt=`${ds}, ${ts} Uhr. Mond ${Math.round(A.fraction*100)} % ${A.phase<0.5?'zunehmend':'abnehmend'}, Sonne ${Math.round(A.sun.alt/rad)}°`+(cel.length?` <span class="cel">${cel.join(', ')}</span>`:'');
   if(txt!==lastTxt){$('readout').innerHTML=txt;lastTxt=txt;}
@@ -918,7 +982,7 @@ function frame(now){
 // Wird beim Start geladen. Fehlt ein Eintrag, gilt der eingebaute Standard. Ist einer fehlerhaft, ebenfalls, mit Hinweis in der Info-Zeile.
 // Einträge, die mit "_" beginnen, sind Notizen und werden ignoriert.
 let ORT='Chiemsee',WETTER={echt:true,min:15},CFG_INFO='',started=false;
-const CFG_KEYS=['ort','familie','hochzeitstag','feuerwehrboot','eisvogel','wetter','anzeige'];
+const CFG_KEYS=['ort','familie','hochzeitstag','feuerwehrboot','eisvogel','wetter','anzeige','astro','astro_punkte'];
 const pMMDD=v=>{const m=/^(\d{1,2})-(\d{1,2})$/.exec(String(v).trim());if(!m)return null;const a=+m[1],b=+m[2];return a>=1&&a<=12&&b>=1&&b<=31?String(a).padStart(2,'0')+'-'+String(b).padStart(2,'0'):null;};
 const pDatum=v=>v===''?'':pMMDD(v); // leer = kein Goldtag
 const pUhr=v=>{const m=/^(\d{1,2}):(\d{2})$/.exec(String(v).trim());if(!m)return null;const a=+m[1],b=+m[2];return b<60&&a*60+b<=1440?a*60+b:null;};
@@ -943,6 +1007,10 @@ function applyConfig(j){const bad=[],notes=[],obj=v=>!!v&&typeof v==='object'&&!
   const autoOr=p=>v=>v==='auto'?0:p(v); // "auto" = automatisch (intern 0)
   part('anzeige',a=>{const setA=(key,v,p,name)=>{const x=take(v,p,name);if(x!==undefined){ANZ[key]=x;if(x>0&&!(key==='max_fps'&&x===30))ANZ_SRC[key]='config.json';}};
     setA('raster_px',a.raster_px,autoOr(pZahl(2,40)),'anzeige raster_px');setA('max_fps',a.max_fps,pZahl(5,120),'anzeige max_fps');setA('aufl',a.interne_aufloesung,autoOr(pZahl(0.25,1)),'anzeige interne_aufloesung');});
+  part('astro',o=>{ASTRO_AN={planeten:or(take(o.planeten,pJaNein,'astro planeten'),ASTRO_AN.planeten),mond:or(take(o.mond_zeichen,pJaNein,'astro mond_zeichen'),ASTRO_AN.mond),kamm:or(take(o.kamm_punkte,pJaNein,'astro kamm_punkte'),ASTRO_AN.kamm)};});
+  if(j.astro_punkte!==undefined){if(!Array.isArray(j.astro_punkte))bad.push('astro_punkte');else{KAMM=[];j.astro_punkte.slice(0,8).forEach((q,n)=>{const nm='astro_punkte '+(n+1);
+    if(!obj(q)||!pZahl(1,3,true)(q.stern)||!PL_FARBE[q.planet]||!['ost','west'].includes(q.richtung)||pZahl(0,20000)(q.km)===null){bad.push(nm);return;}KAMM.push({stern:q.stern,planet:q.planet,richtung:q.richtung,km:Math.round(q.km)});});
+    if(j.astro_punkte.length>8)notes.push('nur die ersten 8 Kamm-Punkte werden gezeigt');}}
   part('wetter',w=>{WETTER={echt:or(take(w.echt,pJaNein,'wetter echt'),WETTER.echt),min:or(take(w.aktualisieren_minuten,pZahl(5,180),'wetter aktualisieren_minuten'),WETTER.min)};});
   const unk=Object.keys(j).filter(k=>k[0]!=='_'&&!CFG_KEYS.includes(k));if(unk.length)notes.push('unbekannt: '+unk.join(', '));
   const msg=[];if(bad.length)msg.push('ungültig: '+bad.join(', ')+' (dort gilt der Standard)');CFG_INFO=msg.concat(notes).length?'config.json: '+msg.concat(notes).join('; '):'';}

@@ -9,5 +9,7 @@
   "feuerwehrboot": { "von": "14:00", "bis": "19:00", "minuten": 5 },
   "eisvogel": { "pro_tag": 3, "minuten": 5 },
   "wetter": { "echt": true, "aktualisieren_minuten": 15 },
-  "anzeige": { "raster_px": "auto", "max_fps": 30, "interne_aufloesung": "auto" }
+  "anzeige": { "raster_px": "auto", "max_fps": 30, "interne_aufloesung": "auto" },
+  "astro": { "planeten": true, "mond_zeichen": true, "kamm_punkte": true },
+  "astro_punkte": []
 }
