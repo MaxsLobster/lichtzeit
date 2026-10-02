@@ -23,6 +23,8 @@ Lichtzeit holt alle 15 Minuten das echte Wetter am Chiemsee von
 es ins Bild:
 
 - **Wolken** – je mehr Bewölkung, desto mehr und größere Wolken; unter 10 % ist der Himmel ganz klar
+- **Bedeckt** (ab etwa 85 % Bewölkung) – geschlossene graue Decke, gedämpfte Farben, statt der Sonnenscheibe nur ein schwacher heller Fleck; der Strahl bleibt weich, aber ablesbar
+- **Hochnebel** (bedeckt, vor allem tiefe Wolken, Luftdruck ab etwa 1020 hPa, kein Regen) – die graue Decke liegt tief über dem See, die Berggipfel ragen oben heraus in die Sonne. Steigender Luftdruck heißt hier nicht „klarer“: Das Raster beruhigt sich dann nicht.
 - **Regen** – Pixelregen und Regenschleier, Pixel „tropfen“
 - **Schnee** – fallende Flocken
 - **Wind** – Pixel verwehen, Böenfelder auf dem See, Schilf wiegt sich
@@ -39,7 +41,7 @@ Der letzte Stand wird im Browser gespeichert. Ist kein Internet da, läuft das
 Bild mit diesem Stand weiter. Ist er älter als 6 Stunden oder gibt es keinen,
 zeigt Lichtzeit das eingebaute, simulierte Wetter. Das Bild ist nie leer.
 
-Die Grenzwerte (Wind, Barometer, Regenbogen, See-Farbton) stehen gesammelt
+Die Grenzwerte (Wind, Bedeckt, Hochnebel, Barometer, Regenbogen, See-Farbton) stehen gesammelt
 oben im Abschnitt „Echtes Wetter“ in `index.html`.
 
 ## Dateien
@@ -109,6 +111,7 @@ Original.
 | `fps=30` | höchste Bildrate |
 | `aufloesung=0.5` | interne Auflösung (oder `auto`) |
 | `gpu=0` | Farben im Prozessor statt in der Grafikeinheit (`gpu=1` = Grafikeinheit) |
+| `lesen=cpu` | Szene über den Prozessor auslesen statt über WebGL (`lesen=webgl`, `lesen=auto`). Standard: Lichtzeit misst nach dem Start beide Wege und nimmt den schnelleren. |
 
 Mit `?dev=1` zeigt die Seite oben rechts, wie viele Bilder pro Sekunde
 tatsächlich gezeichnet werden, wie viele Millisekunden jeder Teil braucht
@@ -189,8 +192,8 @@ Parameter werden an die Adresse angehängt: der erste mit `?`, weitere mit `&`.
 |---|---|
 | `?dev=1` | Test-Modus: Steuerleiste (Tag, Uhrzeit, Zeitraffer, Lesehilfe, Mitternacht ansehen, Seltenheit finden), Info-Zeile mit Wetter und Luftdruck-Trend, oben rechts die Bildrate. Ein Tipp aufs Bild blendet die Steuerung aus. |
 | `?t=2026-12-24T17:30` | Zeit simulieren. Die Uhr läuft ab diesem Moment weiter. Auch möglich: `?t=17:30` (heute) oder `?t=0:00:20`. |
-| `?raster=`, `?fps=`, `?aufloesung=`, `?gpu=` | Anzeige für dieses Gerät, siehe „Anzeige und Leistung“. |
-| `?wetter=gewitter` | Wetter erzwingen: `gewitter`, `regen`, `nebel`, `klar` oder `schnee`. Gewitter kommt mit stark fallendem Luftdruck, Regen mit fallendem. |
+| `?raster=`, `?fps=`, `?aufloesung=`, `?gpu=`, `?lesen=` | Anzeige für dieses Gerät, siehe „Anzeige und Leistung“. |
+| `?wetter=gewitter` | Wetter erzwingen: `gewitter`, `regen`, `nebel`, `klar`, `schnee`, `bedeckt` oder `hochnebel`. Gewitter kommt mit stark fallendem Luftdruck, Regen mit fallendem. |
 
 Beispiele:
 

@@ -297,7 +297,7 @@ function scene(t,A,d,st){
   C.hr=d.getHours()+d.getMinutes()/60+d.getSeconds()/3600;C.dayMode=C.hr>=6&&C.hr<18;C.v=C.dayMode?C.hr-6:((C.hr-18+24)%24);
   C.xv=q=>W*0.07+q/12*W*0.86;C.lx=C.xv(C.v);C.altY=a=>C.hy-a/60*C.hy*0.95;
   C.sunX=C.dayMode?C.lx:(A.sun.az/rad-90)/180*W;C.sunY=C.altY(C.sa);C.moonY=C.hy-(0.18+0.55*Math.sin(Math.PI*C.v/12))*C.hy*0.8;
-  C.storm=0;C.cgrow=0;C.cscale=1;C.rain=0;C.rainbow=0;C.windStr=0;
+  C.storm=0;C.cgrow=0;C.cscale=1;C.rain=0;C.rainbow=0;C.windStr=0;C.bedeckt=0;C.hochnebel=0;C.discDim=0;
   if(st.mode==='weather'){const r=rng(dayKey(d)*29+7),u=r();C.wtype=u<0.18?0:u<0.5?1:u<0.75?2:u<0.9?3:4;if(C.wtype===3&&(d.getMonth()<4||d.getMonth()>8))C.wtype=2;C.wind=r();C.wseed=r();
     const grow=smooth(9,16,C.hr),amt=[0.05,0.3+0.45*grow,0.75,0.3+0.7*grow,1][C.wtype];
     C.cgrow=(C.wtype===1||C.wtype===3)?grow:0.3;C.cscale=0.85+C.cgrow*(C.wtype===3?0.9:0.45);
@@ -310,12 +310,14 @@ function scene(t,A,d,st){
   // Echtes Wetter ersetzt die simulierten Werte, sobald Daten für diesen Zeitpunkt vorliegen
   const LW=st.mode==='weather'?wxAt(instant(d)):null;C.live=LW;
   if(LW){const grow=smooth(9,16,C.hr);C.wtype=LW.wtype;C.cgrow=lerp(LW.wtype===1?grow:0.3,1,LW.th);C.cscale=(0.85+C.cgrow*(0.45+0.45*LW.th))*lerp(0.9,1.2,LW.cloud/100);
-    C.cloudList=LW.cloud<WOLKEN_KLAR?[]:cloudsAll(dayKey(d)*5+1).slice(0,1+Math.round(clamp((LW.cloud-WOLKEN_KLAR)/(100-WOLKEN_KLAR),0,1)*6));C.storm=LW.storm;C.rain=LW.rain;C.windStr=LW.wind;
-    C.rainbow=LW.bow*smooth(REGENBOGEN.sonne_min,REGENBOGEN.sonne_min+5,C.sa)*(C.sa<REGENBOGEN.sonne_max?1:0);C.baroU=LW.baro;C.tempK=LW.tempK;}
+    // Bedeckt: graue Decke statt Einzelwolken. Hochnebel: Decke liegt tief, darüber zählen nur mittelhohe Wolken
+    const hn=LW.hn||0,bd=(LW.bedeckt||0)*(1-hn),cw=C.himmelWolke=hn>0.5?LW.oben:LW.cloud,nW=cw<WOLKEN_KLAR?0:1+Math.round(clamp((cw-WOLKEN_KLAR)/(100-WOLKEN_KLAR),0,1)*6);
+    C.cloudList=cloudsAll(dayKey(d)*5+1).slice(0,Math.round(nW*(1-bd)));C.storm=Math.max(LW.storm*(1-hn),0.32*bd);C.bedeckt=bd;C.hochnebel=hn;C.rain=LW.rain;C.windStr=LW.wind;
+    C.rainbow=LW.bow*smooth(REGENBOGEN.sonne_min,REGENBOGEN.sonne_min+5,C.sa)*(C.sa<REGENBOGEN.sonne_max?1:0);C.baroU=hn>0.5?Math.max(0,LW.baro):LW.baro;C.tempK=LW.tempK;} // bei Hochnebel heißt steigender Druck nicht "klarer"
   C.L=Math.max(0.22+0.78*smooth(-10,14,C.sa),0.22+0.22*C.S.lift)*(1-0.28*C.storm);
   if(C.storm>0){C.S={...C.S,top:mix(C.S.top,[88,92,104],C.storm*0.6),hor:mix(C.S.hor,[140,142,150],C.storm*0.5)};}
   C.haze=(C.wx.foehn&&st.mode!=='weather')?0.22:0.42+C.wx.haze*0.25;
-  C.mist=LW?LW.mist:C.wx.mist*(C.hr<12?1-smooth(2,13,C.sa):0);C.hz=Math.min(0.95,C.haze+C.mist*0.5+st.hazeAdd+C.rain*0.15);
+  C.mist=LW?LW.mist:C.wx.mist*(C.hr<12?1-smooth(2,13,C.sa):0);C.hz=Math.min(0.95,C.haze+C.mist*0.5+st.hazeAdd+C.rain*0.15+C.bedeckt*0.12)*(1-0.65*C.hochnebel); // über dem Hochnebel ist die Luft klar
   C.farSc=H*0.17*(W<H?0.8:1);C.midSc=H*0.07;
   C.farCol=mix(mix([118,128,158],C.S.hor,C.hz),[0,0,0],1-C.L);C.midCol=mix(mix([48,66,60],C.S.hor,C.hz*0.6),[0,0,0],1-C.L);
   C.iy=C.hy+H*0.008;C.silh=mix(mix([22,30,30],C.S.hor,0.18),[0,0,0],(1-C.L)*0.6);C.hn=C.hr<12?C.hr+24:C.hr;C.rowY=C.hy+(H-C.hy)*0.4;
@@ -323,6 +325,8 @@ function scene(t,A,d,st){
   C.beamCol=C.dayMode?mix([255,180,110],[255,245,225],smooth(0,15,C.sa)):[212,222,242];
   C.snowFall=Math.max((d.getMonth()===11&&d.getDate()>=24&&d.getDate()<=26)?0.55:(d.getMonth()===11&&C.hr>=17&&C.hr<22&&hsh(dayKey(d),1,2)<0.35)?0.3:0,LW?LW.snow:0);
   C.beamStr=(C.dayMode?Math.max(0.32,sStrOf(C.sa))*(1-0.4*C.storm):0.3+0.4*A.fraction);
+  if(C.bedeckt||C.hochnebel){C.nebelTop=C.hy-C.farSc*0.42;const discY=C.dayMode?C.sunY:C.moonY,unter=C.hochnebel*smooth(C.nebelTop-12,C.nebelTop+4,discY);
+    C.discDim=Math.max(C.bedeckt,unter);C.beamStr*=lerp(1,0.6,Math.max(C.bedeckt,C.hochnebel));} // Strahl weich, aber ablesbar
   return C;
 }
 function ridgePath(a,hy,sc,f){ctx.beginPath();ctx.moveTo(0,hy);const n=a.length-1;for(let i=0;i<=n;i++)ctx.lineTo(i/n*W,hy-f*a[i]*sc);ctx.lineTo(W,hy);ctx.closePath();}
@@ -427,6 +431,20 @@ function L_finish(C,st){const {S,sa,mn}=C;
   const vg=ctx.createRadialGradient(W/2,H/2,mn*0.3,W/2,H/2,Math.hypot(W,H)*0.62);vg.addColorStop(0,'rgba(0,0,0,0)');vg.addColorStop(1,`rgba(10,8,5,${st.vig})`);ctx.fillStyle=vg;ctx.fillRect(0,0,W,H);
 }
 
+// ---------- Bedeckt und Hochnebel ----------
+// Bedeckt: geschlossene graue Decke über dem ganzen Himmel, nur ein schwacher heller Fleck, wo Sonne oder Mond stehen.
+function W_decke(C){const k=C.bedeckt;if(!(k>0.01))return;const {hy,S,mn,lx,dayMode,sunY,moonY,hr,night}=C,li=clamp((C.L-0.2)/0.8,0,1);
+  const top=mix([30,32,38],[140,144,152],li),hor=mix(mix([42,44,50],[182,184,188],li),S.hor,0.15),g=ctx.createLinearGradient(0,0,0,hy);
+  g.addColorStop(0,rgba(top,0.92*k));g.addColorStop(1,rgba(hor,0.92*k));ctx.fillStyle=g;ctx.fillRect(0,0,W,hy+1);
+  for(let b=0;b<6;b++){const x=((b*0.37+hr*0.006)%1.3-0.15)*W,y=hy*(0.12+0.13*b),c=b%2?mix(top,[0,0,0],0.25):mix(hor,[255,255,255],0.12);softEllipse(x,y,W*0.55,hy*0.05,c,0.22*k);} // ruhige Wolkenstruktur
+  const fy=dayMode?Math.min(sunY,hy-2):moonY;if(fy<hy)softEllipse(lx,fy,mn*0.11,mn*0.08,[236,234,228],(dayMode?0.22:0.12*(1-0.5*night))*k*smooth(-6,4,dayMode?C.sa:10));}
+// Hochnebel: graue Decke tief über dem See, Berggipfel ragen oben heraus in die Sonne.
+function W_hochnebel(C){const k=C.hochnebel;if(!(k>0.01))return;const {hy,S,nebelTop,farSc,hr}=C,li=clamp((C.L-0.2)/0.8,0,1);
+  const obenC=mix(mix([60,62,68],[238,236,232],li),S.hor,0.2),untenC=mix([44,46,52],[172,176,182],li),g=ctx.createLinearGradient(0,nebelTop-farSc*0.06,0,hy+1);
+  g.addColorStop(0,rgba(obenC,0));g.addColorStop(0.12,rgba(obenC,0.96*k));g.addColorStop(1,rgba(untenC,0.96*k));ctx.fillStyle=g;
+  ctx.beginPath();ctx.moveTo(0,hy+1);for(let i=0;i<=48;i++){const x=i/48*W,y=nebelTop-farSc*0.06+farSc*(0.03*Math.sin(x/W*9+hr*0.4)+0.02*Math.sin(x/W*23-hr*0.7));ctx.lineTo(x,y);}ctx.lineTo(W,hy+1);ctx.closePath();ctx.fill();}
+// Unter dem Hochnebel ist auch der See grau und matt.
+function W_nebelSee(C){const k=C.hochnebel;if(!(k>0.01))return;const li=clamp((C.L-0.2)/0.8,0,1);ctx.fillStyle=rgba(mix([40,42,48],[150,154,160],li),0.32*k);ctx.fillRect(0,C.hy,W,H-C.hy);}
 // ---------- Wetter ----------
 function W_rain(C){if(C.rain<0.02)return;const {t,S,hy,hr}=C,r=rng(dayKey(C.d)*3+11);
   for(let v=0;v<2;v++){const x=W*(0.1+0.8*((r()+hr*0.05*(v?-1:1)+10)%1)),w=W*(0.14+r()*0.12),top=hy*0.3,col=mix(S.hor,[92,100,116],0.65),mid=(top+hy)/2;
@@ -601,11 +619,12 @@ function rasterState(C,st){const R={cs:4,gap:1,oneBit:false,silver:C.full,sort:0
   if(st.rmode==='mix'){const w=C.wtype!==undefined?C.wtype:wtypeOf(C.d),sa=C.sa,hr=C.hr,L=[];
     if(w===4){R.smear=C.live?0.6*Math.min(1,C.rain/0.7):0.6;L.push('Regen: Pixel tropfen');}else if(w===3){R.glitch=Math.max(0.15,C.storm);L.push('Gewitter: Glitch');}
     else if(w===2&&C.live&&C.live.snow>0.05)L.push('Schnee: Flocken fallen');
+    else if(w===2&&(C.hochnebel>0.5||C.bedeckt>0.5))L.push(C.hochnebel>0.5?'Hochnebel: Gipfel in der Sonne':'Bedeckt: Grau in Grau');
     else if(w===2){R.drift=Math.max(R.drift,0.8);L.push('Wechselhaft: Pixel verwehen');}else if(w===0){R.cs=3;R.gap=0;L.push('Klar: gestochen scharf');}else L.push('Heiter');
     if(C.mist>0.05){R.jitter=C.mist;L.push('Nebel löst auf');}
     // Barometer: steigender Druck beruhigt, fallender Druck macht unruhig (nur mit echtem Wetter)
     const bu=C.baroU||0;if(bu>0){R.jitter+=0.35*bu;R.drift+=0.5*bu;}else if(bu<0){R.jitter*=1+bu;R.drift*=1+bu;}
-    if(C.live&&C.live.trend&&C.live.trend!=='stabil')L.push('Luftdruck '+C.live.trend+(C.live.trend==='steigend'?': Raster beruhigt sich':C.live.trend==='fallend'?': Raster wird unruhig':': Sturmwarnung'));
+    if(C.live&&C.live.trend&&C.live.trend!=='stabil')L.push('Luftdruck '+C.live.trend+(C.live.trend==='steigend'?(C.hochnebel>0.5?': Hochnebel hält':': Raster beruhigt sich'):C.live.trend==='fallend'?': Raster wird unruhig':': Sturmwarnung'));
     if(f>0.97){R.cs=3;R.gap=0;R.silver=true;L.push('Vollmond: Klarsicht und Silbernacht');}else if(f<0.04){R.cs=10;R.gap=1;R.oneBit=true;L.push('Neumond: 1-Bit');}
     if(hr<1){R.invert=1;if(!R.oneBit)R.cs=6;L.push('Geisterstunde: Negativ');}
     else if(hr<12&&sa>-8&&sa<3){R.boot=smooth(-8,3,sa);L.push('Morgen: Bild fährt hoch');}
@@ -676,7 +695,7 @@ const RICHTUNG8=az=>['N','NO','O','SO','S','SW','W','NW'][Math.round(az/45)%8];
 function astroLayer(C,cs,t){const T=instant(C.d),{hy,night,sa,farSc}=C,snap=x=>Math.floor(x/cs)*cs;
   const px=(x,y,c,a)=>{if(a<0.01)return;ctx.fillStyle=rgba(c,a);ctx.fillRect(x+cs*0.06,y+cs*0.06,cs*0.88,cs*0.88);};
   ASTRO.mondZ=Math.floor(mondLaenge(T)/30);ASTRO.mondStern=FAMILIE.map(p=>ASTRO_AN.mond&&sonnenzeichen(p.geburtstag)===ASTRO.mondZ);
-  const mitte=C.hr<1&&C.hr*3600<85?0:1,klar=mitte*(C.live?1-smooth(55,95,C.live.cloud):1)*(1-C.storm)*(1-0.7*C.mist); // beim Pixelsturz, unter Wolken, im Nebel unsichtbar
+  const mitte=C.hr<1&&C.hr*3600<85?0:1,klar=mitte*(C.live?1-smooth(55,95,C.himmelWolke!==undefined?C.himmelWolke:C.live.cloud):1)*(1-C.storm)*(1-0.7*C.mist); // beim Pixelsturz, unter Wolken, im Nebel unsichtbar
   // Planeten an ihrer echten Stelle, Blick nach Süden: Osten links, Westen rechts; Höhe wie bei der Sonne
   ASTRO.planeten=[];if(ASTRO_AN.planeten)for(const k in PL_SICHT){const p=planetHimmel(k,T),v=PL_SICHT[k],fx=(p.az-90)/180;p.k=k;p.sicht=false;ASTRO.planeten.push(p);
     const a=v.hell*smooth(v.dunkel,v.dunkel-4,sa)*smooth(0.5,4,p.alt)*klar,y=C.altY(p.alt);
@@ -729,7 +748,7 @@ function extrasLayer(C,cs,t){const {d,sa,hy,night,L,S,iy,rowY,pc}=C,snap=x=>Math
 // ---------- Jahreszeiten (dezent) ----------
 function seasonAmt(d){const doy=(d-new Date(d.getFullYear(),0,1))/864e5;
   return{autumn:smooth(262,292,doy)*(1-smooth(318,330,doy)),bare:smooth(308,326,doy)*(1-smooth(345,360,doy)),spring:smooth(95,110,doy)*(1-smooth(140,152,doy)),flies:smooth(160,166,doy)*(1-smooth(196,204,doy))};}
-function seasonLayer(C,cr,cols,rows,hyRow,t,cs){const S=seasonAmt(C.d),L=C.L;
+function seasonLayer(C,cr,cols,rows,hyRow,t,cs){const S=seasonAmt(C.d),L=C.L;if(C.hochnebel>0.01)for(const k in S)S[k]*=1-C.hochnebel; // die Hügel liegen im Nebel
   const put=(i,j,c,a)=>{if(i<0||j<0||i>=cols||j>=rows)return;const k=(j*cols+i)*3;cr[k]=lerp(cr[k],c[0],a);cr[k+1]=lerp(cr[k+1],c[1],a);cr[k+2]=lerp(cr[k+2],c[2],a);};
   const dim=c=>mix(c,[0,0,0],(1-L)*0.8),LEAF=[[214,120,40],[190,72,38],[226,178,64],[168,96,42]];
   if(S.autumn>0.02||S.spring>0.02||S.bare>0.02){for(let i=0;i<cols;i++){const hm=rv(MID,(i+0.5)/cols)*C.midSc/cs,j0=Math.floor(hyRow-hm);
@@ -767,7 +786,7 @@ function rasterClock(C,cs,gap,t,A){const snap=x=>Math.floor(x/cs)*cs,g=Math.max(
   const {v,rowY,pc,beamCol,xv,hy,night,S,dayMode,lx,sunY,moonY,d,sa,L}=C,R=Math.max(3.4,18/cs),n=Math.ceil(R),cx=snap(lx),cy=snap(dayMode?sunY:moonY);
   if(!dayMode||sa>-1.5){for(let j=-n;j<=n;j++)for(let i=-n;i<=n;i++){const u=i/R,w=j/R;if(u*u+w*w>1)continue;if(dayMode&&cy+j*cs>hy)continue;const xl=Math.sqrt(1-w*w);let lit=true;
     if(!dayMode){const k=Math.cos(TAU*A.phase),s=A.phase<0.5?1:-1;lit=s*u>k*xl;}const pul=0.8+0.2*Math.sin(t*2-Math.hypot(i,j)*0.7);
-    cell(cx+i*cs,cy+j*cs,lit?(dayMode?mix([255,210,150],[255,250,235],smooth(0,18,sa)):[240,234,214]):mix(S.top,[200,210,230],0.15),lit?pul:0.6);}}
+    cell(cx+i*cs,cy+j*cs,lit?(dayMode?mix([255,210,150],[255,250,235],smooth(0,18,sa)):[240,234,214]):mix(S.top,[200,210,230],0.15),(lit?pul:0.6)*(C.discDim?1-0.85*C.discDim:1));}} // hinter Wolkendecke oder Hochnebel nur ein Schimmer
   const ry=snap(rowY),big=cs<=5,ph0=big?5:3,ph1=big?3:2;ctx.font='500 11px Figtree,system-ui,sans-serif';ctx.textAlign='center';
   for(let k=0;k<=12;k++){const x=snap(xv(k)),hh=k%3===0?ph0:ph1,gg=Math.exp(-(((k-v)/0.5)**2));
     for(let c=0;c<hh;c++){cell(x,ry-c*cs,c>=hh-2&&gg>0.1?mix(pc,beamCol,gg):pc);if(k===6)cell(x+cs*(big?2:1),ry-c*cs,pc);}
@@ -787,9 +806,9 @@ function drawRaster(t,A,d,st){const p0=performance.now();
   const sc=ctx,sW=W,sH=H;let img;ctx=offCtx;W=cols;H=rows;LS=cols/sW;
   try{ctx.setTransform(1,0,0,1,0,0);ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';const c=scene(t,A,d,st);
     L_sky(c);if(rare.aurora)R_aurora(c,rare.aurora);if(rare.halo)R_halo(c,rare.halo);if(rare.meteor)R_meteor(c,rare.meteor);
-    L_clouds(c);L_far(c);if(rare.sonnwend)R_sonnwend(c,rare.sonnwend);W_rainbow(c);W_rain(c);L_mid(c);L_lake(c);if(rare.ice)R_ice(c,rare.ice);
+    L_clouds(c);W_decke(c);L_far(c);if(rare.sonnwend)R_sonnwend(c,rare.sonnwend);W_rainbow(c);W_rain(c);L_mid(c);W_hochnebel(c);L_lake(c);if(rare.ice)R_ice(c,rare.ice);
     if(rare.aurora)softEllipse(W/2,c.hy+(H-c.hy)*0.12,W*0.6,(H-c.hy)*0.12,[70,230,140],0.1*rare.aurora*c.night);
-    L_islands(c);if(rare.advent)R_advent(c,rare.advent);L_mist(c);if(rare.fire)R_fire(c,rare.fire);if(rare.glut)R_glut(c,rare.glut);
+    L_islands(c);if(rare.advent)R_advent(c,rare.advent);L_mist(c);W_nebelSee(c);if(rare.fire)R_fire(c,rare.fire);if(rare.glut)R_glut(c,rare.glut);
     R_bells(c);L_beam(c);L_shore(c);L_finish(c,{...st,tex:0,vig:st.vig*0.7});W_lightning(c);var p1=performance.now();img=readScene(off,cols,rows);}
   finally{ctx=sc;W=sW;H=sH;LS=1;}const p2=performance.now();
   const N=cols*rows;if(!CR||CR.length!==N*3)CR=new Float32Array(N*3);const cr=CR,hyRow=Math.floor(C.hy/cs),tq=Math.floor(t*3)%4096; // Takt für Zufallsmuster; begrenzt, sonst rechnet der Sinus nach Stunden Laufzeit sechsmal langsamer (Muster wiederholt sich nach 23 min)
@@ -885,7 +904,14 @@ function waveField(cols,rows,cs,hy,lx,ly){const N=cols*rows,key=cols+'|'+rows+'|
 // Szene-Pixel in einen wiederverwendeten Speicher lesen (über WebGL). getImageData legt jedes Mal neuen Speicher an; das zwingt den
 // Browser alle paar hundert Millisekunden zum Aufräumen, und genau dann stockt die Bewegung. Ohne WebGL: Rückfall auf getImageData.
 let RB=null;
-function readScene(src,w,h){
+// Welcher Weg schneller ist, hängt vom Gerät ab: Beim WebGL-Weg muss der Prozessor warten, bis die Grafikeinheit fertig ist; das kann auf
+// manchen Geräten lange dauern. Automatik: nach dem Start abwechselnd beide Wege messen (ganze Bildzeit) und den schnelleren behalten.
+const LESEN={wunsch:'auto',jetzt:'webgl',start:0,s:{webgl:[],cpu:[]},fertig:false};
+function lesenTune(now,work){if(LESEN.fertig||LESEN.wunsch!=='auto')return;if(!LESEN.start){LESEN.start=now+4000;return;}if(now<LESEN.start)return;
+  LESEN.s[LESEN.jetzt].push(work);LESEN.jetzt=LESEN.jetzt==='webgl'?'cpu':'webgl';
+  if(LESEN.s.cpu.length>=40&&LESEN.s.webgl.length>=40){const m=a=>a.reduce((x,y)=>x+y,0)/a.length;LESEN.ms={webgl:m(LESEN.s.webgl),cpu:m(LESEN.s.cpu)};
+    LESEN.jetzt=LESEN.ms.cpu<LESEN.ms.webgl*0.85?'cpu':'webgl';LESEN.fertig=true;}} // WebGL bevorzugt (weniger Aufräumen im Speicher), außer der Prozessor ist klar schneller
+function readScene(src,w,h){if(LESEN.jetzt==='cpu')return src.getContext('2d').getImageData(0,0,w,h).data;
   if(!RB){RB={gl:null};try{const gl=document.createElement('canvas').getContext('webgl',{antialias:false,depth:false,stencil:false,premultipliedAlpha:false,preserveDrawingBuffer:false});
     if(gl){const tx=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,tx);for(const p of [gl.TEXTURE_MIN_FILTER,gl.TEXTURE_MAG_FILTER])gl.texParameteri(gl.TEXTURE_2D,p,gl.NEAREST);
       for(const p of [gl.TEXTURE_WRAP_S,gl.TEXTURE_WRAP_T])gl.texParameteri(gl.TEXTURE_2D,p,gl.CLAMP_TO_EDGE);
@@ -893,8 +919,8 @@ function readScene(src,w,h){
       const fb=gl.createFramebuffer();gl.bindFramebuffer(gl.FRAMEBUFFER,fb);RB={gl,tx,fb,buf:null};}}catch(e){}}
   const gl=RB.gl;
   if(gl&&!gl.isContextLost())try{gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,src);gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,RB.tx,0);
-    if(!RB.buf||RB.buf.length!==w*h*4)RB.buf=new Uint8Array(w*h*4);gl.readPixels(0,0,w,h,gl.RGBA,gl.UNSIGNED_BYTE,RB.buf);if(gl.getError()===gl.NO_ERROR)return RB.buf;}catch(e){}
-  RB.gl=null;return src.getContext('2d').getImageData(0,0,w,h).data;}
+    if(!RB.buf||RB.buf.length!==w*h*4)RB.buf=new Uint8Array(w*h*4);gl.readPixels(0,0,w,h,gl.RGBA,gl.UNSIGNED_BYTE,RB.buf);if(RB.ok||gl.getError()===gl.NO_ERROR){RB.ok=true;return RB.buf;}}catch(e){} // Fehlerabfrage nur beim ersten Mal (sie zwingt sonst jedes Bild zum Warten)
+  RB.gl=null;LESEN.jetzt='cpu';LESEN.fertig=true;return src.getContext('2d').getImageData(0,0,w,h).data;}
 
 // ---------- Farben auf der Grafikeinheit (WebGL2) ----------
 // Rechnet die Endfarbe jeder Zelle (Nacht-Dither, 1-Bit, Negativ, Lichtwellen) im Grafikchip mit denselben Formeln wie die Schleife in drawRaster.
@@ -990,12 +1016,12 @@ function frame(now){
   const T=curT(),d=wall(T),A=astro(new Date(T)),w0=performance.now();
   ctx.setTransform(DPR,0,0,DPR,0,0);ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';
   drawChiemsee(now/1000,A,d,STYLES[study]);
-  const work=performance.now()-w0;autoTune(now,work);
+  const work=performance.now()-w0;autoTune(now,work);lesenTune(now,work);
   if(!DEV)return; // Steuerleiste, Info-Zeile und FPS-Anzeige nur im Test-Modus
   fpsN++;fpsW+=work;if(now-fpsT>=1000){if(fpsT){const q=k=>(PERF[k]/fpsN).toFixed(1),src=k=>ANZ_SRC[k]?' ('+ANZ_SRC[k]+')':' (auto)';
     $('fps').textContent=Math.round(fpsN*1000/(now-fpsT))+' Bilder/s (max. '+ANZ.max_fps+(ANZ_SRC.max_fps?', '+ANZ_SRC.max_fps:'')+') · '+(fpsW/fpsN).toFixed(1)+' ms Rechenzeit\n'
       +'Szene '+q('szene')+' · Auslesen '+q('lesen')+' · Zellen '+q('zellen')+' · Farben '+q('farben')+' · Rest '+q('rest')+' ms\n'
-      +'Raster '+(+RPX.toFixed(2))+' px'+src('raster_px')+' = '+(off?off.width+'×'+off.height:'?')+' Zellen · Farben per '+(PERF.gpu?'Grafikeinheit':'Prozessor')+'\n'
+      +'Raster '+(+RPX.toFixed(2))+' px'+src('raster_px')+' = '+(off?off.width+'×'+off.height:'?')+' Zellen · Farben per '+(PERF.gpu?'Grafikeinheit':'Prozessor')+' · Auslesen per '+(LESEN.jetzt==='cpu'?'Prozessor':'WebGL')+(LESEN.wunsch!=='auto'?' (Adresse)':LESEN.fertig?(LESEN.ms?' (auto: '+LESEN.ms.webgl.toFixed(0)+' / '+LESEN.ms.cpu.toFixed(0)+' ms)':' (auto)'):' (misst …)')+'\n'
       +'intern '+cv.width+'×'+cv.height+' px, '+Math.round(AUFL*100)+' %'+src('aufl')+' · Gerät '+innerWidth+'×'+innerHeight+' bei Pixeldichte '+(+(window.devicePixelRatio||1).toFixed(2))
       +(AUTO.fps?' · gemessen '+Math.round(AUTO.fps)+' Bilder/s':'');}
     fpsN=0;fpsW=0;fpsT=now;for(const k of ['szene','lesen','zellen','farben','rest'])PERF[k]=0;}
@@ -1059,11 +1085,14 @@ function loadConfig(){const ctl=window.AbortController?new AbortController():nul
 // Grenzwerte zum Anpassen:
 const WX_MAX_ALTER_H=6;                // so viele Stunden gilt ein gespeicherter Stand ohne neuen Abruf
 const WIND_RUHIG=5,WIND_STURM=35;      // km/h: darunter kein Wind im Bild, ab hier voller Wind
-const WOLKEN_KLAR=10;                  // % Bewölkung: darunter keine einzige Wolke, klarer Himmel
+const WOLKEN_KLAR=10;
+const BEDECKT_AB=85;                    // % Bewölkung: ab hier geschlossene graue Decke
+const HOCHNEBEL={tief_ab:70,mittel_bis:50,druck_ab:1020}; // tiefe Wolken ab %, mittelhohe höchstens %, Luftdruck ab hPa (hohe Schleierwolken zählen nicht)
+                  // % Bewölkung: darunter keine einzige Wolke, klarer Himmel
 const BARO={stunden:3,steigt:1,faellt:-1,stark:-3,ruhe:0.4,unruhe:0.35,sturm:0.8}; // Druckänderung in hPa über 3 h; ruhe/unruhe/sturm = wie stark das Raster reagiert
 const REGENBOGEN={sonne_min:3,sonne_max:40,wolken_max:70,nach_regen_h:1.25};      // Sonnenhöhe in Grad, Bewölkung in %, wie lange nach dem Regen
 const SEE_TEMP={kalt:0,warm:25,staerke:0.05};                                      // °C; staerke = wie deutlich der See kühler oder wärmer wirkt
-const WX_VARS='weather_code,cloud_cover,precipitation,rain,showers,snowfall,wind_speed_10m,temperature_2m,pressure_msl,visibility',WX_KEY='lichtzeit_wetter';
+const WX_VARS='weather_code,cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high,precipitation,rain,showers,snowfall,wind_speed_10m,temperature_2m,pressure_msl,visibility',WX_KEY='lichtzeit_wetter';
 let WX=null,WX_ERR='',WXM={ts:NaN,v:null};
 // Ein Messwert -> Bildwerte. per = Faktor auf "pro Stunde" (aktuelle Werte gelten für 15 Minuten, stündliche für eine Stunde)
 function wxDerive(r,per){const code=r.code;if(code===null||!isFinite(r.t))return null;
@@ -1074,13 +1103,16 @@ function wxDerive(r,per){const code=r.code;if(code===null||!isFinite(r.t))return
   const snow=Math.max(snowCm>0.02?clamp(0.25+0.4*Math.sqrt(snowCm),0,1):0,snowC?0.3:0);      // cm/h -> Schneefall
   const wtype=thunder?3:rainC?4:(snowC||fog||code===3)?2:(code===1||code===2)?1:code===0?0:cloud<20?0:cloud<60?1:2;
   const mistV=r.vis===null?0:1-smooth(1000,6000,r.vis);                                       // schlechte Sicht -> Nebel
-  return{t:r.t,code,wtype,cloud,rain,snow,mm:liq,
+  // Bedeckt: geschlossene Wolkendecke. Hochnebel: bedeckt, aber nur tiefe Wolken, hoher Luftdruck und kein Niederschlag
+  const low=r.low===undefined?null:r.low,oben=r.mid||0,bedeckt=thunder?0:smooth(BEDECKT_AB-5,BEDECKT_AB+5,cloud);
+  const hn=bedeckt*(low===null?0:smooth(HOCHNEBEL.tief_ab-15,HOCHNEBEL.tief_ab+5,low))*(1-smooth(HOCHNEBEL.mittel_bis,HOCHNEBEL.mittel_bis+30,oben))*(r.p===null?0:smooth(HOCHNEBEL.druck_ab-4,HOCHNEBEL.druck_ab+2,r.p))*(rain<0.05&&snow<0.05?1:0);
+  return{t:r.t,code,wtype,cloud,rain,snow,mm:liq,low,oben,bedeckt,hn,
     storm:thunder?0.7:wtype===4?0.35+0.25*rain:snow>0?0.3:wtype===2?0.15:0,
     mist:Math.max(fog?0.75:0,mistV*(rain>0.1||snow>0.1?0.5:1)),
     wind:r.wind===null?0:clamp((r.wind-WIND_RUHIG)/(WIND_STURM-WIND_RUHIG),0,1),kmh:r.wind,th:thunder?1:0,temp:r.temp,p:r.p};}
 function wxBuild(j){const h=j&&j.hourly,c=j&&j.current;if(!h||!Array.isArray(h.time)||!h.time.length)throw new Error('unerwartete Antwort');
   const num=v=>typeof v==='number'&&isFinite(v)?v:null;
-  const raw=(g,t)=>({t,code:g('weather_code'),cloud:g('cloud_cover'),pr:g('precipitation'),rain:g('rain'),sh:g('showers'),snow:g('snowfall'),wind:g('wind_speed_10m'),temp:g('temperature_2m'),p:g('pressure_msl'),vis:g('visibility')});
+  const raw=(g,t)=>({t,code:g('weather_code'),cloud:g('cloud_cover'),low:g('cloud_cover_low'),mid:g('cloud_cover_mid'),high:g('cloud_cover_high'),pr:g('precipitation'),rain:g('rain'),sh:g('showers'),snow:g('snowfall'),wind:g('wind_speed_10m'),temp:g('temperature_2m'),p:g('pressure_msl'),vis:g('visibility')});
   let S=h.time.map((t,i)=>wxDerive(raw(k=>num((h[k]||[])[i]),t*1000),1));
   if(c&&num(c.time)!==null){const s=wxDerive(raw(k=>num(c[k]),c.time*1000),3600/(num(c.interval)||900));if(s)S=S.filter(q=>q&&Math.abs(q.t-s.t)>=6e5).concat(s);}
   S=S.filter(Boolean).sort((a,b)=>a.t-b.t);if(!S.length)throw new Error('keine Wetterdaten');return S;}
@@ -1089,7 +1121,7 @@ function wxSeg(ts){const S=WX.S;if(ts<S[0].t||ts>S[S.length-1].t)return null;let
 const wxNum=(g,k)=>g.a[k]===null?g.b[k]:g.b[k]===null?g.a[k]:lerp(g.a[k],g.b[k],g.u);
 function wxCalc(ts){if(WX_FORCE)return WX_FORCE;if(!WX||!WETTER.echt||WX.lat!==LAT||WX.lng!==LNG||Date.now()-WX.fetched>WX_MAX_ALTER_H*36e5)return null;
   const g=wxSeg(ts);if(!g)return null;const n=g.u<0.5?g.a:g.b,o={code:n.code,wtype:n.wtype};
-  for(const k of['cloud','rain','snow','mm','storm','mist','wind','kmh','th','temp','p'])o[k]=wxNum(g,k);
+  for(const k of['cloud','low','oben','bedeckt','hn','rain','snow','mm','storm','mist','wind','kmh','th','temp','p'])o[k]=wxNum(g,k);
   // Barometer: Luftdruck jetzt minus Luftdruck vor 3 Stunden
   const g0=wxSeg(ts-BARO.stunden*36e5),p0=g0?wxNum(g0,'p'):null;o.dp=o.p!==null&&p0!==null?o.p-p0:null;
   // Regenbogen: nur wenn es gerade aufgehört hat zu regnen und nicht zu bewölkt ist (Sonnenstand prüft scene)
@@ -1102,16 +1134,16 @@ function wxExtras(o){const dp=o.dp;
   o.baro=dp===null?0:BARO.unruhe*smooth(-BARO.faellt,0.5-BARO.faellt,-dp)+(BARO.sturm-BARO.unruhe)*smooth(-BARO.stark,0.5-BARO.stark,-dp)-BARO.ruhe*smooth(BARO.steigt,BARO.steigt+0.5,dp);
   o.tempK=o.temp===null?0:clamp((o.temp-(SEE_TEMP.kalt+SEE_TEMP.warm)/2)/((SEE_TEMP.warm-SEE_TEMP.kalt)/2),-1,1);
   return o;}
-// Wetter erzwingen (Test): ?wetter=gewitter|regen|nebel|klar|schnee – feste Werte mit typischem Luftdruck-Trend
-const WX_PRESETS={klar:{code:0,cloud:0,wind:6,temp:18,p:1022,vis:40000,dp:0},gewitter:{code:95,cloud:95,rain:6,wind:30,temp:22,p:1006,vis:15000,dp:-3.5},
+// Wetter erzwingen (Test): ?wetter=gewitter|regen|nebel|klar|schnee|bedeckt|hochnebel – feste Werte mit typischem Luftdruck-Trend
+const WX_PRESETS={bedeckt:{code:3,cloud:100,low:70,mid:90,high:60,wind:8,temp:9,p:1012,vis:15000,dp:0},hochnebel:{code:3,cloud:100,low:100,mid:0,high:0,wind:3,temp:4,p:1031,vis:12000,dp:1.6},klar:{code:0,cloud:0,wind:6,temp:18,p:1022,vis:40000,dp:0},gewitter:{code:95,cloud:95,rain:6,wind:30,temp:22,p:1006,vis:15000,dp:-3.5},
   regen:{code:63,cloud:100,rain:3,wind:15,temp:10,p:1008,vis:8000,dp:-1.5},nebel:{code:45,cloud:90,wind:2,temp:6,p:1024,vis:300,dp:0},schnee:{code:73,cloud:100,snow:1.2,wind:8,temp:-2,p:1012,vis:3000,dp:0}};
 const WX_FORCE=(()=>{const k=(Q.get('wetter')||'').trim().toLowerCase(),x=WX_PRESETS[k];if(!k)return null;if(!x){URL_INFO.push('?wetter='+k+' unbekannt');return null;}
-  const o=wxDerive({t:0,code:x.code,cloud:x.cloud,pr:null,rain:x.rain||0,sh:0,snow:x.snow||0,wind:x.wind,temp:x.temp,p:x.p,vis:x.vis},1);o.dp=x.dp;o.bow=0;o.name=k;return wxExtras(o);})();
+  const o=wxDerive({t:0,code:x.code,cloud:x.cloud,low:x.low===undefined?x.cloud:x.low,mid:x.mid===undefined?x.cloud:x.mid,high:x.high===undefined?x.cloud:x.high,pr:null,rain:x.rain||0,sh:0,snow:x.snow||0,wind:x.wind,temp:x.temp,p:x.p,vis:x.vis},1);o.dp=x.dp;o.bow=0;o.name=k;return wxExtras(o);})();
 function wxAt(ts){if(ts!==WXM.ts){WXM.ts=ts;WXM.v=wxCalc(ts);}return WXM.v;}
 function wxText(d){const w=wxAt(instant(d)),f=(v,n=0)=>v===null?'?':v.toFixed(n).replace('.',',');
   if(!w)return 'Wetter: '+WT[wtypeOf(d)]+' (simuliert'+(!WETTER.echt?', echtes Wetter aus':WX_ERR?', '+WX_ERR:'')+')';
-  const name=w.wtype===3?'Gewitter':w.snow>0.05?'Schnee':w.rain>0.05?'Regen':(w.code===45||w.code===48)?'Nebel':WT[w.wtype];
-  return (WX_FORCE?'Wetter (erzwungen mit ?wetter='+WX_FORCE.name+')':'Wetter (echt, Stand '+new Date(WX.fetched+CLOCK_OFF).toLocaleTimeString('de-DE',{timeZone:TZ,hour:'2-digit',minute:'2-digit'})+(WX_ERR?', '+WX_ERR:'')+')')+': '+name+', '+f(w.temp)+' °C, Wolken '+f(w.cloud)+' %, '+(w.mm>0.05?'Niederschlag '+f(w.mm,1)+' mm/h, ':'')+'Wind '+f(w.kmh)+' km/h, Luftdruck '+f(w.p)+' hPa'+(w.dp!==null?', '+w.trend+' ('+(w.dp>0?'+':'')+f(w.dp,1)+' hPa in '+BARO.stunden+' h)':'');}
+  const name=w.wtype===3?'Gewitter':w.snow>0.05?'Schnee':w.rain>0.05?'Regen':(w.code===45||w.code===48)?'Nebel':w.hn>0.5?'Hochnebel':w.bedeckt>0.5?'bedeckt':WT[w.wtype];
+  return (WX_FORCE?'Wetter (erzwungen mit ?wetter='+WX_FORCE.name+')':'Wetter (echt, Stand '+new Date(WX.fetched+CLOCK_OFF).toLocaleTimeString('de-DE',{timeZone:TZ,hour:'2-digit',minute:'2-digit'})+(WX_ERR?', '+WX_ERR:'')+')')+': '+name+', '+f(w.temp)+' °C, Wolken '+f(w.cloud)+' %'+(w.low!==null&&w.low!==undefined?' (tief '+f(w.low)+' %)':'')+', '+(w.mm>0.05?'Niederschlag '+f(w.mm,1)+' mm/h, ':'')+'Wind '+f(w.kmh)+' km/h, Luftdruck '+f(w.p)+' hPa'+(w.dp!==null?', '+w.trend+' ('+(w.dp>0?'+':'')+f(w.dp,1)+' hPa in '+BARO.stunden+' h)':'');}
 function wxLoad(){try{const c=JSON.parse(localStorage.getItem(WX_KEY)||'null');if(c&&c.lat===LAT&&c.lng===LNG&&c.j){WX={fetched:c.fetched,lat:LAT,lng:LNG,S:wxBuild(c.j)};WXM.ts=NaN;}}catch(e){}}
 function wxFetch(){if(!WETTER.echt)return Promise.resolve();let tm=0;
   const done=()=>{clearTimeout(tm);setTimeout(wxFetch,(WX_ERR?Math.min(5,WETTER.min):WETTER.min)*6e4);},fail=e=>{WX_ERR='Abruf fehlgeschlagen: '+(e.name==='AbortError'?'Zeitüberschreitung':e instanceof TypeError?'keine Verbindung':e.message);console.warn(WX_ERR);};
@@ -1129,6 +1161,7 @@ function wxFetch(){if(!WETTER.echt)return Promise.resolve();let tm=0;
 function urlAnzeige(){const set=(k,key,p,auto)=>{const v=Q.get(k);if(v===null)return;const t=v.trim().toLowerCase(),x=t==='auto'?auto:p(+t.replace(',','.'));
     if(x===null||t==='')URL_INFO.push('?'+k+'='+v+' ungültig');else{ANZ[key]=x;if(t==='auto')delete ANZ_SRC[key];else ANZ_SRC[key]='Adresse';}};
   set('raster','raster_px',pZahl(2,40),0);set('fps','max_fps',pZahl(5,120),30);set('aufloesung','aufl',pZahl(0.25,1),0);
+  const ls=Q.get('lesen');if(ls!==null){if(['webgl','cpu','auto'].includes(ls)){LESEN.wunsch=ls;if(ls!=='auto'){LESEN.jetzt=ls;LESEN.fertig=true;}}else URL_INFO.push('?lesen='+ls+' ungültig');}
   const g=Q.get('gpu');if(g!==null){if(['0','1','aus','an'].includes(g))GPU_WUNSCH=g==='1'||g==='an';else URL_INFO.push('?gpu='+g+' ungültig');}}
 function start(){if(started)return;started=true;urlAnzeige();if(ANZ.raster_px||ANZ.aufl)resize();$('sname').textContent=ORT;document.title='Lichtzeit – '+ORT;toSliders(curT());setMode();keepAwake();requestAnimationFrame(frame);}
 // Start: erst die Einstellungen, dann das Wetter (gespeicherter Stand sofort, neuen Abruf höchstens 3 s abwarten)
