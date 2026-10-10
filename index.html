@@ -204,18 +204,23 @@ let ANZ={raster_px:0,max_fps:30,aufl:0},ANZ_SRC={},GROSS=false,PW=0,PH=0,RPX=0,A
 // alle 5 Sekunden die tatsächliche Bildrate. Liegt sie unter AUTO_MIN_FPS, wechselt sie auf die nächstgröbere Stufe (feiner erst wieder nach dem Neuladen).
 // Auf großen 4K-Bildschirmen senkt sie danach notfalls die interne Auflösung.
 const AUTO_MIN_FPS=25;
-const AUTO={stufe:0,aufl:1,start:0,n:0,last:0,fps:0};
-const autoStufen=dpr=>GROSS?[6,8,10]:[4,6,8].map(x=>x*dpr); // nur Stufen mit gleichmäßigen Rasterlinien
-function autoTune(now){const rAuto=!(ANZ.raster_px>0),aAuto=!(ANZ.aufl>0)&&GROSS;if(!rAuto&&!aAuto)return;
+const AUTO={stufe:0,aufl:1,start:0,n:0,last:0,fps:0,halb:false};
+// Reihenfolge: die zwei feinsten Raster, dann die Szene auf zwei Bilder verteilen (SZENE_HALB, ändert das Aussehen nicht), erst dann gröbere Raster.
+const autoStufen=dpr=>GROSS?[6,8,10,12]:[4,6,8,10].map(x=>x*dpr); // nur Stufen mit gleichmäßigen Rasterlinien
+let SZENE_HALB_WUNSCH='auto'; // ?szene=halb|voll|auto
+function autoTune(now){const rAuto=!(ANZ.raster_px>0),aAuto=!(ANZ.aufl>0)&&GROSS,hAuto=SZENE_HALB_WUNSCH==='auto'&&LESEN.jetzt==='async';if(!rAuto&&!aAuto&&!hAuto)return;
   if(!AUTO.start||now-AUTO.last>500){AUTO.start=now+3000;AUTO.n=0;AUTO.last=now;return;} // Aufwärmen bzw. nach einer Pause neu messen
   AUTO.last=now;if(now<AUTO.start)return;AUTO.n++;if(now-AUTO.start<5000)return;
   AUTO.fps=AUTO.n*1000/(now-AUTO.start);AUTO.start=now;AUTO.n=0;
   if(AUTO.fps>=Math.min(AUTO_MIN_FPS,0.83*ANZ.max_fps))return;
-  if(rAuto&&AUTO.stufe<autoStufen(window.devicePixelRatio||1).length-1){AUTO.stufe++;resize();AUTO.start=0;}
+  const n=autoStufen(window.devicePixelRatio||1).length;
+  if(rAuto&&AUTO.stufe<n-3){AUTO.stufe++;resize();AUTO.start=0;}
+  else if(hAuto&&!AUTO.halb){AUTO.halb=true;AUTO.start=0;} // Szene jedes zweite Bild zur Hälfte malen: halbe Arbeit, Uhr und Effekte bleiben flüssig
+  else if(rAuto&&AUTO.stufe<n-1){AUTO.stufe++;resize();AUTO.start=0;}
   else if(aAuto&&AUTO.aufl>0.5){AUTO.aufl=AUTO.aufl>0.75?0.75:0.5;resize();AUTO.start=0;}}
 // Papiertextur einmal auf die benötigte Größe verkleinern statt in jedem Bild neu (gleiches Ergebnis, viel schneller)
 let TEXS=null;
-function texFor(src,w,h){if(!TEXS||TEXS.src!==src||TEXS.w!==w||TEXS.h!==h){const c=document.createElement('canvas');c.width=w;c.height=h;c.getContext('2d',{willReadFrequently:true}).drawImage(src,0,0,w,h);TEXS={src,w,h,c};}return TEXS.c;} // willReadFrequently: sonst mischt Chrome minimal anders
+function texFor(src,w,h){if(!TEXS||TEXS.src!==src||TEXS.w!==w||TEXS.h!==h||TEXS.g!==SZENE_GPU){const c=document.createElement('canvas');c.width=w;c.height=h;c.getContext('2d',SZENE_GPU?{}:{willReadFrequently:true}).drawImage(src,0,0,w,h);TEXS={src,w,h,c,g:SZENE_GPU};}return TEXS.c;} // willReadFrequently: sonst mischt Chrome minimal anders
 function resize(){const dpr=window.devicePixelRatio||1;PW=innerWidth*dpr;PH=innerHeight*dpr;GROSS=Math.min(PW,PH)>=2000; // 4K-Bildschirm wie der Muse Frame
   const rpx=RPX=ANZ.raster_px>0?ANZ.raster_px:autoStufen(dpr)[AUTO.stufe],aufl=AUFL=ANZ.aufl>0?ANZ.aufl:GROSS?AUTO.aufl:Math.min(1,2/dpr),U=rpx/4; // U = Bildschirmpixel pro Bildpunkt
   W=PW/U;H=PH/U;if(Math.abs(W-Math.round(W))<1e-6)W=Math.round(W);if(Math.abs(H-Math.round(H))<1e-6)H=Math.round(H);
@@ -248,9 +253,14 @@ const REEDS=(()=>{const r=rng(88);return[...Array(70)].map(()=>{const x=Math.pow
 const SHORE=(()=>{const r=rng(55);return[...Array(18)].map(()=>({x:r(),thr:-1-r()*6,off:r()<0.35?99:22+r()*3,s:1.1+r()*0.9,p:r()*6}));})();
 const WIN=(()=>{const r=rng(56),a=[];for(let i=0;i<8;i++)a.push({x:0.385+r()*0.08,y:0.004+r()*0.01,thr:-1.5-r()*5.5,off:r()<0.2?99:21.5+r()*2.5,s:1.3,p:r()*6});for(let i=0;i<3;i++)a.push({x:0.66+r()*0.22,y:0.004+r()*0.004,thr:-2-r()*5,off:r()<0.3?99:22+r()*2,s:1.1,p:r()*6});return a;})();
 let HELP=false;
-function softEllipse(x,y,rx,ry,c,a){ctx.save();ctx.translate(x,y);ctx.scale(1,ry/rx);const g=ctx.createRadialGradient(0,0,0,0,0,rx);g.addColorStop(0,rgba(c,a));g.addColorStop(1,rgba(c,0));ctx.fillStyle=g;ctx.beginPath();ctx.arc(0,0,rx,0,TAU);ctx.fill();ctx.restore();}
+// Farbverläufe werden zwischengespeichert: dieselbe Definition (Radius, Farben) ergibt dasselbe Bild, spart aber das Neuanlegen in jedem Bild
+// Behalten wird nur, was im letzten oder in diesem Bild gebraucht wurde (zwei Generationen), so wächst der Speicher bei flackernden Lichtern nicht.
+let VERLAUF=new Map(),VERLAUF_ALT=new Map();
+function verlauf(k,mach){let g=VERLAUF.get(k);if(g)return g;g=VERLAUF_ALT.get(k)||mach();VERLAUF.set(k,g);return g;}
+const verlaufBild=()=>{VERLAUF_ALT=VERLAUF;VERLAUF=new Map();};
+function softEllipse(x,y,rx,ry,c,a){ctx.save();ctx.translate(x,y);ctx.scale(1,ry/rx);const c1=rgba(c,a),g=verlauf(rx+'|'+c1,()=>{const q=ctx.createRadialGradient(0,0,0,0,0,rx);q.addColorStop(0,c1);q.addColorStop(1,rgba(c,0));return q;});ctx.fillStyle=g;ctx.beginPath();ctx.arc(0,0,rx,0,TAU);ctx.fill();ctx.restore();}
 let LS=1;
-function lamp(x,y,a,s,t,p,rl){s*=LS;rl*=LS;ctx.save();ctx.globalCompositeOperation='lighter';const g=ctx.createRadialGradient(x,y,0,x,y,s*5);g.addColorStop(0,`rgba(255,196,120,${0.55*a})`);g.addColorStop(1,'rgba(255,196,120,0)');ctx.fillStyle=g;ctx.fillRect(x-s*5,y-s*5,s*10,s*10);ctx.fillStyle=`rgba(255,226,170,${a})`;ctx.fillRect(x-s/2,y-s/2,s,s);
+function lamp(x,y,a,s,t,p,rl){s*=LS;rl*=LS;ctx.save();ctx.globalCompositeOperation='lighter';const g=verlauf('L'+x+'|'+y+'|'+s+'|'+a,()=>{const q=ctx.createRadialGradient(x,y,0,x,y,s*5);q.addColorStop(0,`rgba(255,196,120,${0.55*a})`);q.addColorStop(1,'rgba(255,196,120,0)');return q;});ctx.fillStyle=g;ctx.fillRect(x-s*5,y-s*5,s*10,s*10);ctx.fillStyle=`rgba(255,226,170,${a})`;ctx.fillRect(x-s/2,y-s/2,s,s);
   if(rl>0)for(let i=0;i<8;i++){ctx.fillStyle=`rgba(255,196,120,${0.22*a*(1-i/8)*(0.6+0.4*Math.sin(t*2+i+p))})`;ctx.fillRect(x-s*0.6+Math.sin(t*1.7+i*1.9+p)*1.5,y+3+i*rl/8,s*1.2,Math.max(1,rl/12));}ctx.restore();}
 const CC={};
 function clouds(dk,cl){
@@ -323,7 +333,7 @@ function scene(t,A,d,st){
   C.iy=C.hy+H*0.008;C.silh=mix(mix([22,30,30],C.S.hor,0.18),[0,0,0],(1-C.L)*0.6);C.hn=C.hr<12?C.hr+24:C.hr;C.rowY=C.hy+(H-C.hy)*0.4;
   C.pc=mix(mix([40,32,26],C.S.hor,0.15),[0,0,0],(1-C.L)*0.5);C.sunCol=mix([255,190,120],[255,245,225],smooth(0,15,C.sa));
   C.beamCol=C.dayMode?mix([255,180,110],[255,245,225],smooth(0,15,C.sa)):[212,222,242];
-  C.snowFall=Math.max((d.getMonth()===11&&d.getDate()>=24&&d.getDate()<=26)?0.55:(d.getMonth()===11&&C.hr>=17&&C.hr<22&&hsh(dayKey(d),1,2)<0.35)?0.3:0,LW?LW.snow:0);
+  C.festSanft=weihnacht(d)===1&&C.sa<1;C.snowFall=Math.max((d.getMonth()===11&&d.getDate()===24)?0.55:(d.getMonth()===11&&d.getDate()>=25&&d.getDate()<=26)?0.4:(d.getMonth()===11&&C.hr>=17&&C.hr<22&&hsh(dayKey(d),1,2)<0.35)?0.3:0,LW?LW.snow:0);
   C.beamStr=(C.dayMode?Math.max(0.32,sStrOf(C.sa))*(1-0.4*C.storm):0.3+0.4*A.fraction);
   if(C.bedeckt||C.hochnebel){C.nebelTop=C.hy-C.farSc*0.42;const discY=C.dayMode?C.sunY:C.moonY,unter=C.hochnebel*smooth(C.nebelTop-12,C.nebelTop+4,discY);
     C.discDim=Math.max(C.bedeckt,unter);C.beamStr*=lerp(1,0.6,Math.max(C.bedeckt,C.hochnebel));} // Strahl weich, aber ablesbar
@@ -569,7 +579,6 @@ function wtypeOf(d){const r=rng(dayKey(d)*29+7),u=r();let w=u<0.18?0:u<0.5?1:u<0
 function dayRare(d){const m=d.getMonth(),dd=d.getDate(),dow=d.getDay(),u=rng(dayKey(d)*53+19)(),ev=[];
   if(m===5&&dd>=20&&dd<=22)ev.push({k:'sonnwend',n:'Sonnwendfeuer',a:21.5,b:25});
   if(m===7&&dd>=11&&dd<=13)ev.push({k:'meteor',n:'Perseiden',a:22,b:28});
-  if(m===11&&dd===31)ev.push({k:'fire',n:'Silvesterfeuerwerk',a:23.95,b:24.5});
   if(m===11)ev.push({k:'advent',n:'Weihnachtslichter',a:16,b:22.5});
   if(u<0.08)ev.push({k:'halo',n:'Sonnenhalo',a:10,b:15,r:1});
   else if(u<0.12)ev.push({k:'aurora',n:'Nordlicht',a:22,b:26,r:1});
@@ -646,7 +655,8 @@ function rasterState(C,st){const R={cs:4,gap:1,oneBit:false,silver:C.full,sort:0
     const blau=hr>=12&&sa<1&&sa>-10?smooth(1,-4,sa)*(1-smooth(-7,-10,sa)):0;eff('Pixel sortieren sich (Blaue Stunde)',blau,1,x=>{R.sort=blau*x;R.sortHimmel=true;}); // nur der Himmel, die Berge bleiben stehen
     const vorM=hr>=23?smooth(23,24,hr):0;eff('Unruhe vor Mitternacht',vorM,1,x=>{R.jitter=Math.max(R.jitter,0.45*vorM*x);R.tens=vorM*x;});
     const nm=hr>=1&&neumondNacht(C.d)?smooth(0.3,0.7,C.night):0;eff('Neumond-Nacht: gröber, entsättigt',nm,1,x=>{if(nm*x>0.5){R.cs=5;R.gap=1;}R.sat=0.5*nm*x;});
-    if(hr<1){R.invert=1;R.cs=6;R.effekt=hr*3600<85?'Pixelsturz':'Negativ (Geisterstunde)';L.push('Geisterstunde: Negativ');if(hr*3600<85)L.unshift('Mitternacht: Pixelsturz');}
+    if(hr<1&&neujahr(C.d))L.push('Neujahr: Feuerwerk statt Pixelsturz und Geisterstunde');
+    if(hr<1&&!neujahr(C.d)){R.invert=1;R.cs=6;R.effekt=hr*3600<85?'Pixelsturz':'Negativ (Geisterstunde)';L.push('Geisterstunde: Negativ');if(hr*3600<85)L.unshift('Mitternacht: Pixelsturz');}
     else{
       if(hr<12&&sa>-8&&sa<3){R.boot=smooth(-8,3,sa);L.push('Morgen: Bild fährt hoch');}
       else if(blau>0)L.push('Blaue Stunde');else if(hr>=23)L.push('Kurz vor Mitternacht');else if(hr<12&&C.night>0.5)L.push('Nacht: Dither');else if(hr>=12&&C.night>0.5)L.push('Abend');
@@ -676,7 +686,7 @@ function physics(C,cr,cols,rows,hyRow,t){
   const put=(i,j,c,a)=>{if(i<0||j<0||i>=cols||j>=rows)return;const k=(j*cols+i)*3;cr[k]=lerp(cr[k],c[0],a);cr[k+1]=lerp(cr[k+1],c[1],a);cr[k+2]=lerp(cr[k+2],c[2],a);};
   const sf=C.snowFall||0,winter=(!C.live&&[11,0,1].includes(C.d.getMonth()))||sf>0,amt=Math.max(C.rain,sf); // bei echtem Wetter: Schnee nur, wenn es wirklich schneit
   if(amt>0.05){const n=Math.round(amt*cols*(winter?1.2:0.9));
-    for(let q=0;q<n;q++){const col=Math.floor(hsh(q,1,0)*cols),land=hyRow+1+Math.floor(hsh(q,3,0)*(rows-hyRow-2)),sp=winter?(6+hsh(q,4,0)*4):(28+hsh(q,2,0)*18),per=(land+8)/sp,ph=((t+hsh(q,5,0)*per)%per)/per,y=Math.floor(ph*(land+8))-8;
+    for(let q=0;q<n;q++){const col=Math.floor(hsh(q,1,0)*cols),land=hyRow+1+Math.floor(hsh(q,3,0)*(rows-hyRow-2)),sp=winter?(6+hsh(q,4,0)*4)*(C.festSanft?0.6:1):(28+hsh(q,2,0)*18),per=(land+8)/sp,ph=((t+hsh(q,5,0)*per)%per)/per,y=Math.floor(ph*(land+8))-8;
       if(winter){if(y>=0&&y<land)put(col+Math.round(Math.sin(t*0.8+q)*1.5),y,[245,245,250],0.85);}
       else if(y<land){put(col,y,[200,210,228],0.55);put(col,y-1,[200,210,228],0.3);}
       else{const a=y-land;if(a<3){put(col-a,land,[220,228,240],0.5);put(col+a,land,[220,228,240],0.5);}}}}
@@ -720,7 +730,7 @@ const RICHTUNG8=az=>['N','NO','O','SO','S','SW','W','NW'][Math.round(az/45)%8];
 function astroLayer(C,cs,t){const T=instant(C.d),{hy,night,sa,farSc}=C,snap=x=>Math.floor(x/cs)*cs;
   const px=(x,y,c,a)=>{if(a<0.01)return;ctx.fillStyle=rgba(c,a);ctx.fillRect(x+cs*0.06,y+cs*0.06,cs*0.88,cs*0.88);};
   ASTRO.mondZ=Math.floor(mondLaenge(T)/30);ASTRO.mondStern=FAMILIE.map(p=>ASTRO_AN.mond&&sonnenzeichen(p.geburtstag)===ASTRO.mondZ);
-  const mitte=C.hr<1&&C.hr*3600<85?0:1,klar=mitte*(C.live?1-smooth(55,95,C.himmelWolke!==undefined?C.himmelWolke:C.live.cloud):1)*(1-C.storm)*(1-0.7*C.mist); // beim Pixelsturz, unter Wolken, im Nebel unsichtbar
+  const mitte=pixelsturzJetzt(C)?0:1,klar=mitte*(C.live?1-smooth(55,95,C.himmelWolke!==undefined?C.himmelWolke:C.live.cloud):1)*(1-C.storm)*(1-0.7*C.mist); // beim Pixelsturz, unter Wolken, im Nebel unsichtbar
   // Planeten an ihrer echten Stelle, Blick nach Süden: Osten links, Westen rechts; Höhe wie bei der Sonne
   ASTRO.planeten=[];if(ASTRO_AN.planeten)for(const k in PL_SICHT){const p=planetHimmel(k,T),v=PL_SICHT[k],fx=(p.az-90)/180;p.k=k;p.sicht=false;ASTRO.planeten.push(p);
     const a=v.hell*smooth(v.dunkel,v.dunkel-4,sa)*smooth(0.5,4,p.alt)*klar,y=C.altY(p.alt);
@@ -762,7 +772,11 @@ function extrasLayer(C,cs,t){const {d,sa,hy,night,L,S,iy,rowY,pc}=C,snap=x=>Math
     for(let i=-1;i<=3;i++)px(x+i*cs,y-cs,wh);px(x,y-2*cs,wh);px(x+cs,y-2*cs,wh);
     px(x,y-3*cs,blink?[60,120,255]:[20,30,70]);px(x+cs,y-3*cs,blink?[20,30,70]:[60,120,255]);
     if(blink){ctx.save();ctx.globalCompositeOperation='lighter';softEllipse(x+cs,y-3*cs,cs*4,cs*4,[60,120,255],0.35);ctx.restore();}
-    if(e>FW.min*20&&e<FW.min*36){for(let k=1;k<=7;k++){const sx=x-(3+k)*cs,sy=y-2*cs-Math.round(Math.sin(k/7*Math.PI)*3)*cs;px(sx,sy,[230,240,255],0.7*(0.6+0.4*Math.sin(t*10+k)));}}}
+    if(e>FW.min*20&&e<FW.min*36){for(let k=1;k<=7;k++){const sx=x-(3+k)*cs,sy=y-2*cs-Math.round(Math.sin(k/7*Math.PI)*3)*cs;px(sx,sy,[230,240,255],0.7*(0.6+0.4*Math.sin(t*10+k)));}
+      // Scheint die Sonne (nicht bei bedeckt), steht ein kleiner Regenbogen in der Fontäne
+      const sonnig=C.dayMode&&sa>3&&C.bedeckt<0.5&&C.hochnebel<0.5&&C.rain<0.1&&(C.discDim||0)<0.5&&(C.live?(C.himmelWolke!==undefined?C.himmelWolke:C.live.cloud)<80:C.wtype<=1);
+      if(sonnig){const k0=smooth(FW.min*20,FW.min*20+4,e)*(1-smooth(FW.min*36-4,FW.min*36,e)),frei=sperre(C,cs);
+        for(let k=2;k<=6;k++){const sx=x-(3+k)*cs,sy=y-2*cs-Math.round(Math.sin(k/7*Math.PI)*3)*cs;[[255,96,80],[250,220,90],[90,160,255]].forEach((c,b)=>{const yy=sy+(b+1)*cs;if(yy<y-cs&&frei(sx+cs/2,yy+cs/2))px(sx,yy,c,0.5*k0);});}}}}
   // Dezember: Adventslichter am Ufer, Christbaum an Heiligabend
   const n=adventLit(d);if(n>0){for(let k=0;k<4;k++){const x=snap(W*(0.08+k*0.028)),y=snap(hy-2);px(x,y,[235,225,205],0.9);if(k<n){const f=0.75+0.25*Math.sin(t*6+k*1.7);px(x,y-cs,[255,190,90],f);ctx.save();ctx.globalCompositeOperation='lighter';softEllipse(x+cs/2,y-cs/2,cs*3,cs*3,[255,190,110],0.35*f*(0.4+0.6*night));ctx.restore();}}}
   if(d.getMonth()===11&&d.getDate()>=24&&d.getDate()<=26){const x=snap(W*0.455),y=snap(iy),g=mix([40,110,60],[0,0,0],(1-L)*0.5);
@@ -885,11 +899,17 @@ const SZ_ZEICHNE={
     for(let i=-2;i<=1;i++)p(i,0,S.dim([52,44,38]));p(-1,-1,[34,34,40]);p(-1,-2,[34,34,40]);p(-2,-2,[70,60,50],0.5);p(-3,-1,[70,60,50],0.4);p(-3,0,[70,60,50],0.3);
     p(1,-2,[255,198,112],fl);S.licht(S.X+1.5*S.cs,S.Y-1.5*S.cs,S.cs*4,[255,190,110],0.3*fl);
     for(let k=1;k<=4;k++)p(1+Math.round(Math.sin(t*2+k)*0.6),k,[255,190,110],0.35*(1-k/5)*fl);}};
-function entdeckenLayer(C,cs,t){SZ_PAUSE=C.hr<1&&C.hr*3600<85;if(SZ_PAUSE){SZ_JETZT=[];return;} // beim Pixelsturz Pause
-  const akt=szAktiv(C,cs);SZ_JETZT=akt;if(!akt.length)return;
-  const snap=x=>Math.floor(x/cs)*cs,hy=C.hy,k=W/700+0.4*cs,lx=C.lx,dY=C.dayMode?Math.min(C.sunY,hy):C.moonY,dr=(Math.max(3.4,18/cs)+3)*cs,ry=snap(C.rowY);
+// Sperrzonen für alle kleinen Zusätze (Szenen, Feste): Strahl, Sonnen- bzw. Mondscheibe, Pfähle und Dampfer bleiben frei. Einmal je Bild berechnet.
+const SPERRE={C:null,cs:0,f:null};
+function sperre(C,cs){if(SPERRE.C===C&&SPERRE.cs===cs)return SPERRE.f;
+  const snap=x=>Math.floor(x/cs)*cs,hy=C.hy,lx=C.lx,dY=C.dayMode?Math.min(C.sunY,hy):C.moonY,dr=(Math.max(3.4,18/cs)+3)*cs,ry=snap(C.rowY);
   const mm=C.d.getMinutes()+C.d.getSeconds()/60,bx=snap(C.xv(mm/5)),by=snap(C.rowY+(H-hy)*0.12),px0=snap(C.xv(0))-2*cs,px1=snap(C.xv(12))+3*cs;
-  const frei=(x,y)=>!((y>hy&&Math.abs(x-lx)<szStrahl(hy,y,cs)+cs)||((x-lx)**2+(y-dY)**2<dr*dr)||(y>ry-6*cs&&y<ry+2*cs&&x>px0&&x<px1)||(x>bx-20*cs&&x<bx+7*cs&&y>by-9*cs&&y<by+2*cs));
+  const f=(x,y)=>!((y>hy&&Math.abs(x-lx)<szStrahl(hy,y,cs)+cs)||((x-lx)**2+(y-dY)**2<dr*dr)||(y>ry-6*cs&&y<ry+2*cs&&x>px0&&x<px1)||(x>bx-20*cs&&x<bx+7*cs&&y>by-9*cs&&y<by+2*cs));
+  SPERRE.C=C;SPERRE.cs=cs;SPERRE.f=f;return f;}
+const pixelsturzJetzt=C=>C.hr<1&&C.hr*3600<85&&!neujahr(C.d);
+function entdeckenLayer(C,cs,t){SZ_PAUSE=pixelsturzJetzt(C)||feuerwerkGross(C);if(SZ_PAUSE){SZ_JETZT=[];return;} // beim Pixelsturz und beim großen Neujahrsfeuerwerk Pause
+  const akt=szAktiv(C,cs);SZ_JETZT=akt;if(!akt.length)return;
+  const snap=x=>Math.floor(x/cs)*cs,hy=C.hy,frei=sperre(C,cs);
   const ridge=x=>hy-rv(FAR,x/W)*C.farSc-cs,dim=c=>mix(c,[0,0,0],(1-C.L)*0.6);
   for(const z of akt){const f=smooth(0,4,z.e)*(1-smooth(z.D-4,z.D,z.e));if(f<0.01)continue;
     const pa=(x,y,c,a=1,himmel=false)=>{const X=snap(x),Y=snap(y),cx=X+cs/2,cy=Y+cs/2;a*=f;if(a<0.02||cx<0||cx>W||cy<0||cy>H||!frei(cx,cy)||(himmel&&cy>ridge(cx)))return;ctx.fillStyle=rgba(c,a);ctx.fillRect(X+cs*0.06,Y+cs*0.06,cs*0.88,cs*0.88);};
@@ -898,10 +918,134 @@ function entdeckenLayer(C,cs,t){SZ_PAUSE=C.hr<1&&C.hr*3600<85;if(SZ_PAUSE){SZ_JE
       licht:(x,y,r,c,a)=>{if(!frei(x,y)||!frei(x-r,y)||!frei(x+r,y)||!frei(x,y-r)||!frei(x,y+r))return;ctx.save();ctx.globalCompositeOperation='lighter';softEllipse(x,y,r,r,c,a*f);ctx.restore();}}; // auch der Schein bleibt aus dem Strahl
     SZ_ZEICHNE[z.k](S);}}
 // Info-Zeile (?dev=1): welche Szene gerade läuft und welche als Nächstes kommt
-function szText(d){if(!ENTDECKEN)return '';if(SZ_PAUSE)return 'Szenen: Pause (Pixelsturz)';const m=d.getHours()*60+d.getMinutes(),P=szPlan(d);
+function szText(d){if(!ENTDECKEN)return '';if(SZ_PAUSE)return 'Szenen: Pause (Pixelsturz bzw. Feuerwerk)';const m=d.getHours()*60+d.getMinutes(),P=szPlan(d);
   const jetzt=SZ_JETZT.map(z=>SZ_NAME[z.k]+' (bis '+fmtM(z.s.b%1440)+')').join(' + ')||'keine';
   const naechste=[...P.haupt,...P.neben].filter(s=>s.a>m&&!SZ_JETZT.some(z=>z.s===s)).sort((a,b)=>a.a-b.a)[0];
   return 'Szene: '+jetzt+(naechste?' · als Nächstes: '+SZ_NAME[naechste.kand[0]]+(naechste.kand.length>1?' (oder '+naechste.kand.slice(1).map(k=>SZ_NAME[k]).join(', ')+')':'')+' um '+fmtM(naechste.a):'');}
+
+// ---------- Feste: Gespenst (Oktober, Halloween), Heiligabend, Silvester und Neujahr ----------
+// Alles im Pixelstil, zeitlich fest wie Eisvogel und Feuerwehrboot. Strahl, Pfähle und Dampfer bleiben frei (sperre).
+const neujahr=d=>d.getMonth()===0&&d.getDate()===1;
+const dunkelVon=C=>smooth(1,-5,C.sa); // 0 am Tag, 1 ab etwa 5° unter dem Horizont
+// Gespenst: im Oktober jeden Abend einmal einige Minuten zwischen 17 und 19 Uhr. Halloween (31.10.): den ganzen Abend immer wieder.
+// In der Geisterstunde danach (1.11., 0–1 Uhr) der große Auftritt, danach noch ein paar kleine.
+const GEIST_PLAENE=new Map();
+function geistPlan(d){const key=dayKey(d);if(GEIST_PLAENE.has(key))return GEIST_PLAENE.get(key);const m=d.getMonth(),dd=d.getDate(),r=rng(key*83+29),out=[];
+  const frei=(a,b)=>out.every(o=>b+2<=o.a||a>=o.b+2),dauer=()=>3+Math.floor(r()*3);
+  if(m===9){const D=dauer(),a=17*60+Math.floor(r()*(120-D));out.push({a,b:a+D,typ:'klein',seed:Math.floor(r()*1e9)});}
+  if(m===9&&dd===31){let t=17*60+15+Math.floor(r()*10);while(t<23*60+50){const D=dauer();if(frei(t,t+D))out.push({a:t,b:t+D,typ:'klein',seed:Math.floor(r()*1e9)});t+=D+4+Math.floor(r()*6);}}
+  if(m===10&&dd===1){out.push({a:2,b:14,typ:'gross',seed:Math.floor(r()*1e9)});let t=17;while(t<56){const D=dauer();out.push({a:t,b:t+D,typ:'klein',seed:Math.floor(r()*1e9)});t+=D+5+Math.floor(r()*6);}}
+  out.sort((p,q)=>p.a-q.a);if(GEIST_PLAENE.size>4)GEIST_PLAENE.delete(GEIST_PLAENE.keys().next().value);GEIST_PLAENE.set(key,out);return out;}
+// Gespenst als Pixelbild: weißer, rundlicher Körper, zwei schwarze ovale Augen, welliger Saum (zwei Bilder im Wechsel). Groß mit Mund ("Buh").
+const GEIST_K=['.###.','#####','#o#o#','#o#o#','#####'],GEIST_KS=['#.#.#','.#.#.'];
+const GEIST_G=['..#####..','.#######.','#########','##oo#oo##','##oo#oo##','##oo#oo##','#########','####m####','#########','#########'],GEIST_GS=['#.##.##.#','.##.##.##'],GEIST_BUH=['###mmm###','###mmm###'];
+function geistMalen(p,x,y,cs,k,gross,t,buh,negativ,maske){const rows=(gross?GEIST_G.slice():GEIST_K.slice());if(gross&&buh){rows[7]=GEIST_BUH[0];rows[8]=GEIST_BUH[1];}
+  rows.push((gross?GEIST_GS:GEIST_KS)[Math.floor(t*3)%2]);const w=rows[0].length,hh=rows.length,koerper=negativ?[24,26,36]:[246,248,255],auge=negativ?[236,238,246]:[14,14,22];
+  for(let j=0;j<hh;j++)for(let i=0;i<w;i++){const ch=rows[j][i];if(ch==='.')continue;const c=ch==='#'?koerper:auge;
+    for(let a=0;a<k;a++)for(let b=0;b<k;b++){const X=x+((i-(w-1)/2)*k+a)*cs,Y=y-((hh-j)*k-b)*cs;if(maske&&maske(X+cs/2,Y+cs/2))continue;p(X,Y,c,ch==='#'?0.95:1);}}}
+// Zellen sammeln und je Farbe in einem Zug zeichnen (statt eines fillRect pro Zelle); gleiche Pixel, weil sich die Zellen nicht überlappen
+function zellSammler(cs,frei){const snap=x=>Math.floor(x/cs)*cs,M=new Map();
+  const p=(x,y,c,a=1)=>{if(a<0.02)return;const X=snap(x),Y=snap(y);if(!frei(X+cs/2,Y+cs/2))return;const k=rgba(c,Math.round(a*50)/50);let L=M.get(k);if(!L)M.set(k,L=[]);L.push(X,Y);};
+  p.fertig=()=>{for(const [k,L] of M){ctx.fillStyle=k;ctx.beginPath();for(let i=0;i<L.length;i+=2)ctx.rect(L[i]+cs*0.06,L[i+1]+cs*0.06,cs*0.88,cs*0.88);ctx.fill();}M.clear();};return p;}
+// Kirche der Fraueninsel (wie in L_islands): Turm, Kirchenschiff, Inselrücken. Dahinter versteckt sich das Gespenst.
+function kircheMaske(C){const tx=W*0.425,iy=C.iy,tw=Math.max(3,W*0.007),th=H*0.052,a=tx+tw*0.5,m=tx+W*0.02,e=tx+W*0.04;
+  const dach=x=>x<m?lerp(iy-H*0.02,iy-H*0.032,(x-a)/(m-a)):lerp(iy-H*0.032,iy-H*0.02,(x-m)/(e-m));
+  return (x,y)=>(Math.abs(x-tx)<tw*0.8&&y>iy-th-tw*2.3)||(x>a&&x<e&&y>dach(x))||(x>W*0.36&&x<W*0.47&&y>iy-H*0.012);}
+function gespenstLayer(C,cs,t){const d=C.d,mo=d.getMonth();if(mo!==9&&!(mo===10&&d.getDate()===1))return;const P=geistPlan(d);if(!P.length)return;
+  const m=d.getHours()*60+d.getMinutes()+(d.getSeconds()+d.getMilliseconds()/1000)/60,frei=sperre(C,cs),negativ=C.hr<1&&!neujahr(d),p=zellSammler(cs,frei);
+  const tx=W*0.425,tw=Math.max(3,W*0.007),iy=C.iy,dachY=iy-H*0.032,xr=tx+W*0.022,yW=C.hy+(C.rowY-C.hy)*0.3,maske=kircheMaske(C),seg=(u,a,b)=>smooth(a,b,u);
+  for(const g of P){if(m<g.a||m>=g.b||pixelsturzJetzt(C))continue;const u=(m-g.a)/(g.b-g.a),r=rng(g.seed),dir=szLx(g.a)*W>tx?-1:1,bob=Math.sin(t*2.1)*cs*0.8;
+    if(g.typ==='klein'){ // steigt hinter dem Kirchenschiff auf, lugt am Turm vorbei, schwebt übers Wasser, versteckt sich wieder
+      const xT=tx-tw/2-3*cs,xW=tx+dir*W*(0.1+0.05*r()),yP=dachY+2*cs,yH=iy+cs;let x,y;
+      if(u<0.12){x=xr;y=lerp(yH,yP,seg(u,0,0.12));}else if(u<0.2){x=xr+Math.sin(t*1.3)*cs;y=yP;}else if(u<0.3){x=lerp(xr,xT,seg(u,0.2,0.3));y=yP;}
+      else if(u<0.4){const v=seg(u,0.3,0.4);x=lerp(xT,xW,v);y=lerp(yP,yW,v)+bob*v;}else if(u<0.7){x=xW+Math.sin((u-0.4)*12)*W*0.03;y=yW+bob-Math.sin((u-0.4)*9)*H*0.012;}
+      else if(u<0.82){const v=seg(u,0.7,0.82);x=lerp(xW,xr,v);y=lerp(yW,yP,v)+bob*(1-v);}else if(u<0.92){x=xr;y=yP;}else{x=xr;y=lerp(yP,yH,seg(u,0.92,1));}
+      if(!negativ&&C.night>0.2){const f=frei;if(f(x,y-3*cs)){ctx.save();ctx.globalCompositeOperation='lighter';softEllipse(x,y-3*cs,cs*5,cs*5,[200,210,255],0.12*C.night);ctx.restore();}}
+      geistMalen(p,x,y,cs,1,false,t,false,negativ,maske);}
+    else{ // großer Auftritt: erhebt sich hinter der Insel, zieht eine große Acht über See und Himmel, kleine Gespenster kreisen mit, in der Mitte "Buh"
+      const steig=seg(u,0,0.08)*(1-seg(u,0.92,1)),th=(u-0.08)/0.84*TAU*1.5,acht=u>0.08&&u<0.92;
+      let x=tx,y=lerp(iy+12*cs,C.hy-H*0.06,steig);if(acht){const v=smooth(0.08,0.14,u)*(1-smooth(0.86,0.92,u));x=lerp(tx,W*0.5+W*0.33*Math.sin(th),v);y=lerp(C.hy-H*0.06,H*(0.5-0.14*Math.cos(2*th)),v)+bob;}
+      const buh=u>0.48&&u<0.53,k=buh?3:2;geistMalen(p,x,y,cs,k,true,t,buh,negativ,acht?null:maske);
+      if(acht)for(let i=0;i<3;i++){const an=t*1.2+i*TAU/3;geistMalen(p,x+Math.cos(an)*W*0.1,y-6*cs+Math.sin(an)*H*0.05,cs,1,false,t+i,false,negativ,null);}}}
+  p.fertig();}
+function geistText(d){const mo=d.getMonth();if(mo!==9&&!(mo===10&&d.getDate()===1))return '';const m=d.getHours()*60+d.getMinutes(),P=geistPlan(d),jetzt=P.find(g=>m>=g.a&&m<g.b),n=P.find(g=>g.a>m);
+  return jetzt?'Gespenst '+(jetzt.typ==='gross'?'(großer Auftritt) ':'')+'bis '+fmtM(jetzt.b):n?'Gespenst um '+fmtM(n.a):'';}
+// Heiligabend ab der Dämmerung festlich, am 25. und 26.12. etwas ruhiger: Fensterlichter, Weihnachtsstern, Lichterkette am Dampfer, Schnee.
+// Zwischen 17 und 18 Uhr fliegt das Christkind einmal als leuchtendes Licht über den See.
+function weihnacht(d){const a=new Date(d.getFullYear(),d.getMonth(),d.getDate()-(d.getHours()<12?1:0)); // der Abend zählt bis zum nächsten Morgen
+  return a.getMonth()!==11?0:a.getDate()===24?1:(a.getDate()===25||a.getDate()===26)?0.6:0;}
+const FENSTER=(()=>{const r=rng(2412),a=[];const ufer=[[0.02,0.34],[0.48,0.585],[0.94,0.98]];
+  for(let i=0;i<13;i++){const q=ufer[Math.floor(r()*ufer.length)],x=lerp(q[0],q[1],r()),z=r()<0.3?2:1;a.push({fx:x,ort:'ufer',z,p:r()*TAU},{fx:x+0.0045,ort:'ufer',z,p:r()*TAU});}
+  for(let i=0;i<8;i++)a.push({fx:0.64+0.26*r(),ort:'insel',z:1+Math.floor(r()*3),p:r()*TAU});for(let i=0;i<5;i++)a.push({fx:0.365+0.045*r(),ort:'insel',z:1+Math.floor(r()*2),p:r()*TAU});return a;})();
+function christkindZeit(d){const r=rng(dayKey(d)*97+11);return fromWall(d.getFullYear(),d.getMonth(),d.getDate(),17,5+Math.floor(r()*45),Math.floor(r()*60));}
+function weihnachtLayer(C,cs,t){const lv=weihnacht(C.d),dk=dunkelVon(C);if(!lv||dk<0.02)return;const frei=sperre(C,cs),snap=x=>Math.floor(x/cs)*cs,p=zellSammler(cs,frei);
+  const warm=[[255,196,110],[255,214,140],[250,180,92]];
+  FENSTER.forEach((f,i)=>{if(lv<1&&i%5>2)return;const y=(f.ort==='ufer'?snap(C.hy):snap(C.iy))-f.z*cs;p(f.fx*W,y,warm[i%3],dk*(0.72+0.2*Math.sin(t*0.6+f.p))*(0.55+0.45*lv));});
+  // Weihnachtsstern mit Schweif über der Fraueninsel; weicht dem Mond aus
+  let x=W*0.425;const y=H*0.34,ab=W*0.1;if(!C.dayMode&&Math.abs(C.moonY-y)<H*0.12&&Math.abs(x-C.lx)<ab)x+=(x>=C.lx?1:-1)*(ab-Math.abs(x-C.lx));
+  const s=dk*(0.6+0.4*lv),tw=0.8+0.2*Math.sin(t*1.7),q=(i,j,a,c=[255,250,228])=>p(x+i*cs,y+j*cs,c,a*s);
+  if(frei(x,y)){ctx.save();ctx.globalCompositeOperation='lighter';softEllipse(x+cs/2,y+cs/2,cs*6,cs*6,[255,236,190],0.22*s);ctx.restore();}
+  q(0,0,1);for(const [i,j] of [[1,0],[-1,0],[0,-1],[0,1]])q(i,j,0.85*tw);q(2,0,0.45);q(-2,0,0.45);q(0,-2,0.45);q(0,2,0.6);q(0,3,0.35);for(const [i,j] of [[1,1],[-1,1],[1,-1],[-1,-1]])q(i,j,0.25*tw);
+  const ziel=C.iy-H*0.06,ridge=x2=>C.hy-rv(FAR,x2/W)*C.farSc-2*cs; // Schweif nach unten zur Insel, endet über den Bergen
+  for(let k=4;k<=20;k++){const yy=y+k*cs,xx=x+(W*0.425-x)*(k/20)+Math.sin(k*1.3)*0.3*cs;if(yy>ziel||yy>ridge(xx))break;const a=0.85*(1-k/21)*(0.75+0.25*Math.sin(t*3+k));p(xx,yy,[255,236,180],Math.min(1,a*s));if(k<9)p(xx+cs,yy,[255,236,180],a*0.5*s);}
+  // Christkind (nur am 24.12., 17–18 Uhr, einmal 80 s)
+  if(lv===1){const T=instant(C.d),t0=christkindZeit(C.d),u=(T-t0)/80000;if(u>0&&u<1){const r=rng(dayKey(C.d)),dir=r()<0.5?1:-1,X=W*(dir>0?lerp(-0.04,1.04,u):lerp(1.04,-0.04,u)),Y=C.hy-H*0.035-H*0.05*Math.sin(Math.PI*u)+Math.sin(t*3)*cs*0.5;
+    if(frei(X,Y)){ctx.save();ctx.globalCompositeOperation='lighter';softEllipse(X+cs/2,Y+cs/2,cs*3.5,cs*3.5,[255,240,200],0.35);ctx.restore();}
+    p(X,Y,[255,250,232],1);for(const [i,j] of [[1,0],[-1,0],[0,-1],[0,1]])p(X+i*cs,Y+j*cs,[255,240,200],0.5);
+    for(let k=1;k<=14;k++){const uk=u-k*0.006,Xk=W*(dir>0?lerp(-0.04,1.04,uk):lerp(1.04,-0.04,uk)),Yk=C.hy-H*0.035-H*0.05*Math.sin(Math.PI*uk);p(Xk,Yk,[255,226,150],0.5*(1-k/15)*(0.6+0.4*Math.sin(t*9+k)));}
+    p(X,C.hy+(C.hy-Y)*0.5,[255,236,190],0.25);}}p.fertig();} // Spiegelung im See
+// Lichterkette am Dampfer (in rasterClock): Zellen um den Schornstein herum, der Schornstein selbst bleibt frei
+const KETTE_G=[[-5,-4],[-4,-4],[-3,-4],[-2,-4],[-1,-4],[1,-4],[2,-3],[3,-3],[4,-2],[5,-2]],KETTE_K=[[-2,-2],[-1,-2],[1,-2],[2,-1]],KETTE_F=[[255,214,120],[255,96,84],[120,224,120],[130,176,255]];
+// Silvester und Neujahr. Raketen je 5-Sekunden-Abschnitt aus festen Zufallszahlen, daher jederzeit berechenbar und jedes Jahr gleich ablaufend.
+// h = Stunden ab 31.12., 0 Uhr: am 31.12. ab Dunkelheit zunehmend bis Mitternacht, 0–0:30 großes Feuerwerk über die ganze Breite (statt Pixelsturz),
+// bis etwa 3 Uhr Nachzügler, am Abend des 1.1. vereinzelte Raketen. Raketen pro Minute:
+function raketenRate(h,dunkel){if(h<24)return dunkel?Math.min(40,0.4*Math.exp(0.62*(h-17))):0;if(h<24.5)return 240-170*smooth(24.12,24.5,h);if(h<27.5)return 25*Math.exp(-(h-24.5)*1.4);if(h>=40&&h<46)return dunkel?0.6:0;return 0;}
+const silvesterStunde=d=>d.getMonth()===11&&d.getDate()===31?d.getHours()+d.getMinutes()/60+d.getSeconds()/3600:neujahr(d)?24+d.getHours()+d.getMinutes()/60+d.getSeconds()/3600:-1;
+const feuerwerkGross=C=>{const h=silvesterStunde(C.d);return h>=24&&h<24.5;};
+const FW_FARBEN=[[255,206,92],[255,82,70],[96,232,116],[96,156,255],[244,244,255],[204,116,255],[255,150,60]];
+function raketen(T,h,dunkel){const out=[],b0=Math.floor((T-9000)/5000),b1=Math.floor(T/5000);
+  for(let b=b0;b<=b1;b++){const hb=h+(b*5000-T)/36e5,lam=raketenRate(hb,dunkel)/12;if(lam<=0)continue;const r=rng((b*7919+13)>>>0),n=Math.floor(lam)+(r()<lam%1?1:0),gross=hb>=24&&hb<24.5;
+    for(let k=0;k<n;k++){const q={t0:b*5000+r()*5000,x:0.03+0.94*r(),yb:gross?0.08+0.32*r():0.2+0.22*r(),steig:1+0.7*r(),typ:Math.floor(r()*5),f1:Math.floor(r()*7),f2:Math.floor(r()*7),
+      n:gross?48+Math.floor(r()*40):24+Math.floor(r()*14),R:gross?0.06+0.06*r():0.03+0.025*r(),L:gross?2.4+1.4*r():1.9+1.1*r(),seed:Math.floor(r()*1e6)};if(q.t0<=T)out.push(q);}} // erst alle Zufallswerte ziehen, dann filtern
+  return out;}
+// Zellpuffer: eine Farbe pro Rasterzelle direkt ins Bild geschrieben (keine einzelnen Zeichenbefehle), dann in einem Zug vor den Rasterlinien über die Zellen
+// gelegt. Feuerwerk addiert Licht ('lighter'), Rauch liegt halbdurchsichtig darüber.
+const FXB={w:0,h:0,c:null,cx:null,img:null,d:null,an:false},RAUCH={w:0,h:0,c:null,cx:null,img:null,t:-1e9,an:false};
+function fxNeu(B,cols,rows){if(B.w!==cols||B.h!==rows){B.w=cols;B.h=rows;B.c=document.createElement('canvas');B.c.width=cols;B.c.height=rows;B.cx=B.c.getContext('2d');B.img=B.cx.createImageData(cols,rows);B.d=B.img.data;}}
+function feuerwerk(C,cs,t,cols,rows){const h=silvesterStunde(C.d);FXB.an=false;if(h<0)return;const dunkel=C.sa<-3,T=instant(C.d),R=raketen(T,h,dunkel);if(!R.length)return;
+  fxNeu(FXB,cols,rows);const D=FXB.d,frei=sperre(C,cs),hyR=C.hy/cs;D.fill(0);FXB.an=true;
+  const add=(i,j,c,k)=>{i=Math.round(i);j=Math.round(j);if(k<0.03||i<0||j<0||i>=cols||j>=rows||!frei((i+0.5)*cs,(j+0.5)*cs))return;const o=(j*cols+i)*4;D[o]=Math.min(255,D[o]+c[0]*k);D[o+1]=Math.min(255,D[o+1]+c[1]*k);D[o+2]=Math.min(255,D[o+2]+c[2]*k);D[o+3]=255;};
+  const spiegel=(i,j,c,k)=>{if(j<hyR-1&&k>0.25)add(i,hyR+(hyR-j)*0.32+1,c,k*0.2);}; // schwache Spiegelung im See
+  for(const q of R){const age=(T-q.t0)/1000,x0=q.x*W/cs,yb=q.yb*H/cs,y0=hyR-1;
+    if(age<q.steig){const v=1-Math.pow(1-age/q.steig,2),y=lerp(y0,yb,v),x=x0+Math.sin(q.seed+age*3)*0.6;add(x,y,[255,222,170],1);for(let k=1;k<=3;k++)add(x,y+k*(1-v*0.5),[255,170,90],0.55*(1-k/4));continue;}
+    const a=age-q.steig;if(a>q.L)continue;const k0=1.3*Math.pow(1-a/q.L,0.9),weide=q.typ===2,ring=q.typ===1,kn=q.typ===3,Rz=q.R*W/cs*(1-Math.exp(-a*2.4)),g=(weide?0.05:0.03)*H/cs*a*a;
+    if(a<0.12)for(let i=-1;i<=1;i++)for(let j=-1;j<=1;j++)add(x0+i,yb+j,[255,255,255],0.7*(1-a/0.12));
+    for(let pI=0;pI<q.n;pI++){const th=TAU*pI/q.n+hsh(q.seed,pI,1)*0.25,sv=ring?1:pI%3===2?0.45+0.15*hsh(q.seed,pI,2):0.7+0.3*hsh(q.seed,pI,2),x=x0+Math.cos(th)*Rz*sv,y=yb+Math.sin(th)*Rz*sv*0.92+g; // gefüllt: zwei Schalen
+      if(kn&&a>0.5&&hsh(q.seed,pI,Math.floor(t*14))<0.45)continue; // Knistern
+      const c=weide?FW_FARBEN[0]:FW_FARBEN[(q.typ===4&&pI%2)?q.f2:q.f1],k=k0*(kn&&a>0.5?1.2:1);add(x,y,c,k);spiegel(x,y,c,k);
+      if(weide||a<0.9)for(let z=1;z<=(weide?3:1);z++)add(x-Math.cos(th)*sv*0.9*z,y-Math.sin(th)*sv*0.9*z-(weide?0.8*z:0),c,k*0.45/z);}}} // kurze Spuren
+// Neujahrsmorgen: Rauch über dem See (ab 0:15 zunehmend, bis 11 Uhr verzogen). Langsam treibende Schwaden, zweimal pro Sekunde neu berechnet.
+function rauch(C,cs,t,cols,rows){const h=silvesterStunde(C.d),S=h<24?0:smooth(24.25,25,h)*lerp(0.35,1,smooth(30,31.5,h))*(1-smooth(32.5,35,h));RAUCH.an=false;if(S<0.02)return;fxNeu(RAUCH,cols,rows);RAUCH.an=true; // nachts schwach, am Morgen deutlich, bis 11 Uhr verzogen
+  if(Math.abs(t-RAUCH.t)<0.5&&RAUCH.s===S)return;RAUCH.t=t;RAUCH.s=S;const D=RAUCH.d,frei=sperre(C,cs),hyR=Math.floor(C.hy/cs),j0=Math.max(0,hyR-Math.round(rows*0.05)),j1=Math.min(rows,hyR+Math.round(rows*0.22));D.fill(0);
+  const col=mix([70,66,66],[148,138,128],C.L),G=16,nz=(x,y)=>{const xi=Math.floor(x),yi=Math.floor(y),fx=x-xi,fy=y-yi,s=v=>v*v*(3-2*v),a=hsh(xi,yi,3),b=hsh(xi+1,yi,3),c=hsh(xi,yi+1,3),e=hsh(xi+1,yi+1,3);return lerp(lerp(a,b,s(fx)),lerp(c,e,s(fx)),s(fy));};
+  for(let j=j0;j<j1;j++){const prof=Math.exp(-(((j-hyR-rows*0.035)/(rows*0.075))**2));for(let i=0;i<cols;i++){const n=nz(i/G+t*0.012,j/(G*0.35))*0.7+nz(i/(G*0.45)-t*0.02,j/(G*0.3)+5)*0.3,al=S*prof*smooth(0.3,0.75,n)*0.46;
+    if(al<0.02)continue;const o=(j*cols+i)*4,k=frei((i+0.5)*cs,(j+0.5)*cs)?1:0.15;D[o]=col[0];D[o+1]=col[1];D[o+2]=col[2];D[o+3]=Math.min(255,al*k*255);}} // im Strahl kaum Rauch
+  RAUCH.cx.putImageData(RAUCH.img,0,0);}
+function festText(d){const out=[],g=geistText(d);if(g)out.push(g);const w=weihnacht(d);if(w)out.push(w===1?'Heiligabend, Christkind um '+fmtM(Math.round((christkindZeit(d)-fromWall(d.getFullYear(),d.getMonth(),d.getDate()))/6e4)):'Weihnachten (ruhiger)');
+  const h=silvesterStunde(d);if(h>=0){const r=raketenRate(h,true);out.push(h>=24&&h<24.5?'Neujahr: großes Feuerwerk statt Pixelsturz':r>0.05?'Silvester/Neujahr: etwa '+Math.round(r)+' Raketen pro Minute (bei Dunkelheit)':RAUCH.an?'Neujahr: Rauch über dem See':'Silvester/Neujahr');}
+  return out.join(', ');}
+// "Seltenheit finden": besondere Momente eines Tages (Seltenheiten, Gespenst, Heiligabend, Silvester und Neujahr, Regenbogen in der Feuerwehr-Fontäne)
+function momenteAm(d){const y=d.getFullYear(),m=d.getMonth(),dd=d.getDate(),T=(h,mi=0,s=0)=>fromWall(y,m,dd,h,mi,s),out=[];
+  for(const ev of dayRare(d))if(ev.r){const h=ev.b>24?ev.a+0.6:(ev.a+ev.b)/2;out.push({T:T(0,Math.round(h*60)),n:ev.n});}
+  const gp=geistPlan(d);if(gp.length){const g=gp.find(x=>x.typ==='gross');if(g)out.push({T:T(0,g.a,40),n:'Halloween: großer Auftritt in der Geisterstunde'});
+    else out.push({T:T(0,gp[0].a,35),n:m===9&&dd===31?'Halloween: das Gespenst kommt immer wieder':'Gespenst an der Fraueninsel'});}
+  if(m===11&&dd===24){out.push({T:T(16,45),n:'Heiligabend: Stern, Lichter, Schnee'},{T:christkindZeit(d)-5000,n:'Christkind fliegt über den See'});}
+  if(m===11&&(dd===25||dd===26))out.push({T:T(18,0),n:'Weihnachten (ruhiger)'});
+  if(m===11&&dd===31)out.push({T:T(20,30),n:'Silvester: erste Raketen'},{T:T(23,55),n:'Silvester: kurz vor Mitternacht'});
+  if(m===0&&dd===1)out.push({T:T(0,0,3),n:'Neujahr: großes Feuerwerk'},{T:T(1,30),n:'Neujahr: Nachzügler'},{T:T(9,0),n:'Neujahrsmorgen: Rauch über dem See'},{T:T(18,30),n:'Neujahrsabend: vereinzelte Raketen'});
+  if(T(12)>nowT()+36e5*30&&wtypeOf(d)<=1){const V=visitorTimes(d),t0=T(0,V.fw,FW.min*28);if(astro(new Date(t0)).sun.alt/rad>6)out.push({T:t0,n:'Regenbogen in der Feuerwehr-Fontäne'});} // simuliertes Wetter, sonnig
+  return out.sort((a,b)=>a.T-b.T);}
+let MOMENT=null;
 
 // ---------- Jahreszeiten (dezent) ----------
 function seasonAmt(d){const doy=(d-new Date(d.getFullYear(),0,1))/864e5;
@@ -956,30 +1100,37 @@ function rasterClock(C,cs,gap,t,A){const snap=x=>Math.floor(x/cs)*cs,g=Math.max(
     cell(bx,by-3*cs,chim);cell(bx,by-4*cs,chim);cell(bx-5*cs,by-2*cs,trim);cell(bx-5*cs,by-3*cs,trim);cell(bx-6*cs,by-3*cs,messe?[232,168,56]:mix([80,120,180],[0,0,0],1-L));
     const sm=mix(S.hor,[215,215,220],0.4);for(let i=1;i<=4;i++)cell(bx-(i-1)*cs,by-(4+i)*cs,sm,(0.45/i)*(0.6+0.4*Math.sin(t*2-i))*(1-0.5*night));if(dark)for(const i of[-3,-1,1])cell(bx+i*cs,by-2*cs,[255,215,140],0.95);}
   else{for(let i=-3;i<=3;i++)cell(bx+i*cs,by,hull);for(let i=-2;i<=1;i++)cell(bx+i*cs,by-cs,cab,dark?0.9:1);cell(bx,by-2*cs,chim);cell(bx-3*cs,by-2*cs,messe?[232,168,56]:mix([80,120,180],[0,0,0],1-L));}
+  const wl=weihnacht(d)*smooth(-1,-4,sa);if(wl>0.02){const K=big?KETTE_G:KETTE_K;K.forEach(([i,j],n)=>cell(bx+i*cs,by+j*cs,KETTE_F[n%4],wl*(weihnacht(d)===1?0.7+0.3*Math.sin(t*3+n*1.9):0.85)));} // Weihnachten: Lichterkette, Schornstein bleibt frei
   if(HELP){ctx.fillStyle='rgba(245,238,222,0.6)';for(let k=0;k<=12;k+=3)ctx.fillText(String(k*5),snap(xv(k))+cs/2,by+cs*(big?4:3));}}
-function drawRaster(t,A,d,st){const p0=performance.now();
+function drawRaster(t,A,d,st){const p0=performance.now();verlaufBild();
   const C=scene(t,A,d,st),RS=rasterState(C,st);STATE=RS.label;
   const cs=clamp(RS.cs,3,12),cols=Math.ceil(W/cs),rows=Math.ceil(H/cs),rare=activeRare(d);
-  if(!off||off.width!==cols||off.height!==rows){off=document.createElement('canvas');off.width=cols;off.height=rows;offCtx=off.getContext('2d',{willReadFrequently:true});}
+  if(!off||off.width!==cols||off.height!==rows){const asy=GPU_WUNSCH&&LESEN.wunsch!=='cpu'&&LESEN.wunsch!=='webgl'&&asyncInit();if(asy)LESEN.jetzt='async';SZENE_GPU=asy&&SZENE_GPU_ERLAUBT; // asynchron lesen; Szene im Prozessor (bitgenau) oder auf der Grafikeinheit
+    off=document.createElement('canvas');off.width=cols;off.height=rows;offCtx=off.getContext('2d',SZENE_GPU?{}:{willReadFrequently:true});}
+  // Halbe Szene (Automatik bei schwachen Geräten): im einen Bild Himmel und Berge, im nächsten See, Ufer und Abschluss samt Auslesen; dazwischen
+  // gelten die zuletzt gelesenen Pixel. Die Zeichenfläche behält die erste Hälfte, das Ergebnis ist dieselbe Szene wie in einem Zug.
+  const teil=(SZENE_HALB_WUNSCH==='halb'||(SZENE_HALB_WUNSCH==='auto'&&AUTO.halb))&&ASYNC_JETZT&&LESEN.jetzt==='async'&&ASY.hat&&ASY.w===cols&&ASY.h===rows?(SZ_TEIL.p^=1):-1;
   const sc=ctx,sW=W,sH=H;let img;ctx=offCtx;W=cols;H=rows;LS=cols/sW;
   try{ctx.setTransform(1,0,0,1,0,0);ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';const c=scene(t,A,d,st);
-    L_sky(c);if(rare.aurora)R_aurora(c,rare.aurora);if(rare.halo)R_halo(c,rare.halo);if(rare.meteor)R_meteor(c,rare.meteor);
-    L_clouds(c);W_decke(c);L_far(c);if(rare.sonnwend)R_sonnwend(c,rare.sonnwend);W_rainbow(c);W_rain(c);L_mid(c);W_hochnebel(c);L_lake(c);if(rare.ice)R_ice(c,rare.ice);
+    if(teil!==1){L_sky(c);if(rare.aurora)R_aurora(c,rare.aurora);if(rare.halo)R_halo(c,rare.halo);if(rare.meteor)R_meteor(c,rare.meteor);
+    L_clouds(c);W_decke(c);L_far(c);if(rare.sonnwend)R_sonnwend(c,rare.sonnwend);W_rainbow(c);W_rain(c);L_mid(c);W_hochnebel(c);}
+    if(teil===0){offCtx.getImageData(0,0,1,1);var p1=performance.now();img=ASY.buf;}else{ // erste Hälfte gleich rastern (sonst fiele die Arbeit doch ins nächste Bild)
+    L_lake(c);if(rare.ice)R_ice(c,rare.ice);
     if(rare.aurora)softEllipse(W/2,c.hy+(H-c.hy)*0.12,W*0.6,(H-c.hy)*0.12,[70,230,140],0.1*rare.aurora*c.night);
     L_islands(c);if(rare.advent)R_advent(c,rare.advent);L_mist(c);W_nebelSee(c);if(rare.fire)R_fire(c,rare.fire);if(rare.glut)R_glut(c,rare.glut);
-    R_bells(c);L_beam(c);L_shore(c);L_finish(c,{...st,tex:0,vig:st.vig*0.7,sat:st.sat+RS.sat});W_lightning(c);var p1=performance.now();img=readScene(off,cols,rows);}
+    R_bells(c);L_beam(c);L_shore(c);L_finish(c,{...st,tex:0,vig:st.vig*0.7,sat:st.sat+RS.sat});W_lightning(c);var p1=performance.now();img=(ASYNC_JETZT&&LESEN.jetzt==='async'&&readSceneAsync(off,cols,rows))||readScene(off,cols,rows);}}
   finally{ctx=sc;W=sW;H=sH;LS=1;}const p2=performance.now();
   const N=cols*rows;if(!CR||CR.length!==N*3)CR=new Float32Array(N*3);const cr=CR,hyRow=Math.floor(C.hy/cs),tq=Math.floor(t*3)%4096; // Takt für Zufallsmuster; begrenzt, sonst rechnet der Sinus nach Stunden Laufzeit sechsmal langsamer (Muster wiederholt sich nach 23 min)
   // Schnell: was nur von Zeile, Spalte oder dem Drittelsekunden-Takt abhängt, wird einmal berechnet statt für jede Zelle (gleiches Ergebnis)
   const jit=RS.jitter>=0.25?jitterMap(cols,rows,tq):null, /* unter 0,25 verschiebt sich keine Zelle (Rundung ergibt 0) */smc=RS.smear>0?smearCols(cols):null,jA=RS.jitter,sm6=RS.smear*0.6;
   abtasten(img,cr,cols,rows,hyRow,t,tq,jit,smc,jA,sm6,RS.drift,RS.glitch);
-  if(RS.sort>0){const Lmax=Math.max(2,Math.floor(hyRow*RS.sort)),key=new Float64Array(Lmax),idx=new Array(Lmax),tmp=new Float32Array(Lmax*3);
-    for(let i=0;i<cols;i++){const Ls=RS.sortHimmel?Math.max(2,Math.min(Lmax,Math.floor((C.hy-rv(FAR,(i+0.5)/cols)*C.farSc)/cs)-1)):Lmax;idx.length=Ls; // nur bis knapp über den Bergkamm
-      for(let j=0;j<Ls;j++){const o=(j*cols+i)*3;key[j]=cr[o]*0.3+cr[o+1]*0.59+cr[o+2]*0.11;idx[j]=j;tmp[3*j]=cr[o];tmp[3*j+1]=cr[o+1];tmp[3*j+2]=cr[o+2];}
-      idx.sort((p,q)=>key[p]-key[q]);for(let j=0;j<Ls;j++){const o=(j*cols+i)*3,s=3*idx[j];cr[o]=tmp[s];cr[o+1]=tmp[s+1];cr[o+2]=tmp[s+2];}}}
+  if(RS.sort>0){const Lmax=Math.max(2,Math.floor(hyRow*RS.sort)),key=new Float64Array(Lmax),idx=new Int32Array(Lmax),ih=new Int32Array(Lmax),tmp=new Float32Array(Lmax*3);
+    for(let i=0;i<cols;i++){const Ls=RS.sortHimmel?Math.max(2,Math.min(Lmax,Math.floor((C.hy-rv(FAR,(i+0.5)/cols)*C.farSc)/cs)-1)):Lmax; // nur bis knapp über den Bergkamm
+      for(let j=0;j<Ls;j++){const o=(j*cols+i)*3;key[j]=cr[o]*0.3+cr[o+1]*0.59+cr[o+2]*0.11;tmp[3*j]=cr[o];tmp[3*j+1]=cr[o+1];tmp[3*j+2]=cr[o+2];}
+      sortStabil(key,idx,ih,Ls);for(let j=0;j<Ls;j++){const o=(j*cols+i)*3,s=3*idx[j];cr[o]=tmp[s];cr[o+1]=tmp[s+1];cr[o+2]=tmp[s+2];}}}
   physics(C,cr,cols,rows,hyRow,t);seasonLayer(C,cr,cols,rows,hyRow,t,cs);
-  const eMid=C.hr<1?C.hr*3600:-1,falling=st.rmode==='mix'&&eMid>=0&&eMid<85;if(falling)pixelFall(cr,cols,rows,hyRow,eMid,t);
-  if(st.rmode==='mix'&&C.hr>=23.98)pixelFallVorbereiten(cols,rows,hyRow); // eine gute Minute vorher, damit der Sturz selbst flüssig läuft
+  const eMid=C.hr<1?C.hr*3600:-1,falling=st.rmode==='mix'&&eMid>=0&&eMid<85&&!neujahr(C.d);if(falling)pixelFall(cr,cols,rows,hyRow,eMid,t);
+  if(st.rmode==='mix'&&C.hr>=23.98&&!(d.getMonth()===11&&d.getDate()===31))pixelFallVorbereiten(cols,rows,hyRow); // eine gute Minute vorher, damit der Sturz selbst flüssig läuft
   const p3=performance.now();
   // Eine Farbe pro Rasterzelle; die Grafikkarte vergrößert danach auf Bildschirmgröße
   if(!buf||buf.width!==cols||buf.height!==rows){buf=document.createElement('canvas');buf.width=cols;buf.height=rows;bufCtx=buf.getContext('2d');bufImg=bufCtx.createImageData(cols,rows);bufU=new Uint32Array(bufImg.data.buffer);}
@@ -997,12 +1148,17 @@ function drawRaster(t,A,d,st){const p0=performance.now();
   bufCtx.putImageData(bufImg,0,0);src=buf;}
   // Zellen ohne Weichzeichnen auf Bildschirmgröße ziehen, dann die dunklen Rasterlinien. Deren Breite wird so verteilt,
   // dass ihr Flächenanteil auf jedem Bildschirm gleich bleibt (z. B. abwechselnd 1 und 2 Pixel bei 1,5).
-  const csP=cs*DPR,gP=RS.gap*DPR;ctx.setTransform(1,0,0,1,0,0);ctx.imageSmoothingEnabled=false;ctx.drawImage(src,0,0,cols*csP,rows*csP);ctx.imageSmoothingEnabled=true;
-  if(gP>0){ctx.fillStyle=`rgb(${bg[0]|0},${bg[1]|0},${bg[2]|0})`;
-    for(let i=1;i<=cols;i++){const e=Math.round(i*csP),w=Math.round(i*gP)-Math.round((i-1)*gP);if(w>0)ctx.fillRect(e-w,0,w,cv.height);}
-    for(let j=1;j<=rows;j++){const e=Math.round(j*csP),w=Math.round(j*gP)-Math.round((j-1)*gP);if(w>0)ctx.fillRect(0,e-w,cv.width,w);}}
+  const csP=cs*DPR,gP=RS.gap*DPR;ctx.setTransform(1,0,0,1,0,0);ctx.imageSmoothingEnabled=false;ctx.drawImage(src,0,0,cols*csP,rows*csP);
+  feuerwerk(C,cs,t,cols,rows);rauch(C,cs,t,cols,rows); // Silvester/Neujahr: Zellpuffer, vor den Rasterlinien
+  if(RAUCH.an)ctx.drawImage(RAUCH.c,0,0,cols*csP,rows*csP);
+  if(FXB.an){FXB.cx.putImageData(FXB.img,0,0);ctx.globalCompositeOperation='lighter';ctx.drawImage(FXB.c,0,0,cols*csP,rows*csP);ctx.globalCompositeOperation='source-over';}
+  ctx.imageSmoothingEnabled=true;
+  if(gP>0){ctx.fillStyle=`rgb(${bg[0]|0},${bg[1]|0},${bg[2]|0})`;const gk=cols+'|'+rows+'|'+csP+'|'+gP+'|'+cv.width+'|'+cv.height; // alle Linien als ein vorbereiteter Pfad: ein Zeichenbefehl statt Hunderten, gleiche Pixel
+    if(GITTER.k!==gk){const P=new Path2D();for(let i=1;i<=cols;i++){const e=Math.round(i*csP),w=Math.round(i*gP)-Math.round((i-1)*gP);if(w>0)P.rect(e-w,0,w,cv.height);}
+      for(let j=1;j<=rows;j++){const e=Math.round(j*csP),w=Math.round(j*gP)-Math.round((j-1)*gP);if(w>0)P.rect(0,e-w,cv.width,w);}GITTER.k=gk;GITTER.p=P;}
+    ctx.fill(GITTER.p);}
   const p4=performance.now();ctx.setTransform(DPR,0,0,DPR,0,0);
-  astroLayer(C,cs,t);if(ENTDECKEN&&st.rmode==='mix')entdeckenLayer(C,cs,t);rasterClock(C,cs,RS.gap,t,A);extrasLayer(C,cs,t);familyLayer(C,cs,t); // Astro und Szenen zuerst: die Uhr liegt immer obenauf
+  astroLayer(C,cs,t);if(ENTDECKEN&&st.rmode==='mix')entdeckenLayer(C,cs,t);gespenstLayer(C,cs,t);weihnachtLayer(C,cs,t);rasterClock(C,cs,RS.gap,t,A);extrasLayer(C,cs,t);familyLayer(C,cs,t); // Astro und Szenen zuerst: die Uhr liegt immer obenauf
   PERF.szene+=p1-p0;PERF.lesen+=p2-p1;PERF.zellen+=p3-p2;PERF.farben+=p4-p3;PERF.rest+=performance.now()-p4;}
 // Abtasten: jede Zelle holt ihre Farbe aus der Szene, verschoben durch Wind, Glitch, Flimmern, Regen-Schlieren.
 // Eigene Funktion, damit sie optimiert weiterläuft, auch wenn der Browser drawRaster wegen eines seltenen Zweigs neu übersetzt.
@@ -1066,7 +1222,7 @@ let RB=null;
 // Welcher Weg schneller ist, hängt vom Gerät ab: Beim WebGL-Weg muss der Prozessor warten, bis die Grafikeinheit fertig ist; das kann auf
 // manchen Geräten lange dauern. Automatik: nach dem Start abwechselnd beide Wege messen (ganze Bildzeit) und den schnelleren behalten.
 const LESEN={wunsch:'auto',jetzt:'webgl',start:0,s:{webgl:[],cpu:[]},fertig:false};
-function lesenTune(now,work){if(LESEN.fertig||LESEN.wunsch!=='auto')return;if(!LESEN.start){LESEN.start=now+4000;return;}if(now<LESEN.start)return;
+function lesenTune(now,work){if(LESEN.fertig||LESEN.wunsch!=='auto'||LESEN.jetzt==='async')return;if(!LESEN.start){LESEN.start=now+4000;return;}if(now<LESEN.start)return;
   LESEN.s[LESEN.jetzt].push(work);LESEN.jetzt=LESEN.jetzt==='webgl'?'cpu':'webgl';
   if(LESEN.s.cpu.length>=40&&LESEN.s.webgl.length>=40){const m=a=>a.reduce((x,y)=>x+y,0)/a.length;LESEN.ms={webgl:m(LESEN.s.webgl),cpu:m(LESEN.s.cpu)};
     LESEN.jetzt=LESEN.ms.cpu<LESEN.ms.webgl*0.85?'cpu':'webgl';LESEN.fertig=true;}} // WebGL bevorzugt (weniger Aufräumen im Speicher), außer der Prozessor ist klar schneller
@@ -1080,6 +1236,29 @@ function readScene(src,w,h){if(LESEN.jetzt==='cpu')return src.getContext('2d').g
   if(gl&&!gl.isContextLost())try{gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,src);gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,RB.tx,0);
     if(!RB.buf||RB.buf.length!==w*h*4)RB.buf=new Uint8Array(w*h*4);gl.readPixels(0,0,w,h,gl.RGBA,gl.UNSIGNED_BYTE,RB.buf);if(RB.ok||gl.getError()===gl.NO_ERROR){RB.ok=true;return RB.buf;}}catch(e){} // Fehlerabfrage nur beim ersten Mal (sie zwingt sonst jedes Bild zum Warten)
   RB.gl=null;LESEN.jetzt='cpu';LESEN.fertig=true;return src.getContext('2d').getImageData(0,0,w,h).data;}
+// Asynchron auslesen (Standard, wenn die Grafikeinheit rechnet und WebGL2 da ist): Die Szene wird auf der Grafikeinheit gemalt, in eine Textur
+// kopiert und mit readPixels in einen Pixelpuffer gelesen, ohne zu warten; ein Fence meldet, wann die Daten da sind. Verwendet wird das Ergebnis
+// des vorigen Bildes (33 ms später, unsichtbar). So wartet der Prozessor nie auf die Grafikeinheit. Nur in der Bildschleife (ASYNC_JETZT);
+// der Pixelvergleich und ?gpu=0 lesen wie bisher synchron und bitgenau (Szene im Prozessor gemalt).
+let ASYNC_JETZT=false,SZENE_GPU=false,SZENE_GPU_ERLAUBT=false;const SZ_TEIL={p:1};
+const ASY={init:false,gl:null,w:0,h:0,pbo:[],fence:[null,null],i:0,buf:null,hat:false};
+function asyncInit(){if(ASY.init)return !!ASY.gl;ASY.init=true;
+  try{const gl=document.createElement('canvas').getContext('webgl2',{antialias:false,depth:false,stencil:false,premultipliedAlpha:false,preserveDrawingBuffer:false});
+    if(gl){const tx=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,tx);for(const p of [gl.TEXTURE_MIN_FILTER,gl.TEXTURE_MAG_FILTER])gl.texParameteri(gl.TEXTURE_2D,p,gl.NEAREST);
+      for(const p of [gl.TEXTURE_WRAP_S,gl.TEXTURE_WRAP_T])gl.texParameteri(gl.TEXTURE_2D,p,gl.CLAMP_TO_EDGE);
+      gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL,false);gl.pixelStorei(gl.UNPACK_COLORSPACE_CONVERSION_WEBGL,gl.NONE);
+      const fb=gl.createFramebuffer();gl.bindFramebuffer(gl.FRAMEBUFFER,fb);ASY.gl=gl;ASY.tx=tx;ASY.fb=fb;}}catch(e){}
+  return !!ASY.gl;}
+function readSceneAsync(src,w,h){const gl=ASY.gl;if(!gl||gl.isContextLost())return null;
+  try{if(ASY.w!==w||ASY.h!==h){for(const b of ASY.pbo)gl.deleteBuffer(b);for(const f of ASY.fence)if(f)gl.deleteSync(f);ASY.pbo=[gl.createBuffer(),gl.createBuffer()];
+      for(const b of ASY.pbo){gl.bindBuffer(gl.PIXEL_PACK_BUFFER,b);gl.bufferData(gl.PIXEL_PACK_BUFFER,w*h*4,gl.STREAM_READ);}ASY.fence=[null,null];ASY.w=w;ASY.h=h;ASY.buf=new Uint8Array(w*h*4);ASY.hat=false;}
+    const i=ASY.i,j=1-i;ASY.i=j;
+    gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,src);gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,ASY.tx,0); // Auftrag für dieses Bild
+    gl.bindBuffer(gl.PIXEL_PACK_BUFFER,ASY.pbo[i]);gl.readPixels(0,0,w,h,gl.RGBA,gl.UNSIGNED_BYTE,0);if(ASY.fence[i])gl.deleteSync(ASY.fence[i]);ASY.fence[i]=gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE,0);gl.flush();
+    if(ASY.fence[j]){const s=gl.clientWaitSync(ASY.fence[j],0,0);if(s===gl.ALREADY_SIGNALED||s===gl.CONDITION_SATISFIED){ // Ergebnis des vorigen Bildes, falls schon da
+      gl.bindBuffer(gl.PIXEL_PACK_BUFFER,ASY.pbo[j]);gl.getBufferSubData(gl.PIXEL_PACK_BUFFER,0,ASY.buf);gl.deleteSync(ASY.fence[j]);ASY.fence[j]=null;ASY.hat=true;}}
+    gl.bindBuffer(gl.PIXEL_PACK_BUFFER,null);return ASY.hat?ASY.buf:null;} // null: noch nichts da, dann einmal synchron lesen
+  catch(e){console.warn('Asynchrones Auslesen fällt aus:',e.message);ASY.gl=null;return null;}}
 
 // ---------- Farben auf der Grafikeinheit (WebGL2) ----------
 // Rechnet die Endfarbe jeder Zelle (Nacht-Dither, 1-Bit, Negativ, Lichtwellen) im Grafikchip mit denselben Formeln wie die Schleife in drawRaster.
@@ -1117,6 +1296,13 @@ function glCells(cols,rows,cr,WF,sp,cp,amp,oneBit,inv,avg,nAmt,scan,falling,eMid
     gl.uniform1i(U.uScan,scan);gl.uniform1i(U.uOneBit,oneBit?1:0);gl.uniform1i(U.uInv,inv?1:0);gl.uniform1i(U.uFalling,falling?1:0);gl.uniform1i(U.uRows,rows);gl.uniform3fv(U.uPal,pal.flat());
     gl.drawArrays(gl.TRIANGLES,0,3);if(gl.isContextLost())throw new Error('Kontext verloren');return c;}
   catch(e){console.warn('Grafikeinheit fällt aus, weiter im Prozessor:',e.message);GL.ok=false;return null;}}
+// Stabile Sortierung der Indizes nach Helligkeit (bei Gleichstand bleibt die alte Reihenfolge): dasselbe Ergebnis wie Array.sort mit
+// Vergleichsfunktion, aber ohne Funktionsaufrufe (Mergesort von unten nach oben). Für die Blaue Stunde, die sonst viel Rechenzeit kostet.
+function sortStabil(key,idx,h,n){for(let j=0;j<n;j++)idx[j]=j;let a1=idx,a2=h;
+  for(let w=1;w<n;w*=2){for(let lo=0;lo<n;lo+=2*w){const mid=Math.min(lo+w,n),hi=Math.min(lo+2*w,n);let a=lo,b=mid,k=lo;
+      while(a<mid&&b<hi){if(key[a1[b]]<key[a1[a]])a2[k++]=a1[b++];else a2[k++]=a1[a++];}while(a<mid)a2[k++]=a1[a++];while(b<hi)a2[k++]=a1[b++];}const x=a1;a1=a2;a2=x;}
+  if(a1!==idx)for(let j=0;j<n;j++)idx[j]=a1[j];}
+const GITTER={k:'',p:null}; // Rasterlinien als Pfad, je Rastergröße einmal gebaut
 let SMC=null;function smearCols(cols){if(!SMC||SMC.length!==cols){SMC=new Uint8Array(cols);for(let i=0;i<cols;i++)SMC[i]=1+Math.floor(hsh(i,3,0)*3);}return SMC;}
 
 // ---------- Zeichnen ----------
@@ -1142,13 +1328,17 @@ function toSliders(ts){const d=wall(ts),n=wall(nowT()),a=new Date(d.getFullYear(
 function setMode(m){$('now').classList.toggle('on',m==='live'&&!playing);$('play').classList.toggle('on',playing);$('play').textContent=playing?'Anhalten':'Zeitraffer';}
 document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{study=+b.dataset.s;document.querySelectorAll('.tabs button').forEach(x=>x.classList.toggle('on',x===b));$('sname').textContent=NAMES[study];});
 $('day').oninput=$('min').oninput=()=>{playing=false;mode='manual';manualT=fromSliders();setMode();};
-$('now').onclick=()=>{playing=false;mode='live';T_SIM=null;setMode();};
+$('now').onclick=()=>{playing=false;mode='live';T_SIM=null;MOMENT=null;GEZEIGT.clear();setMode();};
 $('play').onclick=()=>{if(playing){playing=false;mode='manual';manualT=playT;}else{speed=3600;playT=curT();playing=true;}setMode();};
 $('mid').onclick=()=>{speed=1;playT=midnight(1)-15000;playing=true;setMode();document.body.classList.add('clean');};
 $('fm').onclick=()=>{let best=0,bf=-1;const from=curT();for(let h=24;h<24*33;h++){const ts=from+h*36e5,f=astro(new Date(ts)).fraction;if(f>bf){bf=f;best=ts;}}const d=wall(best);playing=false;mode='manual';manualT=fromWall(d.getFullYear(),d.getMonth(),d.getDate(),21,30);setMode();};
 const _mf=()=>{const n=new Date();let m=new Date(n.getFullYear(),9,4,18,40);if(m.getTime()<Date.now()-864e5)m=new Date(n.getFullYear()+1,9,4,18,40);playing=false;mode='manual';manualT=m.getTime();setMode();};
 $('help').onclick=()=>{HELP=!HELP;$('help').classList.toggle('on',HELP);};
-$('rare').onclick=()=>{const from=wall(curT());for(let o=1;o<400;o++){const d=new Date(from.getFullYear(),from.getMonth(),from.getDate()+o);const ev=dayRare(d).find(e=>e.r);if(ev){const h=ev.b>24?ev.a+0.6:(ev.a+ev.b)/2;playing=false;mode='manual';manualT=fromWall(d.getFullYear(),d.getMonth(),d.getDate(),0,Math.round(h*60));setMode();return;}}};
+// Seltenheit finden: springt zum nächsten besonderen Moment nach der angezeigten Zeit (Seltenheiten, Gespenst, Weihnachten, Silvester/Neujahr, Fontänen-Regenbogen); die Zeit läuft von dort weiter
+// Jeder Moment kommt einmal dran (sonst käme im Oktober jeden Tag das Gespenst); "Jetzt" fängt wieder von vorn an.
+const GEZEIGT=new Set();
+$('rare').onclick=()=>{const from=curT()+30000,w=wall(from);for(let runde=0;runde<2;runde++){for(let o=0;o<400;o++){const d=wall(fromWall(w.getFullYear(),w.getMonth(),w.getDate()+o,12));const m=momenteAm(d).find(x=>x.T>from&&!GEZEIGT.has(x.n));
+  if(m){GEZEIGT.add(m.n);playing=false;mode='live';T_SIM={at:m.T,dev:Date.now()};MOMENT=m;setMode();return;}}GEZEIGT.clear();}};
 // Bildschirm wach halten (Wake Lock, wenn der Browser es kann). Nach dem Zurückkehren auf die Seite erneut anfordern.
 let wake=null;
 function keepAwake(){try{if(!wake&&navigator.wakeLock&&document.visibilityState==='visible')navigator.wakeLock.request('screen').then(w=>{wake=w;w.addEventListener('release',()=>{wake=null;});}).catch(()=>{});}catch(e){}}
@@ -1162,7 +1352,7 @@ let lastTxt='';
 function readout(d,A){
   const ds=d.toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'}),ts=d.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
   const wx=dayWeather(d),cel=[];
-  cel.push(wxText(d));if(A.fraction>0.985)cel.push('Vollmond');if(isMesse(d))cel.push('Messetag');if(wx.shoot)cel.push('Sternschnuppennacht');for(const p of FAMILIE)if(isBday(p,d))cel.push('Geburtstag: '+p.name);if(isAnniv(d))cel.push('Hochzeitstag');{const V=visitorTimes(d);cel.push('Feuerwehr '+fmtM(V.fw)+', Eisvogel '+V.kf.map(fmtM).join(' / '));}if(adventLit(d))cel.push(adventLit(d)+'. Advent');if(STATE)cel.push(STATE);if(ENTDECKEN)cel.push(szText(d));{const at=astroText();if(at)cel.push(at);}for(const ev of dayRare(d))cel.push(ev.n+' ('+Math.floor(ev.a)+'–'+(Math.floor(ev.b)%24)+' Uhr)');if(CFG_INFO)cel.push(CFG_INFO);if(T_SIM&&mode==='live'&&!playing)cel.push('Zeit simuliert mit ?t=');if(URL_INFO.length)cel.push(URL_INFO.join(', '));
+  cel.push(wxText(d));if(A.fraction>0.985)cel.push('Vollmond');if(isMesse(d))cel.push('Messetag');if(wx.shoot)cel.push('Sternschnuppennacht');for(const p of FAMILIE)if(isBday(p,d))cel.push('Geburtstag: '+p.name);if(isAnniv(d))cel.push('Hochzeitstag');{const V=visitorTimes(d);cel.push('Feuerwehr '+fmtM(V.fw)+', Eisvogel '+V.kf.map(fmtM).join(' / '));}if(adventLit(d))cel.push(adventLit(d)+'. Advent');if(STATE)cel.push(STATE);if(ENTDECKEN)cel.push(szText(d));{const ft=festText(d);if(ft)cel.push(ft);}if(MOMENT&&Math.abs(instant(d)-MOMENT.T)<3*36e5)cel.unshift('Moment: '+MOMENT.n);{const at=astroText();if(at)cel.push(at);}for(const ev of dayRare(d))cel.push(ev.n+' ('+Math.floor(ev.a)+'–'+(Math.floor(ev.b)%24)+' Uhr)');if(CFG_INFO)cel.push(CFG_INFO);if(T_SIM&&mode==='live'&&!playing)cel.push('Zeit simuliert mit ?t=');if(URL_INFO.length)cel.push(URL_INFO.join(', '));
   if(CLOCK_OFF)cel.push('Geräteuhr korrigiert um '+Math.round(CLOCK_OFF/6e4)+' min ('+CLOCK_SRC+')');if(DEV_TZ!==TZ)cel.push('Gerät steht auf Zeitzone '+DEV_TZ+', Lichtzeit rechnet in Berliner Zeit');
   const txt=`${ds}, ${ts} Uhr. Mond ${Math.round(A.fraction*100)} % ${A.phase<0.5?'zunehmend':'abnehmend'}, Sonne ${Math.round(A.sun.alt/rad)}°`+(cel.length?` <span class="cel">${cel.join(', ')}</span>`:'');
   if(txt!==lastTxt){$('readout').innerHTML=txt;lastTxt=txt;}
@@ -1174,15 +1364,15 @@ function frame(now){
   const iv=1000/ANZ.max_fps;if(now-lastDraw<iv-4)return;lastDraw=now-lastDraw<2*iv?lastDraw+iv:now;
   const T=curT(),d=wall(T),A=astro(new Date(T)),w0=performance.now();
   ctx.setTransform(DPR,0,0,DPR,0,0);ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';
-  drawChiemsee(now/1000,A,d,STYLES[study]);
+  ASYNC_JETZT=true;try{drawChiemsee(now/1000,A,d,STYLES[study]);}finally{ASYNC_JETZT=false;} // nur hier darf asynchron gelesen werden
   const work=performance.now()-w0;autoTune(now,work);lesenTune(now,work);
   if(!DEV)return; // Steuerleiste, Info-Zeile und FPS-Anzeige nur im Test-Modus
   fpsN++;fpsW+=work;if(now-fpsT>=1000){if(fpsT){const q=k=>(PERF[k]/fpsN).toFixed(1),src=k=>ANZ_SRC[k]?' ('+ANZ_SRC[k]+')':' (auto)';
     $('fps').textContent=Math.round(fpsN*1000/(now-fpsT))+' Bilder/s (max. '+ANZ.max_fps+(ANZ_SRC.max_fps?', '+ANZ_SRC.max_fps:'')+') · '+(fpsW/fpsN).toFixed(1)+' ms Rechenzeit\n'
       +'Szene '+q('szene')+' · Auslesen '+q('lesen')+' · Zellen '+q('zellen')+' · Farben '+q('farben')+' · Rest '+q('rest')+' ms\n'
-      +'Raster '+(+RPX.toFixed(2))+' px'+src('raster_px')+' = '+(off?off.width+'×'+off.height:'?')+' Zellen · Farben per '+(PERF.gpu?'Grafikeinheit':'Prozessor')+' · Auslesen per '+(LESEN.jetzt==='cpu'?'Prozessor':'WebGL')+(LESEN.wunsch!=='auto'?' (Adresse)':LESEN.fertig?(LESEN.ms?' (auto: '+LESEN.ms.webgl.toFixed(0)+' / '+LESEN.ms.cpu.toFixed(0)+' ms)':' (auto)'):' (misst …)')+'\n'
+      +'Raster '+(+RPX.toFixed(2))+' px'+src('raster_px')+' = '+(off?off.width+'×'+off.height:'?')+' Zellen · Farben per '+(PERF.gpu?'Grafikeinheit':'Prozessor')+' · Auslesen per '+(LESEN.jetzt==='async'?'Grafikeinheit asynchron (Szene auf der Grafikeinheit)':LESEN.jetzt==='cpu'?'Prozessor':'WebGL')+(LESEN.wunsch!=='auto'?' (Adresse)':LESEN.fertig?(LESEN.ms?' (auto: '+LESEN.ms.webgl.toFixed(0)+' / '+LESEN.ms.cpu.toFixed(0)+' ms)':' (auto)'):' (misst …)')+'\n'
       +'intern '+cv.width+'×'+cv.height+' px, '+Math.round(AUFL*100)+' %'+src('aufl')+' · Gerät '+innerWidth+'×'+innerHeight+' bei Pixeldichte '+(+(window.devicePixelRatio||1).toFixed(2))
-      +(AUTO.fps?' · gemessen '+Math.round(AUTO.fps)+' Bilder/s':'');}
+      +(AUTO.fps?' · gemessen '+Math.round(AUTO.fps)+' Bilder/s':'')+((SZENE_HALB_WUNSCH==='halb'||(SZENE_HALB_WUNSCH==='auto'&&AUTO.halb))?' · Szene halb (jedes 2. Bild)':'');}
     fpsN=0;fpsW=0;fpsT=now;for(const k of ['szene','lesen','zellen','farben','rest'])PERF[k]=0;}
   if(mode!=='manual'||playing)toSliders(T);
   readout(d,A);
@@ -1251,7 +1441,7 @@ const HOCHNEBEL={tief_ab:70,mittel_bis:50,druck_ab:1016}; // tiefe Wolken ab %, 
                   // % Bewölkung: darunter keine einzige Wolke, klarer Himmel
 const BARO={stunden:3,steigt:1,faellt:-1,stark:-4,ruhe:0.4,unruhe:0.35,sturm:0.8}; // Druckänderung in hPa über 3 h (stark = Luftdruck-Absturz); ruhe/unruhe/sturm = wie stark das Raster reagiert
 const STURM={wind_ab:50,boeen_ab:62};  // km/h: ab diesem mittleren Wind oder diesen Böen gilt es als Sturm (Böen ab 62 km/h = Windstärke 8)
-const REGENBOGEN={sonne_min:3,sonne_max:40,wolken_max:70,nach_regen_h:1.25};      // Sonnenhöhe in Grad, Bewölkung in %, wie lange nach dem Regen
+const REGENBOGEN={sonne_min:2,sonne_max:42,wolken_max:85,nach_regen_h:2,regen_max:0.45}; // Sonnenhöhe in Grad, Bewölkung in %, wie lange nach dem Regen (h), bis zu welcher Regenstärke schon währenddessen (Sonnenregen)
 const SEE_TEMP={kalt:0,warm:25,staerke:0.05};                                      // °C; staerke = wie deutlich der See kühler oder wärmer wirkt
 const WX_VARS='weather_code,cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high,precipitation,rain,showers,snowfall,wind_speed_10m,wind_gusts_10m,temperature_2m,pressure_msl,visibility',WX_KEY='lichtzeit_wetter';
 let WX=null,WX_ERR='',WXM={ts:NaN,v:null};
@@ -1287,7 +1477,7 @@ function wxCalc(ts){if(WX_FORCE)return WX_FORCE;if(!WX||!WETTER.echt||WX.lat!==L
   // Barometer: Luftdruck jetzt minus Luftdruck vor 3 Stunden
   const g0=wxSeg(ts-BARO.stunden*36e5),p0=g0?wxNum(g0,'p'):null;o.dp=o.p!==null&&p0!==null?o.p-p0:null;
   // Regenbogen: nur wenn es gerade aufgehört hat zu regnen und nicht zu bewölkt ist (Sonnenstand prüft scene)
-  let bow=0;if(o.rain<0.05&&o.snow<0.05){for(let h=1/12;h<=REGENBOGEN.nach_regen_h;h+=1/12){const q=wxSeg(ts-h*36e5);if(!q)break;if(wxNum(q,'rain')>=0.05){bow=1-smooth(REGENBOGEN.nach_regen_h*0.2,REGENBOGEN.nach_regen_h,h);break;}}
+  let bow=0;if(o.snow<0.05&&o.rain<REGENBOGEN.regen_max){if(o.rain>=0.05)bow=0.8;else for(let h=1/12;h<=REGENBOGEN.nach_regen_h;h+=1/12){const q=wxSeg(ts-h*36e5);if(!q)break;if(wxNum(q,'rain')>=0.05){bow=1-smooth(REGENBOGEN.nach_regen_h*0.3,REGENBOGEN.nach_regen_h,h);break;}}
     bow*=1-smooth(REGENBOGEN.wolken_max-10,REGENBOGEN.wolken_max+5,o.cloud);}
   o.bow=bow;return wxExtras(o);}
 // Druck-Trend, Unruhe des Rasters und See-Farbton
@@ -1299,9 +1489,9 @@ function wxExtras(o){const dp=o.dp;
 // Wetter erzwingen (Test): ?wetter=gewitter|regen|nebel|klar|schnee|bedeckt|hochnebel – feste Werte mit typischem Luftdruck-Trend
 const WX_PRESETS={bedeckt:{code:3,cloud:100,low:70,mid:90,high:60,wind:8,temp:9,p:1012,vis:15000,dp:0},hochnebel:{code:3,cloud:100,low:100,mid:0,high:0,wind:3,temp:4,p:1031,vis:12000,dp:1.6},klar:{code:0,cloud:0,wind:6,temp:18,p:1022,vis:40000,dp:0},gewitter:{code:95,cloud:95,rain:6,wind:30,temp:22,p:1006,vis:15000,dp:-3.5},
   regen:{code:63,cloud:100,rain:3,wind:15,temp:10,p:1008,vis:8000,dp:-1.5},nebel:{code:45,cloud:90,wind:2,temp:6,p:1024,vis:300,dp:0},schnee:{code:73,cloud:100,snow:1.2,wind:8,temp:-2,p:1012,vis:3000,dp:0},
-  sturm:{code:3,cloud:80,low:50,mid:70,high:60,wind:58,gust:90,temp:11,p:999,vis:15000,dp:-2.5}};
+  sturm:{code:3,cloud:80,low:50,mid:70,high:60,wind:58,gust:90,temp:11,p:999,vis:15000,dp:-2.5},regenbogen:{code:2,cloud:45,low:30,mid:30,high:20,wind:8,temp:17,p:1014,vis:30000,dp:0.5,bow:1}};
 const WX_FORCE=(()=>{const k=(Q.get('wetter')||'').trim().toLowerCase(),x=WX_PRESETS[k];if(!k)return null;if(!x){URL_INFO.push('?wetter='+k+' unbekannt');return null;}
-  const o=wxDerive({t:0,code:x.code,cloud:x.cloud,low:x.low===undefined?x.cloud:x.low,mid:x.mid===undefined?x.cloud:x.mid,high:x.high===undefined?x.cloud:x.high,pr:null,rain:x.rain||0,sh:0,snow:x.snow||0,wind:x.wind,gust:x.gust===undefined?null:x.gust,temp:x.temp,p:x.p,vis:x.vis},1);o.dp=x.dp;o.bow=0;o.name=k;return wxExtras(o);})();
+  const o=wxDerive({t:0,code:x.code,cloud:x.cloud,low:x.low===undefined?x.cloud:x.low,mid:x.mid===undefined?x.cloud:x.mid,high:x.high===undefined?x.cloud:x.high,pr:null,rain:x.rain||0,sh:0,snow:x.snow||0,wind:x.wind,gust:x.gust===undefined?null:x.gust,temp:x.temp,p:x.p,vis:x.vis},1);o.dp=x.dp;o.bow=x.bow||0;o.name=k;return wxExtras(o);})();
 function wxAt(ts){if(ts!==WXM.ts){WXM.ts=ts;WXM.v=wxCalc(ts);}return WXM.v;}
 function wxText(d){const w=wxAt(instant(d)),f=(v,n=0)=>v===null?'?':v.toFixed(n).replace('.',',');
   if(!w)return 'Wetter: '+WT[wtypeOf(d)]+' (simuliert'+(!WETTER.echt?', echtes Wetter aus':WX_ERR?', '+WX_ERR:'')+')';
@@ -1324,8 +1514,9 @@ function wxFetch(){if(!WETTER.echt)return Promise.resolve();let tm=0;
 function urlAnzeige(){const set=(k,key,p,auto)=>{const v=Q.get(k);if(v===null)return;const t=v.trim().toLowerCase(),x=t==='auto'?auto:p(+t.replace(',','.'));
     if(x===null||t==='')URL_INFO.push('?'+k+'='+v+' ungültig');else{ANZ[key]=x;if(t==='auto')delete ANZ_SRC[key];else ANZ_SRC[key]='Adresse';}};
   set('raster','raster_px',pZahl(2,40),0);set('fps','max_fps',pZahl(5,120),30);set('aufloesung','aufl',pZahl(0.25,1),0);
-  const ls=Q.get('lesen');if(ls!==null){if(['webgl','cpu','auto'].includes(ls)){LESEN.wunsch=ls;if(ls!=='auto'){LESEN.jetzt=ls;LESEN.fertig=true;}}else URL_INFO.push('?lesen='+ls+' ungültig');}
+  const ls=Q.get('lesen');if(ls!==null){if(['webgl','cpu','auto','async'].includes(ls)){LESEN.wunsch=ls;if(ls!=='auto'&&ls!=='async'){LESEN.jetzt=ls;LESEN.fertig=true;}}else URL_INFO.push('?lesen='+ls+' ungültig');}
   const g=Q.get('gpu');if(g!==null){if(['0','1','aus','an'].includes(g))GPU_WUNSCH=g==='1'||g==='an';else URL_INFO.push('?gpu='+g+' ungültig');}
+  const sz=Q.get('szene');if(sz!==null){if(['halb','voll','auto'].includes(sz))SZENE_HALB_WUNSCH=sz;else URL_INFO.push('?szene='+sz+' ungültig');}
   const en=Q.get('entdecken');if(en!==null){if(['0','1','aus','an'].includes(en))ENTDECKEN=en==='1'||en==='an';else URL_INFO.push('?entdecken='+en+' ungültig');}}
 function start(){if(started)return;started=true;urlAnzeige();if(ANZ.raster_px||ANZ.aufl)resize();$('sname').textContent=ORT;document.title='Lichtzeit – '+ORT;toSliders(curT());setMode();keepAwake();requestAnimationFrame(frame);}
 // Start: erst die Einstellungen, dann das Wetter (gespeicherter Stand sofort, neuen Abruf höchstens 3 s abwarten)

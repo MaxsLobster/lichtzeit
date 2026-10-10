@@ -31,8 +31,10 @@ es ins Bild:
 - **Nebel, schlechte Sicht** – Pixel lösen sich auf
 - **Gewitter** – Glitch und Blitze. Kündigt sich ein Gewitter an, türmen sich die Wolken schon vorher auf.
 - **Sturm** – ab etwa 50 km/h Wind oder Böen ab 62 km/h (Windstärke 8) fliegen die Pixel
-- **Regenbogen** – nur wenn es gerade aufgehört hat zu regnen, die Sonne
-  zwischen 3° und 40° hoch steht und weniger als etwa 70 % bewölkt ist
+- **Regenbogen** – bis zu 2 Stunden nach einem Regen oder bei Sonnenregen
+  (leichter Regen, die Sonne kommt durch), wenn die Sonne zwischen 2° und 42°
+  hoch steht und weniger als etwa 85 % bewölkt ist. Spritzt das Feuerwehrboot
+  bei Sonnenschein, steht ein kleiner Regenbogen in der Fontäne.
 - **Temperatur** – der See wirkt bei Kälte ganz leicht kühler, bei Wärme wärmer
 - **Barometer** – der Luftdruck-Trend der letzten 3 Stunden: Steigt er, wird
   das Raster ruhiger. Fällt er, wird es leicht unruhig. Stürzt er ab (mehr als
@@ -110,12 +112,18 @@ Unter `"anzeige"` in `config.json`:
 
 **Automatik:** Steht die Rastergröße auf `"auto"`, misst Lichtzeit alle
 5 Sekunden, wie viele Bilder tatsächlich gezeichnet werden. Sind es weniger
-als etwa 25 pro Sekunde, wechselt sie auf das nächstgröbere Raster. Feiner wird
-es erst wieder nach dem Neuladen (spätestens um 4:00 Uhr). Feste Zahlen schalten
-die Automatik ab.
+als etwa 25 pro Sekunde, geht sie eine Stufe weiter: vom feinsten Raster auf
+das zweitfeinste, dann **Szene halb** (die Landschaft wird auf zwei Bilder
+verteilt gemalt, das Aussehen bleibt gleich; Uhr, Pixel-Effekte und Feuerwerk
+laufen weiter mit voller Bildrate), danach auf gröbere Raster. Zurück geht es
+erst nach dem Neuladen (spätestens um 4:00 Uhr). Feste Zahlen schalten die
+Automatik fürs Raster ab.
 
 **Grafikeinheit:** Die Endfarbe jeder Rasterzelle rechnet die Grafikeinheit
-(WebGL2), das ist auf schwachen Geräten viel schneller. Grafikchips rechnen mit
+(WebGL2), das ist auf schwachen Geräten viel schneller. Die gemalte Landschaft
+wird *asynchron* ausgelesen: Der Prozessor wartet nicht mehr auf die
+Grafikeinheit, sondern nimmt das Ergebnis ein Bild später (33 ms, unsichtbar).
+Genau dieses Warten hatte den Muse ausgebremst. Grafikchips rechnen mit
 etwas weniger Nachkommastellen: Im Pixelvergleich mit dem Original sind die
 meisten Momente identisch, sonst weichen einzelne Zellen um eine Farbstufe ab
 (unsichtbar). Ohne WebGL2 rechnet automatisch der Prozessor, dann exakt wie das
@@ -131,12 +139,14 @@ Original.
 | `fps=30` | höchste Bildrate |
 | `aufloesung=0.5` | interne Auflösung (oder `auto`) |
 | `gpu=0` | Farben im Prozessor statt in der Grafikeinheit (`gpu=1` = Grafikeinheit) |
-| `lesen=cpu` | Szene über den Prozessor auslesen statt über WebGL (`lesen=webgl`, `lesen=auto`). Standard: Lichtzeit misst nach dem Start beide Wege und nimmt den schnelleren. |
+| `lesen=cpu` | Szene über den Prozessor auslesen (`lesen=webgl` = über die Grafikeinheit, aber mit Warten; `lesen=auto` = beide messen). Standard: asynchron über die Grafikeinheit, ohne Warten. |
+| `szene=halb` | Szene immer auf zwei Bilder verteilen (`szene=voll` = nie, `szene=auto` = die Automatik entscheidet, Standard) |
 
 Mit `?dev=1` zeigt die Seite oben rechts, wie viele Bilder pro Sekunde
 tatsächlich gezeichnet werden, wie viele Millisekunden jeder Teil braucht
 (Szene, Auslesen, Zellen, Farben, Rest), welches Raster aktiv ist, ob die
-Grafikeinheit rechnet und mit welcher Auflösung der Browser des Geräts arbeitet.
+Grafikeinheit rechnet, ob die Szene halb gemalt wird und mit welcher Auflösung
+der Browser des Geräts arbeitet.
 
 ## Entdecken
 
@@ -164,6 +174,34 @@ Kleines findet:
 Im Test-Modus (`?dev=1`) steht in der Info-Zeile, welche Szene gerade läuft und
 welche als Nächstes kommt. Mit `?entdecken=0` lassen sie sich für ein Gerät
 ausschalten, für alle über `"entdecken": false` in `config.json`.
+
+## Feste
+
+- **Gespenst (Oktober):** Jeden Abend einige Minuten zwischen 17 und 19 Uhr lugt
+  ein kleines weißes Pixelgespenst hinter der Kirche der Fraueninsel hervor,
+  schwebt kurz übers Wasser und versteckt sich wieder. **An Halloween** (31.10.)
+  kommt es den ganzen Abend immer wieder, in der Geisterstunde danach (0–1 Uhr)
+  hat es einen großen Auftritt mit kleinen Begleitern und einem „Buh“. Im
+  Negativ der Geisterstunde ist es dunkel mit hellen Augen.
+- **Heiligabend:** Ab der Dämmerung fällt sanfter Schnee (unabhängig vom
+  Wetter), am Ufer und auf den Inseln brennen warme Fensterlichter, der Dampfer
+  trägt eine Lichterkette (der Schornstein bleibt frei) und über der Fraueninsel
+  steht ein heller Weihnachtsstern mit Schweif. Zwischen 17 und 18 Uhr fliegt das
+  Christkind einmal als kleines Licht über den See. Am 25. und 26.12. geht es
+  etwas ruhiger weiter.
+- **Silvester und Neujahr:** Am 31.12. steigen ab der Dunkelheit Raketen am Ufer
+  auf, immer mehr bis Mitternacht. Um 0 Uhr gibt es statt Pixelsturz und
+  Geisterstunde ein großes Feuerwerk über die ganze Breite (30 Minuten), bis
+  etwa 3 Uhr Nachzügler. Am Neujahrsmorgen liegt Rauch über dem See, am Abend
+  des 1.1. steigen noch vereinzelte Raketen.
+
+Strahl, Pfähle, Dampfer und Sonne bzw. Mond bleiben dabei immer frei und lesbar.
+
+**Vorab ansehen:** Im Test-Modus springt **Seltenheit finden** zum nächsten
+besonderen Moment (Seltenheiten, Gespenst, Halloween, Heiligabend, Christkind,
+Silvester, Neujahrsfeuerwerk, Rauch, Regenbogen in der Feuerwehr-Fontäne).
+Jeder Moment kommt einmal dran; die Uhr läuft von dort aus weiter. **Jetzt**
+führt zurück.
 
 ## Himmel
 
@@ -241,7 +279,7 @@ Parameter werden an die Adresse angehängt: der erste mit `?`, weitere mit `&`.
 | `?t=2026-12-24T17:30` | Zeit simulieren. Die Uhr läuft ab diesem Moment weiter. Auch möglich: `?t=17:30` (heute) oder `?t=0:00:20`. |
 | `?raster=`, `?fps=`, `?aufloesung=`, `?gpu=`, `?lesen=` | Anzeige für dieses Gerät, siehe „Anzeige und Leistung“. |
 | `?entdecken=0` | Die kleinen Szenen für dieses Gerät aus (`1` = an). |
-| `?wetter=gewitter` | Wetter erzwingen: `gewitter`, `regen`, `nebel`, `klar`, `schnee`, `bedeckt`, `hochnebel` oder `sturm`. Gewitter, Regen und Sturm kommen mit fallendem Luftdruck. |
+| `?wetter=gewitter` | Wetter erzwingen: `gewitter`, `regen`, `nebel`, `klar`, `schnee`, `bedeckt`, `hochnebel`, `sturm` oder `regenbogen`. Gewitter, Regen und Sturm kommen mit fallendem Luftdruck. |
 
 Beispiele:
 
