@@ -24,7 +24,7 @@ es ins Bild:
 
 - **Wolken** – je mehr Bewölkung, desto mehr und größere Wolken; unter 10 % ist der Himmel ganz klar
 - **Bedeckt** (ab etwa 85 % Bewölkung) – geschlossene graue Decke, gedämpfte Farben, statt der Sonnenscheibe nur ein schwacher heller Fleck; der Strahl bleibt weich, aber ablesbar
-- **Hochnebel** (bedeckt, vor allem tiefe Wolken, Luftdruck ab etwa 1020 hPa, kein Regen) – die graue Decke liegt tief über dem See, die Berggipfel ragen oben heraus in die Sonne. Steigender Luftdruck heißt hier nicht „klarer“: Das Raster beruhigt sich dann nicht.
+- **Hochnebel** (bedeckt, vor allem tiefe Wolken, Luftdruck ab etwa 1016 hPa, kein Regen) – die graue Decke liegt tief über dem See, die Berggipfel ragen oben heraus in die Sonne. Steigender Luftdruck heißt hier nicht „klarer“: Das Raster beruhigt sich dann nicht.
 - **Regen** – Pixelregen und Regenschleier, Pixel „tropfen“
 - **Schnee** – fallende Flocken
 - **Wind** – Pixel verwehen, Böenfelder auf dem See, Schilf wiegt sich
