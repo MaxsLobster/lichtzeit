@@ -770,6 +770,139 @@ function extrasLayer(C,cs,t){const {d,sa,hy,night,L,S,iy,rowY,pc}=C,snap=x=>Math
     px(x,y-7*cs,[255,215,90],0.8+0.2*Math.sin(t*2));px(x,y,[90,60,40]);}
 }
 
+// ---------- Entdecken: kleine Szenen ----------
+// Winzige Szenen im Pixelstil, damit man bei jedem Blick etwas Kleines findet. Immer mindestens eine, nie mehr als zwei, jede 3 bis 10 Minuten.
+// Der Ablauf ist pro Tag fest (wie Eisvogel und Feuerwehrboot), aber jeden Tag anders: eine lückenlose Kette von Hauptszenen plus gelegentlich
+// eine zweite. Jede hat eine Kandidatenliste; gezeigt wird der erste Kandidat, der gerade passt (Jahreszeit, Licht, Wetter, Platz neben dem Strahl).
+// Die Szenen liegen unter Uhr und Dampfer, Zellen im Strahl, an der Sonnen- bzw. Mondscheibe, an den Pfählen und am Dampfer werden ausgelassen.
+let ENTDECKEN=true;
+const SZ_NAME={angler:'Angler im Schilf',reiher:'Graureiher im Flachwasser',ruderboot:'Ruderboot im Nebel',flugzeug:'Flugzeug mit Kondensstreifen',sup:'Stand-up-Paddler',enten:'Entenfamilie',
+  fledermaus:'Fledermäuse',spaziergang:'Spaziergänger mit Hund',heimfahrt:'Boote fahren heim',autos:'Autoscheinwerfer am fernen Ufer',satellit:'Satellit',kahn:'Kahn mit Laterne'};
+const SZ_POOL={morgen:['angler','reiher','ruderboot'],tag:['flugzeug','sup','enten'],abend:['fledermaus','spaziergang','heimfahrt'],nacht:['autos','satellit','kahn']};
+const szSaison=(k,mo)=>!(k==='sup'&&(mo<4||mo>8))&&!(k==='fledermaus'&&(mo<3||mo>9)); // Paddler Mai bis September, Fledermäuse April bis Oktober
+const SZ_PLAENE=new Map();
+// Tagesplan (Minuten seit Mitternacht, Berliner Zeit). Tageszeit nach Sonnenstand: Nacht unter −8°, Morgen bis 10 Uhr, Abend ab 8° am Nachmittag.
+function szPlan(d){const key=dayKey(d);let P=SZ_PLAENE.get(key);if(P)return P;
+  const y=d.getFullYear(),mo=d.getMonth(),da=d.getDate(),r=rng(key*71+13),sonne=m=>astro(new Date(fromWall(y,mo,da,0,m))).sun.alt/rad;
+  const zeit=(m,s)=>s<-8?'nacht':m<12*60?(m<10*60?'morgen':'tag'):s<8?'abend':'tag';
+  const misch=a=>{for(let i=a.length-1;i>0;i--){const j=Math.floor(r()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;};
+  const slot=(a,b,vorher)=>{const s=sonne((a+b)/2),z=zeit((a+b)/2,s),kand=misch(SZ_POOL[z].filter(k=>szSaison(k,mo)));if(kand[0]===vorher&&kand.length>1)kand.push(kand.shift());
+    return{a,b,kand,z,sa:s,seed:Math.floor(r()*1e9)};};
+  const haupt=[],neben=[];let t=0,vorher='';
+  while(t<1440){const rest=1440-t;let dur=3+Math.floor(r()*8);if(rest-dur<3&&rest!==dur)dur=rest<=10?rest:rest-3;const s=slot(t,t+dur,vorher);haupt.push(s);vorher=s.kand[0];t+=dur;}
+  let frei=0;for(const h of haupt){if(h.a<frei||r()>0.3)continue;const dur=3+Math.floor(r()*8),a=h.a+Math.floor(r()*(h.b-h.a));if(a+dur>1440)continue;const s=slot(a,a+dur,h.kand[0]);s.neben=true;neben.push(s);frei=a+dur;}
+  P={haupt,neben};if(SZ_PLAENE.size>4)SZ_PLAENE.delete(SZ_PLAENE.keys().next().value);SZ_PLAENE.set(key,P);return P;}
+// Wo der Strahl zu einer Uhrzeit steht (Anteil der Breite), wie breit er auf Höhe y ist (halbe Breite in Bildpunkten), Uferlinie vorne links (wie L_shore)
+const szLx=m=>{const hr=m/60,v=hr>=6&&hr<18?hr-6:(hr-18+24)%24;return 0.07+v/12*0.86;};
+const szStrahl=(hy,y,cs)=>{if(y<=hy)return 0;const u=Math.pow(clamp((y-hy)/((H-hy)*0.95),0,1),1/1.3);return (3+30*u*u)*(W/700+0.4*cs);};
+const uferY=fx=>{const t=(-0.36+Math.sqrt(0.1296+0.16*clamp(fx,0,0.4)))/0.08;return (1-t)*(1-t)*0.93+2*t*(1-t)*0.9+t*t;};
+// Freie Abschnitte zwischen x0 und x1 auf Höhe y, ohne den Strahl zu Beginn und am Ende der Szene (am Himmel: ohne die Spalte über Sonne bzw. Mond)
+function szLuecken(C,y,x0,x1,s,rand,cs){let L=[[x0,x1]];const cut=(a,b)=>{const n=[];for(const [p,q] of L){if(b<=p||a>=q){n.push([p,q]);continue;}if(a>p)n.push([p,a]);if(b<q)n.push([b,q]);}L=n;};
+  for(const m of [s.a,s.b-0.01]){const lx=szLx(m)*W,hw=y>C.hy?szStrahl(C.hy,y,cs):W*0.07;cut(lx-hw-rand,lx+hw+rand);}return L;}
+const szLaengste=L=>L.reduce((b,q)=>q[1]-q[0]>b[1]-b[0]?q:b,[0,0]);
+// Platz und feste Zufallswerte einer Szene, einmal je Szene berechnet. null = kein Platz (dann kommt der nächste Kandidat).
+const SZ_ANKER=new Map();
+function szAnker(k,s,C,cs){const key=s.seed+'|'+k+'|'+W+'|'+H;if(SZ_ANKER.has(key))return SZ_ANKER.get(key);
+  const r=rng(s.seed^0x5bd1),hy=C.hy,F=H-hy,m=6*cs,A={r:[]};for(let i=0;i<24;i++)A.r.push(r());let ok=true;
+  const bahn=(y,x0,x1,min,weg)=>{const q=szLaengste(szLuecken(C,y,x0*W,x1*W,s,m,cs));if(q[1]-q[0]<min*W){ok=false;return;}const dir=A.r[0]<0.5?1:-1,len=Math.min(q[1]-q[0]-2*m,weg*W);
+    A.y=y;A.dir=dir;A.x0=dir>0?q[0]+m:q[1]-m;A.x1=A.x0+dir*len;};
+  if(k==='angler'||k==='reiher'){const xs=k==='angler'?[0.07,0.27]:[0.5,0.64,0.78,0.9],frei=[];
+    for(const fx of xs){const y=(k==='angler'?uferY(fx):0.895)*H,L=szLuecken(C,y,fx*W-9*cs,fx*W+9*cs,s,0,cs);if(L.length===1&&L[0][1]-L[0][0]>=18*cs-1)frei.push({x:fx*W,y});}
+    if(!frei.length)ok=false;else{const i=Math.floor(A.r[1]*frei.length);A.P0=frei[i];A.P1=frei.length>1?frei[(i+1+Math.floor(A.r[2]*(frei.length-1)))%frei.length]:null;}}
+  else if(k==='ruderboot')bahn(hy+F*(0.10+0.06*A.r[3]),0.03,0.97,0.2,0.3);
+  else if(k==='sup')bahn(0.865*H,0.32,0.97,0.18,0.16);
+  else if(k==='enten')bahn((0.905+0.02*A.r[3])*H,0.3,0.97,0.15,0.12);
+  else if(k==='kahn')bahn(hy+F*(A.r[3]<0.5?0.26:0.62),0.05,0.95,0.15,0.07);
+  else if(k==='spaziergang'){const q=szLaengste(szLuecken(C,0.95*H,0.02*W,0.37*W,s,m,cs));if(q[1]-q[0]<0.12*W)ok=false;else{A.dir=A.r[0]<0.5?1:-1;A.x0=A.dir>0?q[0]:q[1];A.x1=A.dir>0?q[1]:q[0];}}
+  else if(k==='fledermaus'){const L=szLuecken(C,0.4*H,0.12*W,0.88*W,s,0.08*W,cs).filter(q=>q[1]-q[0]>0.02*W);if(!L.length)ok=false;else{const q=L[Math.floor(A.r[3]*L.length)];A.x=lerp(q[0],q[1],A.r[4]);A.y=(0.34+0.1*A.r[5])*H;}}
+  else if(k==='heimfahrt'){A.dir=szLx(s.a)>0.5?-1:1;A.boote=[];const n=2+Math.floor(A.r[3]*2),D=(s.b-s.a)*60;
+    for(let i=0;i<n;i++){const x0=(A.dir<0?0.08+0.3*A.r[4+i]:0.62+0.3*A.r[4+i])*W,weg=A.dir<0?x0+0.04*W:1.04*W-x0;A.boote.push({x0,y:hy+F*(0.07+0.055*i+0.02*A.r[8+i]),v:weg/(D*(i===0?1.05:0.6+0.35*A.r[11+i]))});}} // das erste Boot ist bis zum Schluss zu sehen
+  else if(k==='flugzeug'){const D=(s.b-s.a)*60;A.dir=A.r[0]<0.5?1:-1;A.fluege=[{e0:2,y:(0.07+0.22*A.r[3])*H,sl:(A.r[4]-0.5)*0.16}];if(D>330)A.fluege.push({e0:D*0.5,y:(0.07+0.22*A.r[5])*H,sl:(A.r[6]-0.5)*0.16});}
+  else if(k==='satellit'){const D=(s.b-s.a)*60,n=Math.max(1,Math.round(D/170));A.paesse=[];for(let i=0;i<n;i++){const dir=A.r[3+i]<0.5?1:-1,y0=(0.05+0.3*A.r[7+i])*H;A.paesse.push({e0:i*D/n,P:D/n,dir,y0,y1:clamp(y0+(A.r[11+i]-0.5)*0.3*H,0.03*H,0.42*H)});}}
+  else if(k==='autos'){const D=(s.b-s.a)*60,rr=rng(s.seed^0x2c9);A.autos=[];for(let e=rr()*8;e<D;e+=10+rr()*18)A.autos.push({e0:e,T:30+rr()*25,dir:rr()<0.5?1:-1});}
+  const res=ok?A:null;if(SZ_ANKER.size>40)SZ_ANKER.delete(SZ_ANKER.keys().next().value);SZ_ANKER.set(key,res);return res;}
+// Passt die Szene gerade? Licht nach dem Sonnenstand der Szenenmitte (kein Wechsel mittendrin), Wetter wie es gerade ist.
+function szErlaubt(k,C,s){const nass=C.rain>0.08||C.wtype===3||C.wtype===4,sturm=C.sturmS>0.3,wolke=C.live?(C.himmelWolke!==undefined?C.himmelWolke:C.live.cloud):(C.wtype<=1?20:80);
+  switch(k){case 'sup':case 'spaziergang':return !nass&&!sturm; // bei Regen oder Sturm keine Paddler, Flugzeuge oder Spaziergänger
+    case 'flugzeug':return !nass&&!sturm&&wolke<75&&C.bedeckt<0.5&&s.sa>-2;
+    case 'satellit':return s.sa<-10&&wolke<30&&C.bedeckt<0.3&&C.mist<0.3&&C.storm<0.2; // nur bei klarem Himmel
+    case 'fledermaus':return s.sa<2&&s.sa>-12; // in der Dämmerung
+    case 'autos':return s.sa<-4&&C.hochnebel<0.5&&C.mist<0.6;
+    default:return true;}}
+let SZ_JETZT=[],SZ_PAUSE=false;
+function szAktiv(C,cs){const d=C.d,m=d.getHours()*60+d.getMinutes()+(d.getSeconds()+d.getMilliseconds()/1000)/60,P=szPlan(d),out=[];
+  for(const s of [...P.haupt,...P.neben]){if(m<s.a||m>=s.b)continue;
+    for(const k of s.kand){if(out.some(o=>o.k===k)||!szErlaubt(k,C,s))continue;const A=szAnker(k,s,C,cs);if(!A)continue;out.push({k,s,A,e:(m-s.a)*60,D:(s.b-s.a)*60});break;}}
+  return out;}
+// Die Szenen. Koordinaten in Rasterzellen relativ zum Ankerpunkt (Füße bzw. Wasserlinie), j negativ = nach oben.
+const SZ_ZEICHNE={
+  angler(S){const {p,e,C,A}=S,dk=C.sa<-2,col=c=>dk?mix(c,C.silh,0.7):S.dim(c),P=17+A.r[5]*9,ph=e%P,biss=e>P*0.5&&ph<1.2?ph:-1;
+    p(0,0,col([40,38,34]));p(0,-1,col([62,66,58]));p(0,-2,col([88,104,72]));p(0,-3,col([88,104,72]));p(1,-3,col([88,104,72]));p(0,-4,col([214,178,146]));p(0,-5,col([70,72,60]));
+    const rute=biss>0.6?[[1,-4],[2,-5],[2,-6],[3,-7],[3,-8]]:[[2,-4],[3,-5],[4,-6],[5,-7]],tip=rute[rute.length-1];for(const [i,j] of rute)p(i,j,col([120,96,70]),0.85);
+    p(tip[0]+1,tip[1]+1,[225,225,215],0.2);p(7,-6,[225,225,215],0.16);p(7,-5,[230,70,50],biss>0&&biss<0.6?0.25:0.95); // Schnur und Pose; beim Biss taucht sie ab
+    if(biss>0){const w=Math.round(biss*2),a=0.3*(1-biss/1.2);p(6-w,-5,[220,230,235],a);p(8+w,-5,[220,230,235],a);}},
+  reiher(S){const {e,D,t,C,A,cs}=S,g=S.dim([150,156,164]),gd=S.dim([112,118,128]),w=S.dim([228,228,222]),cap=[44,44,52],beak=S.dim([214,180,80]),leg=S.dim([86,82,76]);
+    const te=D*(0.3+0.4*A.r[6]),fl=A.P1?clamp((e-te)/9,0,1):0,P=fl>=1?A.P1:A.P0;
+    if(fl>0&&fl<1){const x=lerp(A.P0.x,A.P1.x,fl),y=lerp(A.P0.y,A.P1.y,fl)-Math.sin(Math.PI*fl)*H*0.045-2*cs,dd=Math.sign(A.P1.x-A.P0.x)||1,q=(i,j,c,a)=>S.pa(x+i*dd*cs,y+j*cs,c,a),up=Math.sin(t*7)>0; // fliegt auf
+      q(-1,0,g);q(0,0,g);q(1,0,g);q(2,-1,w);q(3,-1,beak);q(-2,0,leg);q(-3,0,leg);for(const [i,j] of up?[[-1,-1],[0,-1],[-1,-2],[0,-2]]:[[-1,1],[0,1],[0,2]])q(i,j,gd);return;}
+    const dir=A.r[7]<0.5?1:-1,q=(i,j,c,a)=>S.pa(P.x+i*dir*cs,P.y+j*cs,c,a),stoss=e>3&&e%15<1;
+    q(0,0,leg,0.55);q(0,-1,leg);q(-1,-2,gd);q(0,-2,g);q(-1,-3,g);q(0,-3,g);q(0,1,g,0.15);
+    if(stoss){q(1,-3,w);q(2,-3,w);q(3,-3,w);q(4,-2,beak);}else{q(1,-4,w);q(1,-5,w);q(1,-6,w);q(0,-6,cap);q(2,-6,beak);}},
+  ruderboot(S){const {p,t,C,A}=S,mist=clamp(C.mist,0,1),nb=[222,224,228],c=x=>mix(S.dim(x),nb,0.3+0.4*mist),a=0.85-0.35*mist,dir=A.dir,st=Math.sin(t*1.7)>0;
+    for(let q=0;q<9;q++){const i=Math.round((A.r[12+q%8]-0.5)*16+Math.sin(t*0.05+q)*2),j=Math.round(-A.r[(q*3)%24]*4)+1;p(i,j,nb,(0.07+0.08*mist));} // Nebelschwaden
+    p(-2,0,c([96,72,52]),a);p(-1,0,c([96,72,52]),a);p(0,0,c([96,72,52]),a);p(1,0,c([96,72,52]),a);p(0,-1,c([70,70,82]),a);p(0,-2,c([206,176,146]),a);
+    if(st){p(-2,-1,c([120,100,80]),a);p(2,-1,c([120,100,80]),a);}else{p(-3,0,c([120,100,80]),a);p(2,0,c([120,100,80]),a);p(-3,1,nb,0.3);p(3,1,nb,0.3);}
+    for(let k=1;k<=5;k++)p(-dir*(2+k),0,[230,232,236],0.16*(1-k/6));},
+  flugzeug(S){const {e,C,A,cs}=S,v=1.1*W/150,tint=mix([252,252,248],[255,176,146],smooth(8,0,C.sa)*0.5);
+    for(const f of A.fluege){if(e<f.e0)continue;const x0=A.dir>0?-0.05*W:1.05*W,xp=x0+A.dir*(e-f.e0)*v,yAt=x=>f.y+f.sl*(x-x0)*A.dir;
+      for(let x=x0;A.dir>0?x<Math.min(xp,1.05*W):x>Math.max(xp,-0.05*W);x+=A.dir*cs){const age=Math.abs(xp-x)/v;if(age<2.5)continue;const al=0.5*Math.exp(-age/110);if(al<0.03)continue;
+        const y=yAt(x)+Math.min(age*0.05,3)*cs*0.3;S.pa(x,y,tint,al,true);if(age>35)S.pa(x,y+cs,tint,al*0.35,true);}
+      if(xp>-0.05*W&&xp<1.05*W){S.pa(xp,yAt(xp),[252,252,248],0.95,true);S.pa(xp-A.dir*cs,yAt(xp),[252,252,248],0.45,true);}}},
+  sup(S){const {p,t,A}=S,side=Math.sin(t*1.3)>0?1:-1,brett=S.dim([236,224,196]),shirt=S.dim([214,92,72]),pad=S.dim([60,50,40]);
+    for(let i=-2;i<=2;i++){p(i,0,brett);p(i,1,brett,0.1);}p(0,-1,S.dim([52,62,84]));p(0,-2,shirt);p(0,-3,S.dim([214,178,146]));p(0,1,shirt,0.12);
+    p(side,-2,pad,0.8);p(side,-1,pad,0.8);p(side*3,0,pad,0.7);p(side*3,1,[225,232,238],0.25);},
+  enten(S){const {p,t,A,C}=S,dir=A.dir,mo=C.d.getMonth(),kueken=mo>=3&&mo<=5,braun=S.dim([128,100,72]);
+    p(0,0,braun);p(-dir,0,braun);p(dir,-1,S.dim([100,78,56]));p(2*dir,-1,S.dim([214,170,70]),0.8);p(-2*dir,1,[220,228,236],0.12);
+    if(kueken){const n=4+Math.floor(A.r[9]*4);for(let k=0;k<n;k++){const i=-Math.round((2.5+k*1.5)*dir),bob=Math.sin(t*3+k*1.9)>0.75?-1:0;p(i,bob,S.dim([198,172,98]),0.95);}}
+    else{const o=-4*dir;p(o,0,S.dim([150,148,138]));p(o-dir,0,S.dim([150,148,138]));p(o+dir,-1,S.dim([46,112,66]));p(o+dir,0,S.dim([120,82,60]));}}, // ausserhalb der Kükenzeit ein Paar
+  fledermaus(S){const {t,A,cs}=S,n=2+Math.floor(A.r[9]*3);
+    for(let k=0;k<n;k++){const x=A.x+W*0.06*Math.sin(t*0.9*(1+0.3*k)+k*2)+W*0.025*Math.sin(t*2.9+k*1.3),y=A.y+H*0.018*Math.sin(t*1.4+k)+H*0.008*Math.sin(t*3.7+k*2),up=Math.floor(t*9+k*1.7)%2===0;
+      S.pa(x,y,[26,24,32],0.85,true);S.pa(x-cs,y-(up?cs:0),[26,24,32],0.75,true);S.pa(x+cs,y-(up?cs:0),[26,24,32],0.75,true);}},
+  spaziergang(S){const {e,D,t,C,A,cs}=S,x=lerp(A.x0,A.x1,e/D),dir=Math.sign(A.x1-A.x0)||1,y=uferY(x/W)*H+2*cs,q=(i,j,c,a)=>S.pa(x+i*cs,y+j*cs,c,a),dk=C.sa<-5,col=c=>dk?mix(c,C.silh,0.75):S.dim(c),fr=Math.floor(t*3)%2;
+    if(fr){q(-1,0,col([52,52,62]));q(1,0,col([52,52,62]));}else q(0,0,col([52,52,62]));q(0,-1,col([126,72,60]));q(0,-2,col([126,72,60]));q(0,-3,col([214,178,146]));
+    const dd=dir*(3+Math.round(1.5+1.5*Math.sin(t*0.7)));q(dd,0,col([150,110,62]));q(dd+dir,0,col([150,110,62]));q(dd+2*dir,-1,col([130,92,50]));q(dd-dir,fr?-1:0,col([150,110,62]));
+    if(dk){q(0,-3,[255,240,200],0.95);S.licht(x+cs/2,y-2.5*cs,cs*2.5,[255,236,190],0.25);if(Math.floor(t*2)%2)q(dd+dir,-1,[255,60,60],0.9);}}, // im Dunkeln: Stirnlampe, blinkendes Halsband
+  heimfahrt(S){const {e,C,A,cs}=S,dk=C.sa<-4,segel=dk?mix(C.silh,[60,64,76],0.3):mix(S.dim([244,240,230]),C.S.hor,0.35),rumpf=dk?C.silh:S.dim([236,232,220]);
+    for(const b of A.boote){const x=b.x0+A.dir*b.v*e,q=(i,j,c,a)=>S.pa(x+i*A.dir*cs,b.y+j*cs,c,a);if(x<-0.05*W||x>1.05*W)continue;
+      q(-1,0,rumpf);q(0,0,rumpf);q(1,0,rumpf);q(0,-1,segel);q(0,-2,segel);q(-1,-1,segel);
+      if(dk){q(0,-3,[255,244,220],0.9);q(1,0,A.dir>0?[60,220,90]:[230,60,60],0.8);}}},
+  autos(S){const {e,C,A,cs}=S,y=Math.floor(C.hy/cs)*cs-cs,insel=fx=>(fx>0.355&&fx<0.475)||(fx>0.595&&fx<0.935); // hinter den Inseln verschwinden sie
+    for(const a of A.autos){if(e<a.e0||e>a.e0+a.T)continue;const x=(a.dir>0?-0.02:1.02)*W+a.dir*(e-a.e0)/a.T*1.04*W;if(insel(x/W))continue;
+      S.pa(x,y,[255,238,196],0.95);S.pa(x-a.dir*cs,y,[210,40,30],0.7);S.licht(x+cs/2,y+cs/2,cs*2,[255,230,180],0.2);S.pa(x,y+2*cs,[255,220,170],0.12);S.pa(x,y+4*cs,[255,220,170],0.06);}},
+  satellit(S){const {e,A}=S;for(const q of A.paesse){const u=(e-q.e0)/q.P;if(u<0||u>=1)continue;const x=lerp(q.dir>0?-0.02*W:1.02*W,q.dir>0?1.02*W:-0.02*W,u),y=lerp(q.y0,q.y1,u);
+      S.pa(x,y,[236,238,250],0.75*smooth(0,0.12,u)*(1-smooth(0.8,1,u)),true);}}, // taucht auf, zieht ruhig, verblasst im Erdschatten
+  kahn(S){const {p,t,A}=S,fl=0.85+0.15*Math.sin(t*9)*Math.sin(t*3.3);
+    for(let i=-2;i<=1;i++)p(i,0,S.dim([52,44,38]));p(-1,-1,[34,34,40]);p(-1,-2,[34,34,40]);p(-2,-2,[70,60,50],0.5);p(-3,-1,[70,60,50],0.4);p(-3,0,[70,60,50],0.3);
+    p(1,-2,[255,198,112],fl);S.licht(S.X+1.5*S.cs,S.Y-1.5*S.cs,S.cs*4,[255,190,110],0.3*fl);
+    for(let k=1;k<=4;k++)p(1+Math.round(Math.sin(t*2+k)*0.6),k,[255,190,110],0.35*(1-k/5)*fl);}};
+function entdeckenLayer(C,cs,t){SZ_PAUSE=C.hr<1&&C.hr*3600<85;if(SZ_PAUSE){SZ_JETZT=[];return;} // beim Pixelsturz Pause
+  const akt=szAktiv(C,cs);SZ_JETZT=akt;if(!akt.length)return;
+  const snap=x=>Math.floor(x/cs)*cs,hy=C.hy,k=W/700+0.4*cs,lx=C.lx,dY=C.dayMode?Math.min(C.sunY,hy):C.moonY,dr=(Math.max(3.4,18/cs)+3)*cs,ry=snap(C.rowY);
+  const mm=C.d.getMinutes()+C.d.getSeconds()/60,bx=snap(C.xv(mm/5)),by=snap(C.rowY+(H-hy)*0.12),px0=snap(C.xv(0))-2*cs,px1=snap(C.xv(12))+3*cs;
+  const frei=(x,y)=>!((y>hy&&Math.abs(x-lx)<szStrahl(hy,y,cs)+cs)||((x-lx)**2+(y-dY)**2<dr*dr)||(y>ry-6*cs&&y<ry+2*cs&&x>px0&&x<px1)||(x>bx-20*cs&&x<bx+7*cs&&y>by-9*cs&&y<by+2*cs));
+  const ridge=x=>hy-rv(FAR,x/W)*C.farSc-cs,dim=c=>mix(c,[0,0,0],(1-C.L)*0.6);
+  for(const z of akt){const f=smooth(0,4,z.e)*(1-smooth(z.D-4,z.D,z.e));if(f<0.01)continue;
+    const pa=(x,y,c,a=1,himmel=false)=>{const X=snap(x),Y=snap(y),cx=X+cs/2,cy=Y+cs/2;a*=f;if(a<0.02||cx<0||cx>W||cy<0||cy>H||!frei(cx,cy)||(himmel&&cy>ridge(cx)))return;ctx.fillStyle=rgba(c,a);ctx.fillRect(X+cs*0.06,Y+cs*0.06,cs*0.88,cs*0.88);};
+    const A=z.A,X=A.x0!==undefined&&A.x1!==undefined&&z.k!=='spaziergang'?lerp(A.x0,A.x1,z.e/z.D):A.P0?A.P0.x:A.x!==undefined?A.x:0,Y=A.y!==undefined?A.y:A.P0?A.P0.y:0;
+    const S={C,A,cs,e:z.e,D:z.D,t,f,X,Y,dim,pa,p:(i,j,c,a=1)=>pa(X+i*cs,Y+j*cs,c,a),
+      licht:(x,y,r,c,a)=>{if(!frei(x,y)||!frei(x-r,y)||!frei(x+r,y)||!frei(x,y-r)||!frei(x,y+r))return;ctx.save();ctx.globalCompositeOperation='lighter';softEllipse(x,y,r,r,c,a*f);ctx.restore();}}; // auch der Schein bleibt aus dem Strahl
+    SZ_ZEICHNE[z.k](S);}}
+// Info-Zeile (?dev=1): welche Szene gerade läuft und welche als Nächstes kommt
+function szText(d){if(!ENTDECKEN)return '';if(SZ_PAUSE)return 'Szenen: Pause (Pixelsturz)';const m=d.getHours()*60+d.getMinutes(),P=szPlan(d);
+  const jetzt=SZ_JETZT.map(z=>SZ_NAME[z.k]+' (bis '+fmtM(z.s.b%1440)+')').join(' + ')||'keine';
+  const naechste=[...P.haupt,...P.neben].filter(s=>s.a>m&&!SZ_JETZT.some(z=>z.s===s)).sort((a,b)=>a.a-b.a)[0];
+  return 'Szene: '+jetzt+(naechste?' · als Nächstes: '+SZ_NAME[naechste.kand[0]]+(naechste.kand.length>1?' (oder '+naechste.kand.slice(1).map(k=>SZ_NAME[k]).join(', ')+')':'')+' um '+fmtM(naechste.a):'');}
+
 // ---------- Jahreszeiten (dezent) ----------
 function seasonAmt(d){const doy=(d-new Date(d.getFullYear(),0,1))/864e5;
   return{autumn:smooth(262,292,doy)*(1-smooth(318,330,doy)),bare:smooth(308,326,doy)*(1-smooth(345,360,doy)),spring:smooth(95,110,doy)*(1-smooth(140,152,doy)),flies:smooth(160,166,doy)*(1-smooth(196,204,doy))};}
@@ -869,7 +1002,7 @@ function drawRaster(t,A,d,st){const p0=performance.now();
     for(let i=1;i<=cols;i++){const e=Math.round(i*csP),w=Math.round(i*gP)-Math.round((i-1)*gP);if(w>0)ctx.fillRect(e-w,0,w,cv.height);}
     for(let j=1;j<=rows;j++){const e=Math.round(j*csP),w=Math.round(j*gP)-Math.round((j-1)*gP);if(w>0)ctx.fillRect(0,e-w,cv.width,w);}}
   const p4=performance.now();ctx.setTransform(DPR,0,0,DPR,0,0);
-  astroLayer(C,cs,t);rasterClock(C,cs,RS.gap,t,A);extrasLayer(C,cs,t);familyLayer(C,cs,t); // Astro zuerst: die Uhr liegt immer obenauf
+  astroLayer(C,cs,t);if(ENTDECKEN&&st.rmode==='mix')entdeckenLayer(C,cs,t);rasterClock(C,cs,RS.gap,t,A);extrasLayer(C,cs,t);familyLayer(C,cs,t); // Astro und Szenen zuerst: die Uhr liegt immer obenauf
   PERF.szene+=p1-p0;PERF.lesen+=p2-p1;PERF.zellen+=p3-p2;PERF.farben+=p4-p3;PERF.rest+=performance.now()-p4;}
 // Abtasten: jede Zelle holt ihre Farbe aus der Szene, verschoben durch Wind, Glitch, Flimmern, Regen-Schlieren.
 // Eigene Funktion, damit sie optimiert weiterläuft, auch wenn der Browser drawRaster wegen eines seltenen Zweigs neu übersetzt.
@@ -1029,7 +1162,7 @@ let lastTxt='';
 function readout(d,A){
   const ds=d.toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'}),ts=d.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
   const wx=dayWeather(d),cel=[];
-  cel.push(wxText(d));if(A.fraction>0.985)cel.push('Vollmond');if(isMesse(d))cel.push('Messetag');if(wx.shoot)cel.push('Sternschnuppennacht');for(const p of FAMILIE)if(isBday(p,d))cel.push('Geburtstag: '+p.name);if(isAnniv(d))cel.push('Hochzeitstag');{const V=visitorTimes(d);cel.push('Feuerwehr '+fmtM(V.fw)+', Eisvogel '+V.kf.map(fmtM).join(' / '));}if(adventLit(d))cel.push(adventLit(d)+'. Advent');if(STATE)cel.push(STATE);{const at=astroText();if(at)cel.push(at);}for(const ev of dayRare(d))cel.push(ev.n+' ('+Math.floor(ev.a)+'–'+(Math.floor(ev.b)%24)+' Uhr)');if(CFG_INFO)cel.push(CFG_INFO);if(T_SIM&&mode==='live'&&!playing)cel.push('Zeit simuliert mit ?t=');if(URL_INFO.length)cel.push(URL_INFO.join(', '));
+  cel.push(wxText(d));if(A.fraction>0.985)cel.push('Vollmond');if(isMesse(d))cel.push('Messetag');if(wx.shoot)cel.push('Sternschnuppennacht');for(const p of FAMILIE)if(isBday(p,d))cel.push('Geburtstag: '+p.name);if(isAnniv(d))cel.push('Hochzeitstag');{const V=visitorTimes(d);cel.push('Feuerwehr '+fmtM(V.fw)+', Eisvogel '+V.kf.map(fmtM).join(' / '));}if(adventLit(d))cel.push(adventLit(d)+'. Advent');if(STATE)cel.push(STATE);if(ENTDECKEN)cel.push(szText(d));{const at=astroText();if(at)cel.push(at);}for(const ev of dayRare(d))cel.push(ev.n+' ('+Math.floor(ev.a)+'–'+(Math.floor(ev.b)%24)+' Uhr)');if(CFG_INFO)cel.push(CFG_INFO);if(T_SIM&&mode==='live'&&!playing)cel.push('Zeit simuliert mit ?t=');if(URL_INFO.length)cel.push(URL_INFO.join(', '));
   if(CLOCK_OFF)cel.push('Geräteuhr korrigiert um '+Math.round(CLOCK_OFF/6e4)+' min ('+CLOCK_SRC+')');if(DEV_TZ!==TZ)cel.push('Gerät steht auf Zeitzone '+DEV_TZ+', Lichtzeit rechnet in Berliner Zeit');
   const txt=`${ds}, ${ts} Uhr. Mond ${Math.round(A.fraction*100)} % ${A.phase<0.5?'zunehmend':'abnehmend'}, Sonne ${Math.round(A.sun.alt/rad)}°`+(cel.length?` <span class="cel">${cel.join(', ')}</span>`:'');
   if(txt!==lastTxt){$('readout').innerHTML=txt;lastTxt=txt;}
@@ -1060,7 +1193,7 @@ function frame(now){
 // Wird beim Start geladen. Fehlt ein Eintrag, gilt der eingebaute Standard. Ist einer fehlerhaft, ebenfalls, mit Hinweis in der Info-Zeile.
 // Einträge, die mit "_" beginnen, sind Notizen und werden ignoriert.
 let ORT='Chiemsee',WETTER={echt:true,min:15},CFG_INFO='',started=false;
-const CFG_KEYS=['ort','familie','hochzeitstag','feuerwehrboot','eisvogel','wetter','anzeige','astro','astro_punkte'];
+const CFG_KEYS=['ort','familie','hochzeitstag','feuerwehrboot','eisvogel','wetter','anzeige','astro','astro_punkte','entdecken'];
 const pMMDD=v=>{const m=/^(\d{1,2})-(\d{1,2})$/.exec(String(v).trim());if(!m)return null;const a=+m[1],b=+m[2];return a>=1&&a<=12&&b>=1&&b<=31?String(a).padStart(2,'0')+'-'+String(b).padStart(2,'0'):null;};
 const pDatum=v=>v===''?'':pMMDD(v); // leer = kein Goldtag
 const pUhr=v=>{const m=/^(\d{1,2}):(\d{2})$/.exec(String(v).trim());if(!m)return null;const a=+m[1],b=+m[2];return b<60&&a*60+b<=1440?a*60+b:null;};
@@ -1089,6 +1222,7 @@ function applyConfig(j){const bad=[],notes=[],obj=v=>!!v&&typeof v==='object'&&!
   if(j.astro_punkte!==undefined){if(!Array.isArray(j.astro_punkte))bad.push('astro_punkte');else{KAMM=[];j.astro_punkte.slice(0,8).forEach((q,n)=>{const nm='astro_punkte '+(n+1);
     if(!obj(q)||!pZahl(1,3,true)(q.stern)||!PL_FARBE[q.planet]||!['ost','west'].includes(q.richtung)||pZahl(0,20000)(q.km)===null){bad.push(nm);return;}KAMM.push({stern:q.stern,planet:q.planet,richtung:q.richtung,km:Math.round(q.km)});});
     if(j.astro_punkte.length>8)notes.push('nur die ersten 8 Kamm-Punkte werden gezeigt');}}
+  ENTDECKEN=or(take(j.entdecken,pJaNein,'entdecken'),ENTDECKEN);
   part('wetter',w=>{WETTER={echt:or(take(w.echt,pJaNein,'wetter echt'),WETTER.echt),min:or(take(w.aktualisieren_minuten,pZahl(5,180),'wetter aktualisieren_minuten'),WETTER.min)};});
   const unk=Object.keys(j).filter(k=>k[0]!=='_'&&!CFG_KEYS.includes(k));if(unk.length)notes.push('unbekannt: '+unk.join(', '));
   const msg=[];if(bad.length)msg.push('ungültig: '+bad.join(', ')+' (dort gilt der Standard)');CFG_INFO=msg.concat(notes).length?'config.json: '+msg.concat(notes).join('; '):'';}
@@ -1191,7 +1325,8 @@ function urlAnzeige(){const set=(k,key,p,auto)=>{const v=Q.get(k);if(v===null)re
     if(x===null||t==='')URL_INFO.push('?'+k+'='+v+' ungültig');else{ANZ[key]=x;if(t==='auto')delete ANZ_SRC[key];else ANZ_SRC[key]='Adresse';}};
   set('raster','raster_px',pZahl(2,40),0);set('fps','max_fps',pZahl(5,120),30);set('aufloesung','aufl',pZahl(0.25,1),0);
   const ls=Q.get('lesen');if(ls!==null){if(['webgl','cpu','auto'].includes(ls)){LESEN.wunsch=ls;if(ls!=='auto'){LESEN.jetzt=ls;LESEN.fertig=true;}}else URL_INFO.push('?lesen='+ls+' ungültig');}
-  const g=Q.get('gpu');if(g!==null){if(['0','1','aus','an'].includes(g))GPU_WUNSCH=g==='1'||g==='an';else URL_INFO.push('?gpu='+g+' ungültig');}}
+  const g=Q.get('gpu');if(g!==null){if(['0','1','aus','an'].includes(g))GPU_WUNSCH=g==='1'||g==='an';else URL_INFO.push('?gpu='+g+' ungültig');}
+  const en=Q.get('entdecken');if(en!==null){if(['0','1','aus','an'].includes(en))ENTDECKEN=en==='1'||en==='an';else URL_INFO.push('?entdecken='+en+' ungültig');}}
 function start(){if(started)return;started=true;urlAnzeige();if(ANZ.raster_px||ANZ.aufl)resize();$('sname').textContent=ORT;document.title='Lichtzeit – '+ORT;toSliders(curT());setMode();keepAwake();requestAnimationFrame(frame);}
 // Start: erst die Einstellungen, dann das Wetter (gespeicherter Stand sofort, neuen Abruf höchstens 3 s abwarten)
 function boot(){if(WX_FORCE)return null;wxLoad();const f=wxFetch();return WX&&wxAt(nowT())?null:Promise.race([f,new Promise(r=>setTimeout(r,3000))]);}

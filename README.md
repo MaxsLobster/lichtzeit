@@ -66,7 +66,7 @@ und welche zurückgestellt sind.
 ## Dateien
 
 - `index.html` – das Kunstwerk (eine Datei, ohne Build-Werkzeuge)
-- `config.json` – Einstellungen (Ort, Familie, Termine, Wetter, Anzeige, Himmel)
+- `config.json` – Einstellungen (Ort, Familie, Termine, Wetter, Anzeige, Himmel, Szenen)
 - `README.md` – diese Anleitung
 
 ## Einstellungen ändern
@@ -88,6 +88,7 @@ Alle veränderbaren Daten stehen in `config.json`. So änderst du sie:
 | `anzeige` | Rastergröße, Bildrate und interne Auflösung, siehe unten. `"auto"` passt sich dem Bildschirm an. |
 | `astro` | Schalter für die Himmelselemente: `planeten`, `mond_zeichen`, `kamm_punkte` (je `true` oder `false`). |
 | `astro_punkte` | Die Lichtpunkte auf dem Bergkamm, siehe „Himmel“. |
+| `entdecken` | Die kleinen Szenen (siehe „Entdecken“) an (`true`) oder aus (`false`). |
 
 Regeln, damit nichts schiefgeht:
 
@@ -136,6 +137,33 @@ Mit `?dev=1` zeigt die Seite oben rechts, wie viele Bilder pro Sekunde
 tatsächlich gezeichnet werden, wie viele Millisekunden jeder Teil braucht
 (Szene, Auslesen, Zellen, Farben, Rest), welches Raster aktiv ist, ob die
 Grafikeinheit rechnet und mit welcher Auflösung der Browser des Geräts arbeitet.
+
+## Entdecken
+
+Eine Schicht winziger Szenen im Pixelstil, damit man bei jedem Blick etwas
+Kleines findet:
+
+| Tageszeit | Szenen |
+|---|---|
+| Morgen (Dämmerung bis 10 Uhr) | Angler im Schilf, Graureiher im Flachwasser (fliegt ab und zu auf), Ruderboot im Nebel |
+| Tag | Flugzeug mit Kondensstreifen, Stand-up-Paddler (Mai bis September), Entenfamilie (April bis Juni mit Küken, sonst ein Entenpaar) |
+| Abend (ab etwa einer Stunde vor Sonnenuntergang) | Fledermäuse in der Dämmerung (April bis Oktober), Spaziergänger mit Hund am Ufer (im Dunkeln mit Stirnlampe), Boote fahren heim |
+| Nacht | Autoscheinwerfer am fernen Ufer, Satellit als wandernder Lichtpunkt (nur bei klarem Himmel), Kahn mit Laterne |
+
+- Immer ist mindestens eine Szene zu sehen, nie mehr als zwei. Jede dauert
+  3 bis 10 Minuten.
+- Der Ablauf ist für jeden Tag fest, wie bei Eisvogel und Feuerwehrboot, aber
+  jeden Tag anders.
+- Bei Regen oder Sturm gibt es keine Paddler, Flugzeuge oder Spaziergänger.
+  Dann kommt eine andere Szene dieser Tageszeit.
+- Die Szenen verdecken nie den Strahl, die Pfähle oder den Dampfer. Sie suchen
+  sich einen Platz daneben, und was in den Strahl gerät, verschwindet im
+  Glitzern.
+- Beim Pixelsturz um Mitternacht machen sie 85 Sekunden Pause.
+
+Im Test-Modus (`?dev=1`) steht in der Info-Zeile, welche Szene gerade läuft und
+welche als Nächstes kommt. Mit `?entdecken=0` lassen sie sich für ein Gerät
+ausschalten, für alle über `"entdecken": false` in `config.json`.
 
 ## Himmel
 
@@ -212,6 +240,7 @@ Parameter werden an die Adresse angehängt: der erste mit `?`, weitere mit `&`.
 | `?dev=1` | Test-Modus: Steuerleiste (Tag, Uhrzeit, Zeitraffer, Lesehilfe, Mitternacht ansehen, Seltenheit finden), Info-Zeile mit Wetter und Luftdruck-Trend, oben rechts die Bildrate. Ein Tipp aufs Bild blendet die Steuerung aus. |
 | `?t=2026-12-24T17:30` | Zeit simulieren. Die Uhr läuft ab diesem Moment weiter. Auch möglich: `?t=17:30` (heute) oder `?t=0:00:20`. |
 | `?raster=`, `?fps=`, `?aufloesung=`, `?gpu=`, `?lesen=` | Anzeige für dieses Gerät, siehe „Anzeige und Leistung“. |
+| `?entdecken=0` | Die kleinen Szenen für dieses Gerät aus (`1` = an). |
 | `?wetter=gewitter` | Wetter erzwingen: `gewitter`, `regen`, `nebel`, `klar`, `schnee`, `bedeckt`, `hochnebel` oder `sturm`. Gewitter, Regen und Sturm kommen mit fallendem Luftdruck. |
 
 Beispiele:
@@ -224,6 +253,10 @@ Beispiele:
 
 Lichtzeit ist fertig und läuft. Die Kontroll-Screenshots der Abnahme (Mittag,
 Sonnenuntergang, 23:50, 0:00:20, Gewitter, Nebel, Schnee, Heiligabend) liegen
-lokal in `gazers/abnahme/`. Auf normalen Bildschirmen ist das Bild pixelgleich
-zum ursprünglichen Prototyp `lichtzeit.html`, wenn die Himmelselemente
-ausgeschaltet sind und der Prozessor rechnet (`?gpu=0`).
+lokal in `gazers/abnahme/`.
+
+Seit Oktober 2026 weicht das Bild bewusst vom ursprünglichen Prototyp
+`lichtzeit.html` ab: Die Pixel-Effekte sind seltener und schwächer, und es gibt
+die Szenen zum Entdecken. Alles andere ist unverändert. Geprüft wird das mit
+einem Pixelvergleich gegen den jeweils vorherigen Stand (Werkzeuge in
+`gazers/werkzeuge/tests/`).
