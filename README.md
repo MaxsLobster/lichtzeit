@@ -14,7 +14,7 @@ für einen 32-Zoll Muse Frame im Hochformat.
 - **Minute:** Der Schornstein des Dampfers zeigt die Minute. Jeder Pfahl steht
   für 5 Minuten.
 - **Mond:** Der Mond zeigt seine echte Phase. Bei Vollmond wird das Bild klar
-  und silbern, bei Neumond schaltet es auf 1-Bit.
+  und silbern. In der Neumond-Nacht wird das Raster etwas gröber und blasser.
 
 ## Wetter und Barometer
 
@@ -30,19 +30,38 @@ es ins Bild:
 - **Wind** – Pixel verwehen, Böenfelder auf dem See, Schilf wiegt sich
 - **Nebel, schlechte Sicht** – Pixel lösen sich auf
 - **Gewitter** – Glitch und Blitze. Kündigt sich ein Gewitter an, türmen sich die Wolken schon vorher auf.
+- **Sturm** – ab etwa 50 km/h Wind oder Böen ab 62 km/h (Windstärke 8) fliegen die Pixel
 - **Regenbogen** – nur wenn es gerade aufgehört hat zu regnen, die Sonne
   zwischen 3° und 40° hoch steht und weniger als etwa 70 % bewölkt ist
 - **Temperatur** – der See wirkt bei Kälte ganz leicht kühler, bei Wärme wärmer
 - **Barometer** – der Luftdruck-Trend der letzten 3 Stunden: Steigt er, wird
-  das Raster ruhiger. Fällt er, wird es unruhiger. Fällt er stark (mehr als
-  3 hPa), flirrt es deutlich, wie eine Sturmwarnung.
+  das Raster ruhiger. Fällt er, wird es leicht unruhig. Stürzt er ab (mehr als
+  4 hPa in 3 Stunden), flirrt es deutlich, wie eine Sturmwarnung.
 
 Der letzte Stand wird im Browser gespeichert. Ist kein Internet da, läuft das
 Bild mit diesem Stand weiter. Ist er älter als 6 Stunden oder gibt es keinen,
 zeigt Lichtzeit das eingebaute, simulierte Wetter. Das Bild ist nie leer.
 
-Die Grenzwerte (Wind, Bedeckt, Hochnebel, Barometer, Regenbogen, See-Farbton) stehen gesammelt
+Die Grenzwerte (Wind, Sturm, Bedeckt, Hochnebel, Barometer, Regenbogen, See-Farbton) stehen gesammelt
 oben im Abschnitt „Echtes Wetter“ in `index.html`.
+
+## Pixel-Effekte
+
+Das klare Bild ist der Normalfall. Harte Pixel-Effekte sind selten und kurz:
+
+- **Starke Verpixelung** gibt es nur bei echten Extremen: Gewitter, Sturm,
+  Luftdruck-Absturz, dazu Geisterstunde und Pixelsturz um Mitternacht.
+- **Kleinere Effekte** (Nebel, Regen, Wind, fallender Luftdruck, Blaue Stunde,
+  Unruhe vor Mitternacht, Neumond-Nacht) sind so schwach eingestellt, dass
+  Landschaft und Uhr immer klar erkennbar bleiben. In der Blauen Stunde
+  sortiert sich nur der Himmel, die Berge bleiben stehen.
+- **Immer nur einer:** Treffen mehrere Effekte zusammen, zeigt Lichtzeit nur
+  den stärksten. Liegen zwei fast gleichauf, gehen sie weich ineinander über.
+- Der Nacht-Dither und das Hochfahren am Morgen gehören zum Tagesablauf und
+  laufen unabhängig davon.
+
+Im Test-Modus (`?dev=1`) steht in der Info-Zeile, welcher Effekt gerade wirkt
+und welche zurückgestellt sind.
 
 ## Dateien
 
@@ -193,7 +212,7 @@ Parameter werden an die Adresse angehängt: der erste mit `?`, weitere mit `&`.
 | `?dev=1` | Test-Modus: Steuerleiste (Tag, Uhrzeit, Zeitraffer, Lesehilfe, Mitternacht ansehen, Seltenheit finden), Info-Zeile mit Wetter und Luftdruck-Trend, oben rechts die Bildrate. Ein Tipp aufs Bild blendet die Steuerung aus. |
 | `?t=2026-12-24T17:30` | Zeit simulieren. Die Uhr läuft ab diesem Moment weiter. Auch möglich: `?t=17:30` (heute) oder `?t=0:00:20`. |
 | `?raster=`, `?fps=`, `?aufloesung=`, `?gpu=`, `?lesen=` | Anzeige für dieses Gerät, siehe „Anzeige und Leistung“. |
-| `?wetter=gewitter` | Wetter erzwingen: `gewitter`, `regen`, `nebel`, `klar`, `schnee`, `bedeckt` oder `hochnebel`. Gewitter kommt mit stark fallendem Luftdruck, Regen mit fallendem. |
+| `?wetter=gewitter` | Wetter erzwingen: `gewitter`, `regen`, `nebel`, `klar`, `schnee`, `bedeckt`, `hochnebel` oder `sturm`. Gewitter, Regen und Sturm kommen mit fallendem Luftdruck. |
 
 Beispiele:
 
