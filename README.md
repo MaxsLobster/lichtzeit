@@ -157,7 +157,7 @@ Eingabedatei löschen.“ Dann Datum, Uhrzeit und Ort für Stern 1, 2 und 3 ange
    `werkzeuge/geburtsdaten.json` (nicht in den Ordner `lichtzeit`!), und
    Datum, Uhrzeit und Zeitzone des Geburtsorts eintragen (in Deutschland
    `Europe/Berlin`, in Österreich `Europe/Vienna`).
-2. Im Terminal: `cd ~/Desktop/gazers/werkzeuge` und
+2. Im Terminal: `cd ~/Desktop/MaxPrivat/gazers/werkzeuge` und
    `node linien.js geburtsdaten.json 6`
 3. Die ausgegebene Zeile `"astro_punkte": [...]` in `config.json` auf GitHub an
    Stelle von `"astro_punkte": []` einsetzen (wie unter „Einstellungen ändern“).
