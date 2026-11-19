@@ -9,12 +9,17 @@ für einen 32-Zoll Muse Frame im Hochformat.
 ## So liest man die Uhr
 
 - **Uhrzeit:** Oben links steht die Zeit auf einer Fallblatt-Tafel aus großen
-  Pixelziffern (je 7×10 Zellen, sie rasten auf das Bildraster ein). Die Farbe
+  Pixelziffern (je 5×7 Zellen, etwa 19 % der Bildbreite; sie rasten auf das
+  Bildraster ein, am Muse ist ein Schriftpixel genau eine Rasterzelle). Die Farbe
   kommt aus dem Licht der Szene. Beim Minutenwechsel klappt die Ziffer zur Fuge
-  hin um, der Doppelpunkt atmet langsam.
-- **Darunter:** das Wetter der nächsten drei Tage (siehe „Vorhersage“).
-- **Lichtstrahl und Dampfer** sind reine Stimmung: Der Strahl von Sonne bzw.
-  Mond liegt auf dem See, der Dampfer fährt in zwei Stunden einmal quer darüber.
+  (nach der dritten Zeile) hin um, der Doppelpunkt atmet langsam.
+- **Darunter:** das Wetter der nächsten drei Tage als kleine Abfahrtstafel
+  (siehe „Vorhersage“).
+- **Lichtstrahl und Raddampfer** sind reine Stimmung: Der Strahl von Sonne bzw.
+  Mond liegt auf dem See, der Raddampfer fährt in zwei Stunden einmal quer
+  darüber: mit roter Wasserlinie, drehendem Schaufelrad, Fenstern, Schornstein,
+  zwei Masten und weiß-blauer Fahne, Kielwasser, Bugwelle und Rauchfahne. Nachts
+  leuchten die Fenster warm und spiegeln sich, an den Masten brennen Toplichter.
 - **Mond:** Der Mond zeigt seine echte Phase. Bei Vollmond wird das Bild klar
   und silbern. In der Neumond-Nacht wird das Raster etwas gröber und blasser.
 
@@ -43,8 +48,8 @@ Was wann kommt (in dieser Reihenfolge, das Erste gewinnt):
 
 ## Vorhersage
 
-Unter der Uhr stehen die nächsten drei Tage: Wochentag, Symbol und
-Höchsttemperatur. Symbole: klar, heiter, Wolke, Regen, Schnee, Gewitter, Frost.
+Unter der Uhr stehen die nächsten drei Tage wie auf einer Abfahrtstafel, eine
+Zeile pro Tag: Wochentag, Symbol und Höchsttemperatur (rechtsbündig). Symbole: klar, heiter, Wolke, Regen, Schnee, Gewitter, Frost.
 **Frost** (Tiefstwert höchstens 0 °C, kein Niederschlag) hat ein Eiskristall-
 Symbol; statt des Höchstwerts steht dann der Tiefstwert, beides in Eisblau. Bei
 Schnee mit Frost steht der Tiefstwert ebenfalls in Eisblau. Die Werte kommen mit
@@ -250,7 +255,7 @@ ausschalten, für alle über `"entdecken": false` in `config.json`.
   Negativ der Geisterstunde ist es dunkel mit hellen Augen.
 - **Heiligabend:** Ab der Dämmerung fällt sanfter Schnee (unabhängig vom
   Wetter), am Ufer und auf den Inseln brennen warme Fensterlichter, der Dampfer
-  trägt eine Lichterkette (der Schornstein bleibt frei) und über der Fraueninsel
+  trägt eine Lichterkette vom Mast über den Schornstein zum anderen Mast und über der Fraueninsel
   steht ein heller Weihnachtsstern mit Schweif. Zwischen 17 und 18 Uhr fliegt das
   Christkind einmal als kleines Licht über den See. Am 25. und 26.12. geht es
   etwas ruhiger weiter.
@@ -270,6 +275,9 @@ führt zurück.
 
 ## Advent und Winter
 
+Vorne links ragt eine kleine Halbinsel mit Schilf in den See. Lichterkette,
+Schneemann, Schnee, Angler und Spaziergänger folgen ihrer Uferlinie.
+
 - **Adventskalender:** Am vorderen Ufer hängt eine Lichterkette mit 24 Lichtern;
   am n-ten Dezember brennen n davon. Jeden Morgen um 7:30 öffnet sich ein Türl:
   Das Motiv des Tages steigt leuchtend aus dem See, steht etwa 10 Minuten und
@@ -284,8 +292,8 @@ führt zurück.
   zwinkert er. Bei Tauwetter (Tage über 2 °C) schmilzt er in drei Stufen:
   kleiner, Hut schief, zuletzt nur noch Hut und Karotte im Rest-Schnee.
 - **Eisstockschießen:** Nach mindestens 4 Eistagen in Folge (Höchstwert
-  höchstens 0 °C) friert die vordere Bucht zu, von 10 bis 16 Uhr wird darauf
-  Eisstock geschossen, am Wochenende schauen mehr Leute zu. Nach 2 Tagen über
+  höchstens 0 °C) friert die vordere Bucht zu, von 10 bis 16 Uhr wird rechts der
+  Halbinsel auf dem Eis Eisstock geschossen, am Wochenende schauen mehr Leute zu. Nach 2 Tagen über
   3 °C taut das Eis wieder.
 - **Föhn:** klare Luft, tiefblauer Himmel, die Berge wirken größer und näher,
   über ihnen stehen Föhnfische (linsenförmige Wolken). Erkannt wird Föhn, wenn
@@ -299,6 +307,22 @@ führt zurück.
 
 Alle Grenzwerte (`WARN`, `FOEHN`, `SCHNEE`, `EIS`) stehen im Abschnitt „Echtes
 Wetter“ in `index.html`.
+
+## Licht: Wolkenschatten, Alpenglühen, Erdschatten
+
+- **Wolkenschatten:** Bei Sonne und lockerer Bewölkung (etwa 15 bis 85 %) ziehen
+  weiche Schattenflecken über See und Berge. Bei Regen, Bedeckt oder Hochnebel
+  gibt es keine. Mit echtem Wetter ziehen sie mit dem echten Wind (Richtung und
+  grob die Stärke): Westwind schiebt sie nach links (der Blick geht nach Süden),
+  Südwind zum Betrachter hin. Ohne echtes Wetter ziehen sie von links nach
+  rechts. Wo sie stehen, hängt nur von der Uhrzeit ab, nicht davon, wie lange
+  die Seite schon läuft.
+- **Alpenglühen:** Nach Sonnenuntergang steigt eine Schattenlinie die Berge
+  hinauf, die Gipfel glühen von Orange zu Rosa. Links (Osten) steigt der
+  blaugraue Erdschatten auf, darüber der rosa Venusgürtel. **Morgens umgekehrt:**
+  Vor Sonnenaufgang glühen zuerst die Gipfel, die Linie wandert nach unten, der
+  Erdschatten sinkt rechts (Westen). Zeitraum etwa Sonnenhöhe +4° bis −9°, nur
+  bei klarer Luft (nicht bei Bedeckt, Hochnebel, Gewitter oder dichtem Nebel).
 
 ## Himmel
 
@@ -402,7 +426,7 @@ Parameter werden an die Adresse angehängt: der erste mit `?`, weitere mit `&`.
 
 | Parameter | Wirkung |
 |---|---|
-| `?dev=1` | Test-Modus: Steuerleiste (Tag, Uhrzeit, Zeitraffer, Mitternacht ansehen, Seltenheit finden), Info-Zeile mit Wetter, Luftdruck-Trend und allem, was gerade aktiv ist und warum (Vorhersage, Warnleuchte, Schneemann, Eis, Föhn, Markt, Tafel), oben rechts die Bildrate. Ein Tipp aufs Bild blendet die Steuerung aus. |
+| `?dev=1` | Test-Modus: Steuerleiste (Tag, Uhrzeit, Zeitraffer, Mitternacht ansehen, Seltenheit finden), Info-Zeile mit Wetter, Luftdruck-Trend und allem, was gerade aktiv ist und warum (Vorhersage, Warnleuchte, Schneemann, Eis, Föhn, Wolkenschatten, Alpenglühen, Markt, Tafel), oben rechts die Bildrate. Ein Tipp aufs Bild blendet die Steuerung aus. |
 | `?t=2026-12-24T17:30` | Zeit simulieren. Die Uhr läuft ab diesem Moment weiter. Auch möglich: `?t=17:30` (heute) oder `?t=0:00:20`. |
 | `?raster=`, `?fps=`, `?aufloesung=`, `?gpu=`, `?lesen=` | Anzeige für dieses Gerät, siehe „Anzeige und Leistung“. |
 | `?entdecken=0` | Die kleinen Szenen für dieses Gerät aus (`1` = an). |
@@ -411,9 +435,11 @@ Parameter werden an die Adresse angehängt: der erste mit `?`, weitere mit `&`.
 | `?schnee=1` | Schneemann und Schnee am Ufer (`2`, `3`, `4` = die Schmelzstufen). |
 | `?eis=1` | Zugefrorene Bucht, Eisstockschießen (10–16 Uhr). |
 | `?foehn=1` | Föhn. |
+| `?schatten=1` | Wolkenschatten erzwingen (nur bei Sonne). |
+| `?glut=1` | Alpenglühen und Erdschatten erzwingen, auch wenn die Luft nicht klar ist; am besten mit `?t=` kurz vor Sonnenuntergang (abends) oder vor Sonnenaufgang (morgens). |
 | `?markt=1` | Christkindlmarkt (unabhängig vom Termin). |
 | `?tafel=GUAD\|NACHT` | Die Tafel zeigt dieses Wort 15 s lang (zwei Zeilen mit `\|`, Seiten mit `/`). |
-| `?wetter=gewitter` | Wetter erzwingen: `gewitter`, `regen`, `nebel`, `klar`, `schnee`, `bedeckt`, `hochnebel`, `sturm` oder `regenbogen`. Gewitter, Regen und Sturm kommen mit fallendem Luftdruck. |
+| `?wetter=gewitter` | Wetter erzwingen: `gewitter`, `regen`, `nebel`, `klar`, `heiter`, `schnee`, `bedeckt`, `hochnebel`, `sturm` oder `regenbogen` (`heiter` = 32 % Wolken, mit Wolkenschatten). Gewitter, Regen und Sturm kommen mit fallendem Luftdruck. |
 
 Beispiele:
 
@@ -422,13 +448,17 @@ Beispiele:
 - `https://maxslobster.github.io/lichtzeit/?t=23:58&dev=1` – zwei Minuten vor dem Pixelsturz
 - `https://maxslobster.github.io/lichtzeit/?dev=1&t=2026-12-06T07:29:55` – das Türl am Nikolaustag
 - `https://maxslobster.github.io/lichtzeit/?dev=1&t=2027-01-14T14:00&eis=1&schnee=1` – Eisstock und Schneemann
+- `https://maxslobster.github.io/lichtzeit/?dev=1&t=11:30&schatten=1` – Wolkenschatten
+- `https://maxslobster.github.io/lichtzeit/?dev=1&t=16:05&glut=1` – Alpenglühen heute Abend (Ende November; die Uhr läuft, nach etwa 50 Minuten ist es vorbei)
+- `https://maxslobster.github.io/lichtzeit/?dev=1&t=2026-12-24T17:00` – Heiligabend mit Dampfer-Lichterkette
 
 ## Stand
 
 Lichtzeit ist fertig und läuft. Die Kontroll-Screenshots der ersten Abnahme
 liegen lokal in `gazers/abnahme/`, die der Fallblatt-Uhr (November 2026) in
-`gazers/abnahme/fallblatt/`. Der Stand davor ist als Git-Tag `v-vor-fallblatt`
-gesichert.
+`gazers/abnahme/fallblatt/`, die von Auftrag 2 (kleinere Uhr, Halbinsel,
+Raddampfer, Wolkenschatten, Alpenglühen) in `gazers/abnahme/auftrag-2/`. Die
+Stände davor sind als Git-Tags `v-vor-fallblatt` und `v-vor-auftrag-2` gesichert.
 
 Seit Oktober 2026 weicht das Bild bewusst vom ursprünglichen Prototyp
 `lichtzeit.html` ab: Die Pixel-Effekte sind seltener und schwächer, und es gibt
