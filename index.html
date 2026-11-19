@@ -1789,8 +1789,8 @@ const WARN={vor:46,sturm:63,stunden_vor:1,stunden_nach:3}; // Sturmwarnleuchte w
 // Nebel ohne Sichtweite (DWD liefert sie ab Dezember 2026 nicht mehr): sehr feuchte Luft, kaum Wind, tiefe Wolken, wenig Niederschlag.
 // Abgeglichen am 19.11.2026 mit 60 Tagen Open-Meteo (Moosen): vormittags 216 von 250 Nebelstunden getroffen, 21 Fehlalarme, 35 von 38 Nebelvormittagen.
 const NEBEL_FEUCHT={feuchte_ab:92,feuchte_voll:99,wind_bis:8,wind_aus:15,tief_ab:40,staerke:0.8}; // rel. Feuchte %, Wind km/h (darüber kein Nebel), tiefe Wolken %, höchste Nebelstärke
-// Föhn-Böen ab 10 km/h (bis 19.11.2026: 30): in Moosen 11/2025–10/2026 rund 47 Föhn-Stunden an 13 Tagen statt 4 Stunden an einem Tag.
-const FOEHN={richtung_von:140,richtung_bis:250,boeen_ab:10,feuchte_bis:55,waermer_um:4,sicht_ab:30000,fenster_tief_bis:30}; // Wind aus S bis SW (Grad), Böen km/h, rel. Feuchte %, °C wärmer als im Mittel der 3 Tage davor (Höchstwerte), Sicht m; ohne Sicht: tiefe Wolken höchstens % (Föhnfenster)
+// Föhn-Böen ab 10 km/h (bis 19.11.2026: 30), Feuchte bis 75 % (bis 19.11.2026: 55): in Moosen 11/2025–10/2026 rund 89 Föhn-Stunden an 25 Tagen, davon 5 Tage Oktober–März.
+const FOEHN={richtung_von:140,richtung_bis:250,boeen_ab:10,feuchte_bis:75,waermer_um:4,sicht_ab:30000,fenster_tief_bis:30}; // Wind aus S bis SW (Grad), Böen km/h, rel. Feuchte %, °C wärmer als im Mittel der 3 Tage davor (Höchstwerte), Sicht m; ohne Sicht: tiefe Wolken höchstens % (Föhnfenster)
 const SCHNEE={hoehe_ab:0.02,tau_ab:2};  // Schneemann: ab 2 cm Schneehöhe; Tage mit Höchstwert über 2 °C lassen ihn schmelzen (3 Stufen)
 const EIS={tage:4,eistag_bis:0,tau_ab:3,tau_tage:2}; // Bucht friert nach 4 Eistagen in Folge (Höchstwert ≤ 0 °C), taut nach 2 Tagen mit Höchstwert über 3 °C
 const REGENBOGEN={sonne_min:2,sonne_max:42,wolken_max:85,nach_regen_h:2,regen_max:0.45}; // Sonnenhöhe in Grad, Bewölkung in %, wie lange nach dem Regen (h), bis zu welcher Regenstärke schon währenddessen (Sonnenregen)
