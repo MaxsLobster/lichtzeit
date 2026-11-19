@@ -117,6 +117,8 @@ und welche zurückgestellt sind.
 - `index.html` – das Kunstwerk (eine Datei, ohne Build-Werkzeuge)
 - `config.json` – Einstellungen (Ort, Familie, Termine, Wetter, Anzeige, Himmel, Szenen, Tafel, Christkindlmarkt)
 - `README.md` – diese Anleitung
+- `manifest.webmanifest`, `sw.js`, `icon-192.png`, `icon-512.png` – damit Lichtzeit
+  als App im Vollbild läuft (siehe „Als App am Muse“)
 
 ## Einstellungen ändern
 
@@ -351,6 +353,35 @@ nichts. Außerdem:
 - Jeden Tag um 4:00 Uhr lädt sich die Seite neu, damit Änderungen ankommen.
   Das passiert nur, wenn die Seite gerade erreichbar ist. Ohne Internet läuft
   das Bild einfach weiter.
+
+## Als App am Muse (echtes Vollbild)
+
+Lichtzeit lässt sich in Chrome als App installieren. Sie startet dann ohne
+Adressleiste und ohne Android-Leisten, im Hochformat, mit der Adresse
+`./?raster=8`.
+
+**Installieren:**
+
+1. Am Muse Chrome öffnen und **https://maxslobster.github.io/lichtzeit/** aufrufen.
+2. Oben rechts auf die drei Punkte **⋮** tippen.
+3. **„App installieren“** wählen (heißt manchmal „Zum Startbildschirm
+   hinzufügen“, dann im nächsten Fenster „Installieren“). Bestätigen.
+4. Den Chrome-Tab schließen und Lichtzeit über das neue Symbol (Mond über den
+   Bergen) starten.
+
+**Updates:** Die App holt die Seite und `config.json` bei jedem Start und beim
+Neuladen um 4:00 frisch vom Server. Die zuletzt geladene Fassung wird nur als
+Notkopie aufgehoben, falls beim Start kein Internet da ist (z. B. wenn das WLAN
+langsamer hochkommt als der Muse). Ohne Netz lädt die App um 4:00 nicht neu,
+sondern versucht es alle 10 Minuten wieder.
+
+**Andere Werte für den Muse** (z. B. Raster 6): Die Start-Adresse steht in
+`manifest.webmanifest` (`start_url`). Chrome übernimmt eine Änderung von
+selbst, das kann aber einen Tag oder länger dauern. Sofort wirkt es, wenn man
+die App am Muse deinstalliert und neu installiert.
+
+Das App-Symbol erzeugt `gazers/werkzeuge/app-symbol.mjs`
+(`node werkzeuge/app-symbol.mjs lichtzeit`).
 
 ## Test-Parameter
 

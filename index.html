@@ -4,6 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Lichtzeit – Chiemsee</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#000000">
+<link rel="icon" href="icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;1,500&family=Figtree:wght@400;600&display=swap" rel="stylesheet">
@@ -1350,6 +1353,8 @@ if(DEV)cv.addEventListener('click',()=>document.body.classList.toggle('clean'));
 // Einmal täglich um 4:00 neu laden, damit Updates ankommen, aber nur, wenn die Seite gerade erreichbar ist (sonst in 10 Minuten wieder versuchen)
 let reloadAt=(()=>{const n=wall(nowT());let r=fromWall(n.getFullYear(),n.getMonth(),n.getDate(),4);if(r<=nowT())r=fromWall(n.getFullYear(),n.getMonth(),n.getDate()+1,4);return r;})();
 setInterval(()=>{if(nowT()<reloadAt)return;reloadAt=nowT()+10*6e4;fetch(location.href,{method:'HEAD',cache:'no-store'}).then(r=>{if(r.ok)location.reload();}).catch(()=>{});},3e4);
+// Als App installierbar (Vollbild am Muse): Service Worker nur als Notkopie ohne Netz, Seite und config.json kommen immer frisch vom Server (sw.js)
+if('serviceWorker' in navigator&&location.protocol!=='file:')try{navigator.serviceWorker.register('sw.js',{updateViaCache:'none'}).catch(()=>{});}catch(e){}
 let lastTxt='';
 function readout(d,A){
   const ds=d.toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'}),ts=d.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
