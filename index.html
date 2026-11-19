@@ -79,11 +79,10 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--gold);outline-o
     <button id="now" class="on">Jetzt</button>
     <button id="play">Zeitraffer</button>
     <button id="fm">Nächster Vollmond</button>
-        <button id="help">Lesehilfe</button>
     <button id="mid">Mitternacht ansehen</button>
     <button id="rare">Seltenheit finden</button>
   </div>
-  <div class="hint">Wetter, Tageszeit und Mond verändern das Bild. So liest du die Zeit: Wo der Strahl von Sonne oder Mond die Pfähle trifft, ist die Stunde (links 6, Mitte 12, rechts 18). Der Schornstein des Dampfers zeigt die Minute, jeder Pfahl sind 5 Minuten. Tipp aufs Bild blendet die Steuerung aus.</div>
+  <div class="hint">Wetter, Tageszeit und Mond verändern das Bild. Die Uhrzeit steht oben links auf der Fallblatt-Tafel, darunter das Wetter der nächsten drei Tage. Zur vollen Stunde und bei besonderen Anlässen schreibt die Tafel ein Wort. Tipp aufs Bild blendet die Steuerung aus.</div>
 </div>
 <script>
 // ---------- Grundlagen ----------
@@ -326,9 +325,9 @@ function scene(t,A,d,st){
     C.rainbow=LW.bow*smooth(REGENBOGEN.sonne_min,REGENBOGEN.sonne_min+5,C.sa)*(C.sa<REGENBOGEN.sonne_max?1:0);C.baroU=hn>0.5?Math.max(0,LW.baro):LW.baro;C.tempK=LW.tempK;} // bei Hochnebel heißt steigender Druck nicht "klarer"
   C.L=Math.max(0.22+0.78*smooth(-10,14,C.sa),0.22+0.22*C.S.lift)*(1-0.28*C.storm);
   if(C.storm>0){C.S={...C.S,top:mix(C.S.top,[88,92,104],C.storm*0.6),hor:mix(C.S.hor,[140,142,150],C.storm*0.5)};}
-  C.haze=(C.wx.foehn&&st.mode!=='weather')?0.22:0.42+C.wx.haze*0.25;
+  C.haze=(C.wx.foehn&&st.mode!=='weather')?0.22:0.42+C.wx.haze*0.25;if(foehnAn(C)){C.haze=0.03;C.S={...C.S,top:mix(C.S.top,[22,70,170],0.8*smooth(-2,10,C.sa)),hor:mix(C.S.hor,[140,185,235],0.6*smooth(-2,10,C.sa))};} // Föhn: klare Luft, tiefblauer Himmel
   C.mist=LW?LW.mist:C.wx.mist*(C.hr<12?1-smooth(2,13,C.sa):0);C.hz=Math.min(0.95,C.haze+C.mist*0.5+st.hazeAdd+C.rain*0.15+C.bedeckt*0.12)*(1-0.65*C.hochnebel); // über dem Hochnebel ist die Luft klar
-  C.farSc=H*0.17*(W<H?0.8:1);C.midSc=H*0.07;
+  C.farSc=H*0.17*(W<H?0.8:1)*(foehnAn(C)?1.12:1);C.midSc=H*0.07; // bei Föhn wirken die Berge größer und näher
   C.farCol=mix(mix([118,128,158],C.S.hor,C.hz),[0,0,0],1-C.L);C.midCol=mix(mix([48,66,60],C.S.hor,C.hz*0.6),[0,0,0],1-C.L);
   C.iy=C.hy+H*0.008;C.silh=mix(mix([22,30,30],C.S.hor,0.18),[0,0,0],(1-C.L)*0.6);C.hn=C.hr<12?C.hr+24:C.hr;C.rowY=C.hy+(H-C.hy)*0.4;
   C.pc=mix(mix([40,32,26],C.S.hor,0.15),[0,0,0],(1-C.L)*0.5);C.sunCol=mix([255,190,120],[255,245,225],smooth(0,15,C.sa));
@@ -368,7 +367,7 @@ function L_clouds(C){const {sa,S,night,sunX}=C;
 function L_far(C){const {d,sa,S,hy,farSc,farCol,L}=C;
   ridgePath(FAR,hy,farSc,1);ctx.fillStyle=rgba(farCol);ctx.fill();
   ctx.save();ridgePath(FAR,hy,farSc,1);ctx.clip();
-  const snow=snowAmt(d);if(snow>0.02){const top=hy-farSc,ly=hy-farSc*(0.72-0.35*snow),sc=mix([245,245,250],S.hor,0.3),sg=ctx.createLinearGradient(0,top,0,ly+farSc*0.08);
+  const snow=Math.max(snowAmt(d),schneeMorgen(C));if(snow>0.02){const top=hy-farSc,ly=hy-farSc*(0.72-0.35*snow),sc=mix([245,245,250],S.hor,0.3),sg=ctx.createLinearGradient(0,top,0,ly+farSc*0.08); // morgen Schnee: die Schneegrenze sinkt schon (schneeMorgen)
     sg.addColorStop(0,rgba(sc,0.85*L+0.1));sg.addColorStop(0.9,rgba(sc,0.6*L));sg.addColorStop(1,'rgba(255,255,255,0)');ctx.fillStyle=sg;ctx.fillRect(0,top-10,W,ly-top+farSc*0.08+10);}
   const glow=(sa>-5?Math.exp(-(((sa-1.5)/3.2)**2)):0)*(1-C.storm);
   if(glow>0.02){const ag=ctx.createLinearGradient(0,hy-farSc,0,hy);ag.addColorStop(0,`rgba(245,135,120,${0.75*glow})`);ag.addColorStop(0.7,`rgba(230,120,130,${0.15*glow})`);ag.addColorStop(1,'rgba(0,0,0,0)');ctx.fillStyle=ag;ctx.fillRect(0,hy-farSc,W,farSc);}
@@ -719,7 +718,7 @@ function familyLayer(C,cs,t){const {d,sa,hy,night,L,S,hr}=C,snap=x=>Math.floor(x
 
 // ---------- Astro-Ebene: Planeten, Mond im Tierkreis, Punkte auf dem Bergkamm ----------
 // Dezent: je eine Rasterzelle, dunkler als Uhr und Strahl. Keine Beschriftung im Bild (nur in der Info-Zeile bei ?dev=1).
-let ASTRO_AN={planeten:true,mond:true,kamm:true},KAMM=[];
+let ASTRO_AN={planeten:true,mond:true,kamm:false},KAMM=[]; // Kamm-Punkte seit der Fallblatt-Uhr aus (config.json kann sie wieder einschalten)
 const PL_FARBE={sonne:[255,214,130],mond:[216,222,238],merkur:[190,198,212],venus:[252,250,242],mars:[232,112,82],jupiter:[240,222,184],saturn:[232,198,112],uranus:[160,220,228],neptun:[124,154,232],pluto:[184,152,172]};
 const PL_NAME={sonne:'Sonne',mond:'Mond',merkur:'Merkur',venus:'Venus',mars:'Mars',jupiter:'Jupiter',saturn:'Saturn',uranus:'Uranus',neptun:'Neptun',pluto:'Pluto'};
 // dunkel = Sonnenhöhe in Grad, ab der der Planet auftaucht (4° tiefer voll sichtbar); hell = höchste Deckkraft; gross = zarter Schein ringsum
@@ -899,12 +898,12 @@ const SZ_ZEICHNE={
     for(let i=-2;i<=1;i++)p(i,0,S.dim([52,44,38]));p(-1,-1,[34,34,40]);p(-1,-2,[34,34,40]);p(-2,-2,[70,60,50],0.5);p(-3,-1,[70,60,50],0.4);p(-3,0,[70,60,50],0.3);
     p(1,-2,[255,198,112],fl);S.licht(S.X+1.5*S.cs,S.Y-1.5*S.cs,S.cs*4,[255,190,110],0.3*fl);
     for(let k=1;k<=4;k++)p(1+Math.round(Math.sin(t*2+k)*0.6),k,[255,190,110],0.35*(1-k/5)*fl);}};
-// Sperrzonen für alle kleinen Zusätze (Szenen, Feste): Strahl, Sonnen- bzw. Mondscheibe, Pfähle und Dampfer bleiben frei. Einmal je Bild berechnet.
+// Sperrzonen für alle kleinen Zusätze (Szenen, Feste): Strahl, Sonnen- bzw. Mondscheibe, Dampfer und die Uhr oben links bleiben frei. Einmal je Bild berechnet.
+const UHR_ZONE={x:0.37,y:0.17}; // Fallblatt-Uhr samt Vorhersage (Anteil von Breite und Höhe)
 const SPERRE={C:null,cs:0,f:null};
 function sperre(C,cs){if(SPERRE.C===C&&SPERRE.cs===cs)return SPERRE.f;
-  const snap=x=>Math.floor(x/cs)*cs,hy=C.hy,lx=C.lx,dY=C.dayMode?Math.min(C.sunY,hy):C.moonY,dr=(Math.max(3.4,18/cs)+3)*cs,ry=snap(C.rowY);
-  const mm=C.d.getMinutes()+C.d.getSeconds()/60,bx=snap(C.xv(mm/5)),by=snap(C.rowY+(H-hy)*0.12),px0=snap(C.xv(0))-2*cs,px1=snap(C.xv(12))+3*cs;
-  const f=(x,y)=>!((y>hy&&Math.abs(x-lx)<szStrahl(hy,y,cs)+cs)||((x-lx)**2+(y-dY)**2<dr*dr)||(y>ry-6*cs&&y<ry+2*cs&&x>px0&&x<px1)||(x>bx-20*cs&&x<bx+7*cs&&y>by-9*cs&&y<by+2*cs));
+  const hy=C.hy,lx=C.lx,dY=C.dayMode?Math.min(C.sunY,hy):C.moonY,dr=(Math.max(3.4,18/cs)+3)*cs,{bx,by}=dampferPos(C,cs),ux=W*UHR_ZONE.x,uy=H*UHR_ZONE.y;
+  const f=(x,y)=>!((y>hy&&Math.abs(x-lx)<szStrahl(hy,y,cs)+cs)||((x-lx)**2+(y-dY)**2<dr*dr)||(x<ux&&y<uy)||(x>bx-20*cs&&x<bx+7*cs&&y>by-9*cs&&y<by+2*cs));
   SPERRE.C=C;SPERRE.cs=cs;SPERRE.f=f;return f;}
 const pixelsturzJetzt=C=>C.hr<1&&C.hr*3600<85&&!neujahr(C.d);
 function entdeckenLayer(C,cs,t){SZ_PAUSE=pixelsturzJetzt(C)||feuerwerkGross(C);if(SZ_PAUSE){SZ_JETZT=[];return;} // beim Pixelsturz und beim großen Neujahrsfeuerwerk Pause
@@ -1089,11 +1088,7 @@ function rasterClock(C,cs,gap,t,A){const snap=x=>Math.floor(x/cs)*cs,g=Math.max(
   if(!dayMode||sa>-1.5){for(let j=-n;j<=n;j++)for(let i=-n;i<=n;i++){const u=i/R,w=j/R;if(u*u+w*w>1)continue;if(dayMode&&cy+j*cs>hy)continue;const xl=Math.sqrt(1-w*w);let lit=true;
     if(!dayMode){const k=Math.cos(TAU*A.phase),s=A.phase<0.5?1:-1;lit=s*u>k*xl;}const pul=0.8+0.2*Math.sin(t*2-Math.hypot(i,j)*0.7);
     cell(cx+i*cs,cy+j*cs,lit?(dayMode?mix([255,210,150],[255,250,235],smooth(0,18,sa)):[240,234,214]):mix(S.top,[200,210,230],0.15),(lit?pul:0.6)*(C.discDim?1-0.85*C.discDim:1));}} // hinter Wolkendecke oder Hochnebel nur ein Schimmer
-  const ry=snap(rowY),big=cs<=5,ph0=big?5:3,ph1=big?3:2;ctx.font='500 11px Figtree,system-ui,sans-serif';ctx.textAlign='center';
-  for(let k=0;k<=12;k++){const x=snap(xv(k)),hh=k%3===0?ph0:ph1,gg=Math.exp(-(((k-v)/0.5)**2));
-    for(let c=0;c<hh;c++){cell(x,ry-c*cs,c>=hh-2&&gg>0.1?mix(pc,beamCol,gg):pc);if(k===6)cell(x+cs*(big?2:1),ry-c*cs,pc);}
-    if(HELP){ctx.fillStyle='rgba(245,238,222,0.85)';ctx.fillText(String(dayMode?6+k:(18+k)%24),x+cs/2,ry-hh*cs-3);}}
-  const mm=d.getMinutes()+d.getSeconds()/60,bx=snap(xv(mm/5)),by=snap(rowY+(H-hy)*0.12),dark=night>0.5||sa<-3,messe=isMesse(d);
+  const big=cs<=5,{bx,by}=dampferPos(C,cs),dark=night>0.5||sa<-3,messe=isMesse(d); // Pfähle gibt es nicht mehr; die Uhrzeit zeigt die Fallblatt-Tafel
   const hull=dark?mix(pc,[0,0,0],0.1):mix([236,230,216],[0,0,0],(1-L)*0.55),trim=mix(pc,[0,0,0],0.3),cab=dark?[255,205,130]:mix(hull,[255,255,255],0.25),win=dark?[255,225,160]:mix(pc,S.hor,0.3),chim=messe?[232,168,56]:[40,32,28],wk=mix(S.hor,[255,255,255],0.4);
   for(let k=1;k<=14;k++){const a=0.35*(1-k/15),xw=bx-(k+(big?5:3))*cs;cell(xw,by+Math.round(k*0.3)*cs,wk,a);cell(xw,by-Math.round(k*0.12)*cs,wk,a*0.6);}
   if(big){for(let i=-4;i<=4;i++)cell(bx+i*cs,by,trim);for(let i=-5;i<=5;i++)cell(bx+i*cs,by-cs,hull);for(let i=-3;i<=2;i++)cell(bx+i*cs,by-2*cs,i%2?cab:win,dark&&i%2?0.5:1);
@@ -1101,7 +1096,10 @@ function rasterClock(C,cs,gap,t,A){const snap=x=>Math.floor(x/cs)*cs,g=Math.max(
     const sm=mix(S.hor,[215,215,220],0.4);for(let i=1;i<=4;i++)cell(bx-(i-1)*cs,by-(4+i)*cs,sm,(0.45/i)*(0.6+0.4*Math.sin(t*2-i))*(1-0.5*night));if(dark)for(const i of[-3,-1,1])cell(bx+i*cs,by-2*cs,[255,215,140],0.95);}
   else{for(let i=-3;i<=3;i++)cell(bx+i*cs,by,hull);for(let i=-2;i<=1;i++)cell(bx+i*cs,by-cs,cab,dark?0.9:1);cell(bx,by-2*cs,chim);cell(bx-3*cs,by-2*cs,messe?[232,168,56]:mix([80,120,180],[0,0,0],1-L));}
   const wl=weihnacht(d)*smooth(-1,-4,sa);if(wl>0.02){const K=big?KETTE_G:KETTE_K;K.forEach(([i,j],n)=>cell(bx+i*cs,by+j*cs,KETTE_F[n%4],wl*(weihnacht(d)===1?0.7+0.3*Math.sin(t*3+n*1.9):0.85)));} // Weihnachten: Lichterkette, Schornstein bleibt frei
-  if(HELP){ctx.fillStyle='rgba(245,238,222,0.6)';for(let k=0;k<=12;k+=3)ctx.fillText(String(k*5),snap(xv(k))+cs/2,by+cs*(big?4:3));}}
+}
+// Der Dampfer ist kein Minutenzeiger mehr: er fährt in 2 Stunden einmal von links nach rechts quer über den See
+function dampferPos(C,cs){const snap=x=>Math.floor(x/cs)*cs,d=C.d,mm=(d.getHours()*60+d.getMinutes()+d.getSeconds()/60)%120;
+  return{bx:snap(-W*0.06+mm/120*W*1.12),by:snap(C.rowY+(H-C.hy)*0.12)};}
 function drawRaster(t,A,d,st){const p0=performance.now();verlaufBild();
   const C=scene(t,A,d,st),RS=rasterState(C,st);STATE=RS.label;
   const cs=clamp(RS.cs,3,12),cols=Math.ceil(W/cs),rows=Math.ceil(H/cs),rare=activeRare(d);
@@ -1113,12 +1111,12 @@ function drawRaster(t,A,d,st){const p0=performance.now();verlaufBild();
   const sc=ctx,sW=W,sH=H;let img;ctx=offCtx;W=cols;H=rows;LS=cols/sW;
   try{ctx.setTransform(1,0,0,1,0,0);ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';const c=scene(t,A,d,st);
     if(teil!==1){L_sky(c);if(rare.aurora)R_aurora(c,rare.aurora);if(rare.halo)R_halo(c,rare.halo);if(rare.meteor)R_meteor(c,rare.meteor);
-    L_clouds(c);W_decke(c);L_far(c);if(rare.sonnwend)R_sonnwend(c,rare.sonnwend);W_rainbow(c);W_rain(c);L_mid(c);W_hochnebel(c);}
+    L_clouds(c);W_foehn(c);W_morgen(c);W_decke(c);L_far(c);if(rare.sonnwend)R_sonnwend(c,rare.sonnwend);W_rainbow(c);W_rain(c);L_mid(c);W_hochnebel(c);}
     if(teil===0){offCtx.getImageData(0,0,1,1);var p1=performance.now();img=ASY.buf;}else{ // erste Hälfte gleich rastern (sonst fiele die Arbeit doch ins nächste Bild)
-    L_lake(c);if(rare.ice)R_ice(c,rare.ice);
+    L_lake(c);W_eis(c);if(rare.ice)R_ice(c,rare.ice);
     if(rare.aurora)softEllipse(W/2,c.hy+(H-c.hy)*0.12,W*0.6,(H-c.hy)*0.12,[70,230,140],0.1*rare.aurora*c.night);
     L_islands(c);if(rare.advent)R_advent(c,rare.advent);L_mist(c);W_nebelSee(c);if(rare.fire)R_fire(c,rare.fire);if(rare.glut)R_glut(c,rare.glut);
-    R_bells(c);L_beam(c);L_shore(c);L_finish(c,{...st,tex:0,vig:st.vig*0.7,sat:st.sat+RS.sat});W_lightning(c);var p1=performance.now();img=(ASYNC_JETZT&&LESEN.jetzt==='async'&&readSceneAsync(off,cols,rows))||readScene(off,cols,rows);}}
+    R_bells(c);L_beam(c);L_shore(c);W_schneeUfer(c);L_finish(c,{...st,tex:0,vig:st.vig*0.7,sat:st.sat+RS.sat});W_lightning(c);var p1=performance.now();img=(ASYNC_JETZT&&LESEN.jetzt==='async'&&readSceneAsync(off,cols,rows))||readScene(off,cols,rows);}}
   finally{ctx=sc;W=sW;H=sH;LS=1;}const p2=performance.now();
   const N=cols*rows;if(!CR||CR.length!==N*3)CR=new Float32Array(N*3);const cr=CR,hyRow=Math.floor(C.hy/cs),tq=Math.floor(t*3)%4096; // Takt für Zufallsmuster; begrenzt, sonst rechnet der Sinus nach Stunden Laufzeit sechsmal langsamer (Muster wiederholt sich nach 23 min)
   // Schnell: was nur von Zeile, Spalte oder dem Drittelsekunden-Takt abhängt, wird einmal berechnet statt für jede Zelle (gleiches Ergebnis)
@@ -1158,7 +1156,12 @@ function drawRaster(t,A,d,st){const p0=performance.now();verlaufBild();
       for(let j=1;j<=rows;j++){const e=Math.round(j*csP),w=Math.round(j*gP)-Math.round((j-1)*gP);if(w>0)P.rect(0,e-w,cv.width,w);}GITTER.k=gk;GITTER.p=P;}
     ctx.fill(GITTER.p);}
   const p4=performance.now();ctx.setTransform(DPR,0,0,DPR,0,0);
-  astroLayer(C,cs,t);if(ENTDECKEN&&st.rmode==='mix')entdeckenLayer(C,cs,t);gespenstLayer(C,cs,t);weihnachtLayer(C,cs,t);rasterClock(C,cs,RS.gap,t,A);extrasLayer(C,cs,t);familyLayer(C,cs,t); // Astro und Szenen zuerst: die Uhr liegt immer obenauf
+  astroLayer(C,cs,t);if(ENTDECKEN&&st.rmode==='mix')entdeckenLayer(C,cs,t);gespenstLayer(C,cs,t);weihnachtLayer(C,cs,t);rasterClock(C,cs,RS.gap,t,A);
+  if(ASYNC_JETZT)ZB_BILD++;zwischenbild('zusatz',zusatzAktiv(C),2,1,false,[0,H*0.38,W,H*0.62],()=>{niederschlagHinweis(C,cs,t);adventKalender(C,cs,t);christkindlmarkt(C,cs,t);eisstock(C,cs,t);schneemann(C,cs,t);});
+  {const I=tafelInhalt(C),k=I.art+'|'+I.z.join('|'),neu=k!==UHR_K||tafelBewegt(t,I)||!UHR_O;UHR_K=k; // Uhr und Vorhersage je jedes 6. Bild, gegeneinander versetzt
+    zwischenbild('uhr',true,6,0,neu,[0,0,W,H*0.17],()=>{UHR_O=fallblattUhr(C,cs,t,ASYNC_JETZT);});if(ASYNC_JETZT)doppelpunkt(C,cs,t);
+    const o=UHR_O||{X0:0,Y:0,u:1,a:0};zwischenbild('vorhersage',o.a>0.005,6,3,neu,[0,o.Y,W*0.5,25*Math.max(1,Math.round(o.u*0.55))*cs],()=>wetterDrei(C,cs,t,o));}
+  warnLeuchte(C,cs,t);extrasLayer(C,cs,t);familyLayer(C,cs,t);LETZT_C=C; // Astro und Szenen zuerst, die Fallblatt-Uhr liegt obenauf
   PERF.szene+=p1-p0;PERF.lesen+=p2-p1;PERF.zellen+=p3-p2;PERF.farben+=p4-p3;PERF.rest+=performance.now()-p4;}
 // Abtasten: jede Zelle holt ihre Farbe aus der Szene, verschoben durch Wind, Glitch, Flimmern, Regen-Schlieren.
 // Eigene Funktion, damit sie optimiert weiterläuft, auch wenn der Browser drawRaster wegen eines seltenen Zweigs neu übersetzt.
@@ -1333,7 +1336,6 @@ $('play').onclick=()=>{if(playing){playing=false;mode='manual';manualT=playT;}el
 $('mid').onclick=()=>{speed=1;playT=midnight(1)-15000;playing=true;setMode();document.body.classList.add('clean');};
 $('fm').onclick=()=>{let best=0,bf=-1;const from=curT();for(let h=24;h<24*33;h++){const ts=from+h*36e5,f=astro(new Date(ts)).fraction;if(f>bf){bf=f;best=ts;}}const d=wall(best);playing=false;mode='manual';manualT=fromWall(d.getFullYear(),d.getMonth(),d.getDate(),21,30);setMode();};
 const _mf=()=>{const n=new Date();let m=new Date(n.getFullYear(),9,4,18,40);if(m.getTime()<Date.now()-864e5)m=new Date(n.getFullYear()+1,9,4,18,40);playing=false;mode='manual';manualT=m.getTime();setMode();};
-$('help').onclick=()=>{HELP=!HELP;$('help').classList.toggle('on',HELP);};
 // Seltenheit finden: springt zum nächsten besonderen Moment nach der angezeigten Zeit (Seltenheiten, Gespenst, Weihnachten, Silvester/Neujahr, Fontänen-Regenbogen); die Zeit läuft von dort weiter
 // Jeder Moment kommt einmal dran (sonst käme im Oktober jeden Tag das Gespenst); "Jetzt" fängt wieder von vorn an.
 const GEZEIGT=new Set();
@@ -1352,7 +1354,7 @@ let lastTxt='';
 function readout(d,A){
   const ds=d.toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'}),ts=d.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
   const wx=dayWeather(d),cel=[];
-  cel.push(wxText(d));if(A.fraction>0.985)cel.push('Vollmond');if(isMesse(d))cel.push('Messetag');if(wx.shoot)cel.push('Sternschnuppennacht');for(const p of FAMILIE)if(isBday(p,d))cel.push('Geburtstag: '+p.name);if(isAnniv(d))cel.push('Hochzeitstag');{const V=visitorTimes(d);cel.push('Feuerwehr '+fmtM(V.fw)+', Eisvogel '+V.kf.map(fmtM).join(' / '));}if(adventLit(d))cel.push(adventLit(d)+'. Advent');if(STATE)cel.push(STATE);if(ENTDECKEN)cel.push(szText(d));{const ft=festText(d);if(ft)cel.push(ft);}if(MOMENT&&Math.abs(instant(d)-MOMENT.T)<3*36e5)cel.unshift('Moment: '+MOMENT.n);{const at=astroText();if(at)cel.push(at);}for(const ev of dayRare(d))cel.push(ev.n+' ('+Math.floor(ev.a)+'–'+(Math.floor(ev.b)%24)+' Uhr)');if(CFG_INFO)cel.push(CFG_INFO);if(T_SIM&&mode==='live'&&!playing)cel.push('Zeit simuliert mit ?t=');if(URL_INFO.length)cel.push(URL_INFO.join(', '));
+  cel.push(wxText(d));if(A.fraction>0.985)cel.push('Vollmond');if(isMesse(d))cel.push('Messetag');if(wx.shoot)cel.push('Sternschnuppennacht');for(const p of FAMILIE)if(isBday(p,d))cel.push('Geburtstag: '+p.name);if(isAnniv(d))cel.push('Hochzeitstag');{const V=visitorTimes(d);cel.push('Feuerwehr '+fmtM(V.fw)+', Eisvogel '+V.kf.map(fmtM).join(' / '));}if(adventLit(d))cel.push(adventLit(d)+'. Advent');if(STATE)cel.push(STATE);if(ENTDECKEN)cel.push(szText(d));{const ft=festText(d);if(ft)cel.push(ft);}{const zt=zusatzText(LETZT_C);if(zt)cel.push(zt);}if(MOMENT&&Math.abs(instant(d)-MOMENT.T)<3*36e5)cel.unshift('Moment: '+MOMENT.n);{const at=astroText();if(at)cel.push(at);}for(const ev of dayRare(d))cel.push(ev.n+' ('+Math.floor(ev.a)+'–'+(Math.floor(ev.b)%24)+' Uhr)');if(CFG_INFO)cel.push(CFG_INFO);if(T_SIM&&mode==='live'&&!playing)cel.push('Zeit simuliert mit ?t=');if(URL_INFO.length)cel.push(URL_INFO.join(', '));
   if(CLOCK_OFF)cel.push('Geräteuhr korrigiert um '+Math.round(CLOCK_OFF/6e4)+' min ('+CLOCK_SRC+')');if(DEV_TZ!==TZ)cel.push('Gerät steht auf Zeitzone '+DEV_TZ+', Lichtzeit rechnet in Berliner Zeit');
   const txt=`${ds}, ${ts} Uhr. Mond ${Math.round(A.fraction*100)} % ${A.phase<0.5?'zunehmend':'abnehmend'}, Sonne ${Math.round(A.sun.alt/rad)}°`+(cel.length?` <span class="cel">${cel.join(', ')}</span>`:'');
   if(txt!==lastTxt){$('readout').innerHTML=txt;lastTxt=txt;}
@@ -1379,11 +1381,339 @@ function frame(now){
   {const el=$('cd');let txt='';if(playing&&speed===1){const hr=d.getHours()*3600+d.getMinutes()*60+d.getSeconds();if(hr>=86380)txt='Mitternacht in '+(86400-hr)+' s';else if(hr<85)txt='Pixelsturz';}if(el.textContent!==txt){el.textContent=txt;el.classList.toggle('on',!!txt);}}
 }
 
+// ---------- Fallblatt-Uhr und Anzeigetafel (oben links), 3-Tage-Vorhersage, Hinweise für morgen, Sturmwarnleuchte ----------
+// Ziffern und Buchstaben 7×10 Zellen, kleine Schrift 3×5 (Wochentag, Temperatur). '#' = Zelle an.
+const UHR_Z={'0':['.#####.','##...##','##...##','##..###','##.#.##','##.#.##','###..##','##...##','##...##','.#####.'],
+ '1':['..##...','.###...','####...','..##...','..##...','..##...','..##...','..##...','..##...','######.'],
+ '2':['.#####.','##...##','.....##','.....##','....##.','...##..','..##...','.##....','##.....','#######'],
+ '3':['.#####.','##...##','.....##','.....##','..####.','.....##','.....##','.....##','##...##','.#####.'],
+ '4':['....##.','...###.','..####.','.##.##.','##..##.','##..##.','#######','....##.','....##.','....##.'],
+ '5':['#######','##.....','##.....','######.','.....##','.....##','.....##','.....##','##...##','.#####.'],
+ '6':['..####.','.##....','##.....','##.....','######.','##...##','##...##','##...##','##...##','.#####.'],
+ '7':['#######','.....##','....##.','....##.','...##..','...##..','..##...','..##...','..##...','..##...'],
+ '8':['.#####.','##...##','##...##','##...##','.#####.','##...##','##...##','##...##','##...##','.#####.'],
+ '9':['.#####.','##...##','##...##','##...##','.######','.....##','.....##','.....##','....##.','.####..']};
+const KL_Z={'0':['###','#.#','#.#','#.#','###'],'1':['.#.','##.','.#.','.#.','###'],'2':['##.','..#','.#.','#..','###'],'3':['##.','..#','.#.','..#','##.'],
+ '4':['#.#','#.#','###','..#','..#'],'5':['###','#..','##.','..#','##.'],'6':['.##','#..','###','#.#','###'],'7':['###','..#','.#.','.#.','.#.'],
+ '8':['###','#.#','###','#.#','###'],'9':['###','#.#','###','..#','##.'],'-':['...','...','###','...','...'],'°':['#.','..','..','..','..'],
+ 'M':['#.#','###','#.#','#.#','#.#'],'O':['###','#.#','#.#','#.#','###'],'D':['##.','#.#','#.#','#.#','##.'],'I':['###','.#.','.#.','.#.','###'],
+ 'F':['###','#..','##.','#..','#..'],'R':['##.','#.#','##.','#.#','#.#'],'S':['.##','#..','.#.','..#','##.'],'A':['.#.','#.#','###','#.#','#.#'],' ':['...','...','...','...','...']};
+const WTAG=['SO','MO','DI','MI','DO','FR','SA'];
+// Wettersymbole 7×5: s = Sonne, w = Wolke, r = Regen, n = Schnee, b = Blitz, f = Eiskristall
+const WSYM={klar:['..s....','.sss...','sssss..','.sss...','..s....'],heiter:['..s....','.sssww.','sswwwww','.wwwwww','.......'],
+ wolke:['.......','..www..','.wwwww.','wwwwwww','.......'],regen:['..www..','.wwwww.','wwwwwww','.r.r.r.','r.r.r..'],
+ schnee:['..www..','.wwwww.','wwwwwww','.n.n.n.','n.n.n..'],frost:['f..f..f','.f.f.f.','..fff..','.f.f.f.','f..f..f'],gewitter:['..www..','.wwwww.','wwwwwww','..bb...','.b.....']};
+const WSYM_F={f:[170,218,255],s:[255,212,120],w:[226,230,238],r:[140,180,240],n:[245,248,255],b:[255,214,90]};
+// Frost: Tiefstwert ≤ 0 °C und kein Niederschlag
+function symFor(f){const n=symName(f.code);return (n==='regen'||n==='schnee'||n==='gewitter')?n:(f.min!==undefined&&f.min!==null&&f.min<=0)?'frost':n;}
+function symName(code){return code>=95?'gewitter':(code>=71&&code<=77)||code===85||code===86?'schnee':(code>=51&&code<=67)||(code>=80&&code<=82)?'regen':code===3||code===45||code===48?'wolke':code===1||code===2?'heiter':'klar';}
+
+// Vorhersage für die nächsten 3 Tage: Tageswerte aus dem Open-Meteo-Abruf (wxTage), sonst simuliert aus dem Tagesmuster. ?vorhersage=regen:6:2,… erzwingt sie.
+const fcParse=v=>v.split(',').map(s=>{const [n,tp,tn]=s.split(':');const code={klar:0,heiter:2,wolke:3,regen:63,schnee:73,gewitter:95,frost:0}[n];const mx=+tp||0;return{code:code===undefined?0:code,max:mx,min:tn!==undefined?+tn:(n==='frost'?mx-6:mx-3)};});
+const FC_FORCE=(()=>{const v=Q.get('vorhersage');return v?fcParse(v):null;})();
+const VH={k:'',v:null,quelle:''};
+function vorhersage(d){const echt=WX&&WX.D&&WX.D.length&&WETTER.echt&&Date.now()-WX.fetched<24*36e5?WX.D:null,key=dayKey(d)+'|'+(echt?WX.fetched:0);if(VH.k===key)return VH.v;
+  const out=[];let treffer=0;
+  for(let k=1;k<=3;k++){const dd=new Date(d.getFullYear(),d.getMonth(),d.getDate()+k),wd=WTAG[dd.getDay()];
+    if(FC_FORCE&&FC_FORCE[k-1]){out.push({wd,...FC_FORCE[k-1]});continue;}
+    const e=echt&&echt.find(x=>x.dk===dayKey(dd));if(e){treffer++;out.push({wd,code:e.code,max:e.max,min:e.min,boe:e.boe});continue;}const w=wtypeOf(dd),r=rng(dayKey(dd)*7+1)();{const mx=Math.round(4+8*Math.sin((dd.getMonth()-3)/12*TAU)*0.8+r*4);out.push({wd,code:[0,2,3,95,63][w],max:mx,min:mx-5});}}
+  VH.k=key;VH.v=out;VH.quelle=FC_FORCE?'erzwungen':treffer===3?'echt':treffer?'echt, teils simuliert':'simuliert';return out;}
+
+// Zellen sammeln und je Farbe und Deckkraft gruppiert malen: die Farbe wird einmal gesetzt statt für jede Zelle neu (die Uhr hat über tausend Zellen).
+// Deckkraft auf 1/100 gerundet (unsichtbar, ergibt wenige Gruppen). Wo sich Zellen überlagern, nimmt jede Lage ihren eigenen Sammler.
+// licht() malt zuerst alles Gesammelte, dann den Schein: so bleibt die Reihenfolge wie beim Malen Zelle für Zelle.
+let ZELL_EXAKT=false,LETZT_C=null; // nur für den Vergleich mit der Vorschau: Zelle für Zelle malen, nicht bündeln
+function zellMaler(cs){const snap=x=>Math.floor(x/cs)*cs,M=new Map();
+  const p=(x,y,c,a)=>{if(a<0.01)return;if(ZELL_EXAKT){ctx.fillStyle=rgba(c,a);ctx.fillRect(snap(x)+cs*0.06,snap(y)+cs*0.06,cs*0.88,cs*0.88);return;} // Vergleichsmodus: Zelle für Zelle wie in der Vorschau
+    const k=(((c[0]|0)*256+(c[1]|0))*256+(c[2]|0))*101+Math.round(a*100);let L=M.get(k);if(!L)M.set(k,L=[]);L.push(snap(x),snap(y));}; // Schlüssel als Zahl: keine Zeichenkette pro Zelle
+  p.fertig=()=>{for(const [k,L] of M){const q=k%101,f=(k-q)/101;ctx.fillStyle=`rgba(${f>>16&255},${f>>8&255},${f&255},${q/100})`;for(let i=0;i<L.length;i+=2)ctx.fillRect(L[i]+cs*0.06,L[i+1]+cs*0.06,cs*0.88,cs*0.88);}M.clear();}; // je Farbe einmal fillStyle, dann einzelne Rechtecke (gleiche Kanten wie Zelle für Zelle)
+  p.licht=(x,y,rx,ry,c,a)=>{p.fertig();ctx.save();ctx.globalCompositeOperation='lighter';softEllipse(x,y,rx,ry,c,a);ctx.restore();};
+  return p;}
+let CSZ=4;
+function glyphe(px,G,x,y,u,c,a,t,welle,von=0,bis=99,yMap=null){for(let j=Math.max(0,von);j<Math.min(G.length,bis);j++){const row=G[j];for(let i=0;i<row.length;i++){if(row[i]==='.')continue;
+  const yy=yMap?yMap(j):j;if(yy===null)continue;const pul=welle?0.86+0.14*Math.sin(t*1.5-(x/u+i+yy)*0.42):1;
+  for(let b=0;b<u;b++)for(let e=0;e<u;e++)px(x+(i*u+e)*CSZ,y+(yy*u+b)*CSZ,c,a*pul);}}}
+// Drei Tage, klein unter der Uhr: Wochentag, Symbol, Höchstwert (bei Frost der Tiefstwert in Eisblau)
+function wetterDrei(C,cs,t,o){const pS=zellMaler(cs),pH=zellMaler(cs),{d,S}=C,u=Math.max(1,Math.round(o.u*0.55)),F=vorhersage(d);
+  const txt=mix(mix(C.beamCol,[255,255,255],0.45),S.hor,0.12),a0=0.9*o.a,sch=mix(S.top,[0,0,0],0.6),pxS=(x,y,c,a)=>{pS(x+cs,y+cs,sch,0.32*a);pH(x,y,c,a);},sp=13*u*cs;let y=o.Y+u*cs;
+  F.forEach((f,k)=>{const x=o.X0+k*sp;
+    for(let n=0;n<2;n++)glyphe(pxS,KL_Z[f.wd[n]],x+n*4*u*cs,y,u,txt,a0*0.8,t,true);
+    const sy=symFor(f),G=WSYM[sy],ys=y+6*u*cs;for(let j=0;j<G.length;j++)for(let i=0;i<G[j].length;i++){const ch=G[j][i];if(ch==='.')continue;
+      let c=WSYM_F[ch],a=a0;if(ch==='r'||ch==='n')a*=0.5+0.5*Math.sin(t*3-j*1.3+i);if(ch==='s')a*=0.85+0.15*Math.sin(t*1.2+i+j);if(ch==='b')a*=Math.sin(t*2.7+k)>0.6?1:0.25;if(ch==='f')a*=0.7+0.3*Math.sin(t*2.2+i*1.7+j);
+      if(ch==='w')c=mix(c,S.hor,0.15);for(let b=0;b<u;b++)for(let e=0;e<u;e++)pxS(x+(i*u+e)*cs,ys+(j*u+b)*cs,c,a);}
+    const fr=sy==='frost'||(f.min!==undefined&&f.min<=0&&sy==='schnee'),tt=String(Math.round(fr?f.min:f.max))+'°',tc=fr?mix([170,218,255],txt,0.25):txt;let xx=x,yt=ys+6*u*cs;
+    for(const ch of tt){const G2=KL_Z[ch];if(!G2)continue;glyphe(pxS,G2,xx,yt,u,tc,a0,t,true);xx+=(G2[0].length+1)*u*cs;}});
+  pS.fertig();pH.fertig();}
+// Morgen Regen oder Schnee: ab etwa 13 Uhr ziehen hinter den rechten Bergen schon Wolken auf (Szenen-Ebene, wird mitgerastert). Frost hat bewusst keinen Hinweis im Bild.
+function W_morgen(C){const n=symFor(vorhersage(C.d)[0]);if(!['regen','gewitter','schnee'].includes(n))return;const k=smooth(13,16,C.hr)*(C.hr<23.5?1:0);if(k<0.02)return;
+  const sn=n==='schnee',col=sn?mix([238,241,248],C.S.hor,0.1):mix([70,76,92],C.S.hor,0.2),r=rng(dayKey(C.d)*3+5),b=C.hy-C.farSc*0.5,dk=mix(col,[0,0,0],(1-C.L)*0.8);
+  for(let i=0;i<(sn?13:9);i++){const x=W*(sn?0.38+0.68*r():0.62+0.42*r()),y=b-C.farSc*(0.2+0.65*r());softEllipse(x,y,W*(0.12+0.09*r()),C.farSc*(0.3+0.22*r()),dk,(sn?0.8:0.7)*k);}}
+// Morgen Schnee: die Schneegrenze an den Bergen sinkt schon (in L_far)
+function schneeMorgen(C){if(C._sm!==undefined)return C._sm;const n=symFor(vorhersage(C.d)[0]);return C._sm=n==='schnee'?0.95*smooth(12,15.5,C.hr)*(C.hr<23.8?1:0):0;}
+// Darunter fällt es schon: Regenschleier bzw. Flocken über den rechten Bergen (Zellen, nur im Himmel über dem Kamm)
+function niederschlagHinweis(C,cs,t){const n=symFor(vorhersage(C.d)[0]);if(!['regen','gewitter','schnee'].includes(n))return;const k=smooth(13,16,C.hr)*(C.hr<23.5?1:0);if(k<0.02)return;
+  const sn=n==='schnee',px=zellMaler(cs),col=sn?[244,247,255]:mix([120,140,170],C.S.hor,0.2),top=C.hy-C.farSc*1.25;
+  if(sn){for(let q=0;q<110;q++){const r=rng(q*977+13),fx=0.4+0.62*r(),ph=(t*(0.02+0.015*r())+r())%1,yy=top+ph*(C.hy-top+H*0.06),xx=fx*W+Math.sin(t*0.5+q*1.3)*cs*3;
+      const a=k*0.9*smooth(0,0.1,ph)*(1-smooth(0.85,1,ph))*(0.75+0.25*Math.sin(t*2+q)),c=mix(col,[0,0,0],(1-C.L)*0.35);px(xx,yy,c,a);if(q%3===0){px(xx+cs,yy,c,a*0.55);px(xx,yy+cs,c,a*0.55);}}px.fertig();return;}
+  for(let q=0;q<40;q++){const r=rng(q*977+13),fx=0.6+0.4*r(),ph=(t*0.22+r())%1,yy=top+ph*C.farSc*1.1,xx=fx*W-ph*C.farSc*0.25,kamm=C.hy-rv(FAR,clamp(xx/W,0,1))*C.farSc;
+    if(yy>kamm-cs)continue;const a=k*0.55*smooth(0,0.15,ph)*(1-smooth(0.85,1,ph));px(xx,yy,mix(col,[0,0,0],(1-C.L)*0.4),a);px(xx+cs*0.3,yy-cs,col,a*0.5);}
+  px.fertig();}
+// Sturmwarnleuchte am Ufer der Herreninsel, wie die echten Chiemsee-Leuchten: Vorwarnung 40-mal, Sturmwarnung 90-mal pro Minute (Grenzwerte WARN)
+let WARN_TEST=null;
+function warnBoe(C){if(!WX||!WX.S)return null;const T=instant(C.d);let g=null;for(const s of WX.S)if(s.t>=T-WARN.stunden_vor*36e5&&s.t<=T+WARN.stunden_nach*36e5&&s.gust!==null&&s.gust!==undefined)g=Math.max(g||0,s.gust);return g;}
+function warnStufe(C){if(WARN_TEST!==null)return WARN_TEST;const g=warnBoe(C);if(g===null)return C.sturmS>0.5?2:0;return g>=WARN.sturm?2:g>=WARN.vor?1:0;}
+function warnLeuchte(C,cs,t){const st=warnStufe(C),px=zellMaler(cs),x=Math.floor(W*0.86/cs)*cs,y=Math.floor((C.iy-cs*3)/cs)*cs,mast=mix(C.silh,[0,0,0],0.25);
+  for(let k=1;k<=3;k++)px(x,y+k*cs,mast,0.95);px(x-cs,y+3*cs,mast,0.6);px(x+cs,y+3*cs,mast,0.6);
+  if(!st){px(x,y,[150,96,50],0.25+0.35*C.night);px.fertig();return;}
+  const P=st===2?60/90:60/40,ph=(t%P)/P,an=ph<0.45?Math.pow(Math.sin(ph/0.45*Math.PI),0.6):0,org=[255,146,36];px.fertig();
+  ctx.save();ctx.globalCompositeOperation='lighter';const R=cs*7,g=ctx.createRadialGradient(x+cs/2,y+cs/2,0,x+cs/2,y+cs/2,R);g.addColorStop(0,`rgba(255,140,40,${0.45*an})`);g.addColorStop(1,'rgba(255,140,40,0)');ctx.fillStyle=g;ctx.fillRect(x-R,y-R,2*R,2*R);ctx.restore();
+  px(x,y,[255,214,150],0.4+0.6*an);for(const [dx,dy] of[[1,0],[-1,0],[0,-1]])px(x+dx*cs,y+dy*cs,org,0.2+0.6*an);
+  for(const [dx,dy] of[[2,0],[-2,0],[0,-2],[1,-1],[-1,-1]])px(x+dx*cs,y+dy*cs,org,0.25*an);
+  for(let j=5;j<26;j++){const r=rng(j*17+Math.floor(t*5))();if(r<0.75)px(x+(Math.round((r-0.37)*3))*cs,y+j*cs,org,0.5*an*(1-j/26));} // Spiegelung im Wasser
+  px.fertig();}
+
+// ---------- Anzeigetafel: die Uhr schreibt ----------
+// Jede Stelle ist ein eigenes Fallblatt. Zwei Zeilen mit '|', mehrere Seiten mit '/' (je 5 s). Grüße und Rituale auf Bairisch, Infos auf Hochdeutsch.
+// Was wann kommt (zugleich die Rangfolge): 6:00 Aufwachen, Rituale (config.json "tafel"), Türl im Advent um 7:30, Anlässe (Eisvogel, Feuerwehr, Szenen), Wort zur vollen Stunde.
+const BUCHST={' ':Array(10).fill('.......'),
+ A:['.#####.','##...##','##...##','##...##','#######','##...##','##...##','##...##','##...##','##...##'],
+ B:['######.','##...##','##...##','##...##','######.','##...##','##...##','##...##','##...##','######.'],
+ C:['.#####.','##...##','##.....','##.....','##.....','##.....','##.....','##.....','##...##','.#####.'],
+ D:['#####..','##..##.','##...##','##...##','##...##','##...##','##...##','##...##','##..##.','#####..'],
+ E:['#######','##.....','##.....','##.....','######.','##.....','##.....','##.....','##.....','#######'],
+ F:['#######','##.....','##.....','##.....','######.','##.....','##.....','##.....','##.....','##.....'],
+ G:['.#####.','##...##','##.....','##.....','##.####','##...##','##...##','##...##','##...##','.#####.'],
+ H:['##...##','##...##','##...##','##...##','#######','##...##','##...##','##...##','##...##','##...##'],
+ I:['#######','..###..','..###..','..###..','..###..','..###..','..###..','..###..','..###..','#######'],
+ J:['...####','.....##','.....##','.....##','.....##','.....##','.....##','##...##','##...##','.#####.'],
+ K:['##...##','##..##.','##.##..','####...','###....','####...','##.##..','##..##.','##...##','##...##'],
+ L:['##.....','##.....','##.....','##.....','##.....','##.....','##.....','##.....','##.....','#######'],
+ M:['##...##','###.###','#######','##.#.##','##.#.##','##...##','##...##','##...##','##...##','##...##'],
+ N:['##...##','###..##','###..##','####.##','##.####','##..###','##..###','##...##','##...##','##...##'],
+ O:['.#####.','##...##','##...##','##...##','##...##','##...##','##...##','##...##','##...##','.#####.'],
+ P:['######.','##...##','##...##','##...##','######.','##.....','##.....','##.....','##.....','##.....'],
+ R:['######.','##...##','##...##','##...##','######.','####...','##.##..','##..##.','##...##','##...##'],
+ S:['.#####.','##...##','##.....','##.....','.#####.','.....##','.....##','.....##','##...##','.#####.'],
+ T:['#######','..###..','..###..','..###..','..###..','..###..','..###..','..###..','..###..','..###..'],
+ U:['##...##','##...##','##...##','##...##','##...##','##...##','##...##','##...##','##...##','.#####.'],
+ V:['##...##','##...##','##...##','##...##','##...##','##...##','.##.##.','.##.##.','..###..','...#...'],
+ W:['##...##','##...##','##...##','##...##','##...##','##.#.##','##.#.##','#######','###.###','##...##'],
+ Z:['#######','.....##','.....##','....##.','...##..','..##...','.##....','##.....','##.....','#######'],
+ 'Ä':['.#...#.','.......','.#####.','##...##','##...##','#######','##...##','##...##','##...##','##...##'],
+ 'Ö':['.#...#.','.......','.#####.','##...##','##...##','##...##','##...##','##...##','##...##','.#####.'],
+ 'Ü':['.#...#.','.......','##...##','##...##','##...##','##...##','##...##','##...##','##...##','.#####.'],
+ ':':['.......','.......','..##...','..##...','.......','.......','..##...','..##...','.......','.......'],
+ '.':['.......','.......','.......','.......','.......','.......','.......','.......','..##...','..##...']};
+const TAFEL_ABC='ABCDEFGHIKLMNOPRSTUVWZ0123456789';
+const zeichen=ch=>UHR_Z[ch]||BUCHST[ch]||BUCHST[' '];
+const TAFEL={slots:new Map(),art:'uhr',colA:1,fcA:1};
+let TAFEL_CFG={an:true,stunden_wort:true,rituale:{'07:00':'SERVUS','19:00':'GUAD|NACHT'}},TAFEL_TEST=null; // ?tafel=WORT zeigt das Wort 15 s lang
+const SZ_WORT={reiher:'REIHER',enten:'ENTEN',angler:'ANGLER',ruderboot:'RUDER|BOOT',flugzeug:'FLIEGER',sup:'PADDLER',fledermaus:'FLEDER|MÄUSE',spaziergang:'GASSI',heimfahrt:'HEIMWEG',autos:'AUTOS',satellit:'SATELLIT',kahn:'LATERNE'};
+// Sonnenauf- und -untergang in Berliner Zeit (aus dem Sonnenstand alle 10 Minuten)
+const SONNE_TAG={};
+function sonnenZeit(d,auf){const k=dayKey(d);let a=SONNE_TAG[k];if(!a){a=[];for(let i=0;i<=144;i++)a.push(astro(new Date(fromWall(d.getFullYear(),d.getMonth(),d.getDate(),0,i*10))).sun.alt/rad);SONNE_TAG[k]=a;}
+  for(let i=1;i<a.length;i++){const p=a[i-1],q=a[i];if(auf?(p<-0.83&&q>=-0.83):(p>=-0.83&&q<-0.83)){const m=(i-1+(-0.83-p)/(q-p))*10;return Math.floor(m/60)+':'+String(Math.round(m%60)).padStart(2,'0');}}return null;}
+const tagIst=(d,mo,da)=>d.getMonth()===mo&&d.getDate()===da;
+function tagesWort(d){const adv=adventLit(d),so=d.getDay()===0;
+  if(tagIst(d,11,6))return 'NIKO|LAUS';if(tagIst(d,11,24))return 'HEILIG|ABEND';if(tagIst(d,11,25)||tagIst(d,11,26))return 'FROHE|WEIHNACHT';
+  if(tagIst(d,11,31))return 'GUADN|RUTSCH';if(tagIst(d,0,1))return 'PROSIT|NEUJAHR';if(FAMILIE.some(p=>isBday(p,d)))return 'ALLES|GUTE';
+  if(so&&adv>0)return adv+'.|ADVENT';return null;}
+// Wort zur vollen Stunde: Pool aus Tag, Wetter, Himmel und Tageslicht, die Auswahl rotiert stündlich
+function stundenWort(C){const d=C.d,h=d.getHours(),pool=[],tw=tagesWort(d);if(tw)pool.push(tw,tw);
+  const w=C.live,F=C.A.fraction;
+  if(foehnAn(C))pool.push('FÖHN');
+  if(w){if(w.wtype===3)pool.push('GEWITTER');else if(w.sturm>0.5)pool.push('STURM');else if(w.snow>0.05)pool.push('SCHNEE');else if(w.rain>0.05)pool.push('REGEN');else if(w.hn>0.5)pool.push('HOCH|NEBEL');else if(w.mist>0.4)pool.push('NEBEL');else if(w.temp!==null&&w.temp<=0)pool.push('FROST');else if(w.cloud<30&&C.dayMode)pool.push('SONNE');}
+  if(F>0.97)pool.push('VOLL|MOND');else if(F<0.03)pool.push('NEU|MOND');
+  if(ASTRO.planeten&&ASTRO.planeten.some(p=>p.sicht&&p.k==='venus'))pool.push('VENUS');
+  if(h<12){const z=sonnenZeit(d,true);if(z)pool.push('SONNEN|AUFGANG/'+z);}else if(h<18){const z=sonnenZeit(d,false);if(z)pool.push('SONNEN|UNTERGANG/'+z);}
+  if(!pool.length)pool.push('CHIEMSEE');return pool[h%pool.length];}
+function tafelInhalt(C){const d=C.d,h=d.getHours(),m=d.getMinutes(),s=d.getSeconds()+d.getMilliseconds()/1000,mm=h*60+m,uhr={art:'uhr',z:[String(h).padStart(2,'0')+String(m).padStart(2,'0')]};
+  const W2=(x,el=s)=>{const P=x.split('/'),q=P[Math.min(P.length-1,Math.floor(el/5))];return{art:'wort',z:q.split('|')};};
+  if(TAFEL_TEST){const T=instant(d);if(TAFEL_TEST.ab===undefined)TAFEL_TEST.ab=T;const el=(T-TAFEL_TEST.ab)/1000;if(el>=0&&el<15)return W2(TAFEL_TEST.text,el);}
+  if(!TAFEL_CFG.an)return uhr;
+  if(h===6&&m===0&&s<4)return{art:'ratter',z:['????']}; // die Tafel wacht auf
+  const rit=TAFEL_CFG.rituale[String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')];if(rit&&s<(rit.includes('|')?12:10))return W2(rit);
+  const n=adventTag(d);if(n&&h===7&&m===30&&s<12)return W2('TÜRL|'+n);
+  const vt=visitorTimes(d);for(const k of vt.kf)if(mm===k&&s<9)return W2('EIS|VOGEL');
+  if(mm===vt.fw&&s<9)return W2('FEUER|WEHR');
+  for(const z of SZ_JETZT)if(z.e<9&&SZ_WORT[z.k])return W2(SZ_WORT[z.k]);
+  if(m===0&&TAFEL_CFG.stunden_wort){const w=stundenWort(C);if(s<(w.includes('/')?10:8))return W2(w);}
+  return uhr;}
+// Zeichnen: jede Stelle ein Fallblatt mit eigener Klappe. Beim Minutenwechsel klappt die Ziffer zur Fuge hin um; Wechsel Uhr ↔ Wort: kurzes Rattern.
+// Ziffern 7×10 Zellen, rasten aufs Raster ein, kein Rahmen; Farbe aus dem Licht der Szene, weicher Schatten, leichtes Pulsieren, der Doppelpunkt atmet.
+function fallblattUhr(C,cs,t,ohneDP=false){CSZ=cs;const pS=zellMaler(cs),pH=zellMaler(cs),pK=zellMaler(cs),{d,S}=C,R=10,HB=5;C.T=instant(d);
+  const u=Math.max(1,Math.round(W*0.27/(35*cs))),X0=Math.floor(W*0.065/cs)*cs,Y0=Math.floor(H*0.04/cs)*cs,dw=8*u*cs,lh=11*u*cs;
+  const hell=mix(mix(C.beamCol,[255,255,255],0.4),S.hor,0.12),schatten=mix(S.top,[0,0,0],0.6),aS=0.42;
+  const I=tafelInhalt(C),artWechsel=I.art!==TAFEL.art;TAFEL.art=I.art;TAFEL.jetzt=I;const want=new Map();
+  I.z.forEach((zeile,li)=>{[...zeile].forEach((ch,i)=>{const x=I.art==='wort'?X0+i*dw:X0+(i<2?i*dw:i*dw+3*u*cs);want.set(li+'|'+i,{ch,x,y:Y0+li*lh,i,li});});});
+  for(const [k,v] of want){let sl=TAFEL.slots.get(k);if(!sl){sl={ch:' ',prev:' ',t0:-9,rat:0,x:v.x,y:v.y};TAFEL.slots.set(k,sl);}
+    sl.x=v.x;sl.y=v.y;if(sl.ch!==v.ch){sl.prev=sl.ch;sl.ch=v.ch;sl.t0=t+v.i*0.1+v.li*0.25;sl.rat=artWechsel?0.35+0.5*rng(v.i*7+v.li*3+Math.floor(t))():0;}}
+  for(const [k,sl] of TAFEL.slots)if(!want.has(k)){if(sl.ch!==' '){sl.prev=sl.ch;sl.ch=' ';sl.t0=t+(+k.split('|')[1])*0.06;sl.rat=0.2;}else if(t-sl.t0>1.5)TAFEL.slots.delete(k);}
+  TAFEL.colA=lerp(TAFEL.colA,I.art==='uhr'?1:0,0.15);TAFEL.fcA=lerp(TAFEL.fcA,I.art==='uhr'||I.z.length<2?1:0,0.12); // bei zweizeiligen Wörtern blendet die Vorhersage aus
+  if(!ohneDP)doppelpunkt(C,cs,t,pS,pH);
+  for(const [k,sl] of TAFEL.slots){const x=sl.x,Y=sl.y,tt=t-sl.t0;
+    const male=(G,von,bis,yMap,a)=>{glyphe((xx,yy,c,aa)=>pS(xx+cs,yy+cs,schatten,aS*aa/0.92),G,x,Y,u,schatten,a,t,true,von,bis,yMap);glyphe(pH,G,x,Y,u,hell,a,t,true,von,bis,yMap);};
+    const zufall=n=>zeichen(TAFEL_ABC[Math.floor(rng(n)()*TAFEL_ABC.length)]);
+    if(sl.ch==='?'){male(zufall(Math.floor(t/0.08)*31+x),0,R,null,0.9);continue;} // Aufwachen: wildes Durchblättern
+    if(tt<0){male(zeichen(sl.prev),0,R,null,0.92);continue;}
+    if(tt<sl.rat){male(zufall(Math.floor(tt/0.08)*31+x+Y),0,R,null,0.85);continue;}
+    const alt=sl.rat>0?zufall(Math.floor(sl.rat/0.08)*31+x+Y):zeichen(sl.prev),neu=zeichen(sl.ch),p=clamp((tt-sl.rat)/0.7,0,1);
+    if(p>=1){male(neu,0,R,null,0.92);continue;}
+    if(p<0.5){const s=1-p*2;male(neu,0,HB,null,0.45);male(alt,HB,R,null,0.92);
+      glyphe(pK,alt,x,Y,u,hell,0.95,t,false,0,HB,j=>{const y=Math.round(HB-(HB-j)*s);return y>=HB?null:y;});}
+    else{const s=(p-0.5)*2;male(neu,0,HB,null,0.92);male(alt,HB,R,null,0.5*(1-s));
+      glyphe(pK,neu,x,Y,u,hell,0.95,t,false,HB,R,j=>{const y=Math.round(HB+(j-HB)*s);return y<HB?null:y;});}}
+  pS.fertig();pH.fertig();pK.fertig();
+  return{X0,Y:Y0+(R+1)*u*cs,u,a:TAFEL.fcA};}
+// Der Doppelpunkt atmet langsam (4 s); er wird in jedem Bild gemalt, auch wenn die Ziffern aus dem Zwischenbild kommen
+function doppelpunkt(C,cs,t,pS,pH){if(TAFEL.colA<=0.02)return;const eigen=!pS;if(eigen){pS=zellMaler(cs);pH=zellMaler(cs);}
+  const u=Math.max(1,Math.round(W*0.27/(35*cs))),X0=Math.floor(W*0.065/cs)*cs,Y0=Math.floor(H*0.04/cs)*cs,dw=8*u*cs,hell=mix(mix(C.beamCol,[255,255,255],0.4),C.S.hor,0.12),schatten=mix(C.S.top,[0,0,0],0.6),aS=0.42;
+  const dp=(0.55+0.35*Math.sin(t*TAU/4))*TAFEL.colA;for(const yy of[2,3,6,7])for(let b=0;b<u;b++)for(let e=0;e<2*u;e++){pS(X0+2*dw+e*cs+cs,Y0+(yy*u+b)*cs+cs,schatten,aS*dp);pH(X0+2*dw+e*cs,Y0+(yy*u+b)*cs,hell,0.9*dp);}
+  if(eigen){pS.fertig();pH.fertig();}}
+
+// Zwischenbild: Zusätze, die sich langsam ändern (Uhr, Vorhersage, Advent, Winter), werden nur alle paar Bilder in eine eigene Zeichenfläche
+// neu gemalt und dazwischen nur aufgelegt (spart am Muse mehrere Millisekunden). Beim Umklappen der Ziffern wird jedes Bild neu gemalt.
+// Nur in der Bildschleife (ASYNC_JETZT); der Pixelvergleich malt direkt.
+// n = jedes wievielte Bild, phase = in welchem (so verteilen sich Uhr, Vorhersage und Zusätze auf verschiedene Bilder); bereich = [x, y, b, h] in Bildpunkten.
+const ZB={};let UHR_K='',ZB_BILD=0,UHR_O=null;
+function zwischenbild(name,aktiv,n,phase,mussNeu,bereich,malen){if(!aktiv)return;if(!ASYNC_JETZT){malen();return;}
+  const [bx,by,bw,bh]=bereich,X=Math.floor(bx*DPR),Y=Math.floor(by*DPR),w=Math.ceil(bw*DPR),h=Math.ceil(bh*DPR);
+  let z=ZB[name];if(!z||z.c.width!==w||z.c.height!==h||z.X!==X||z.Y!==Y){z=ZB[name]={c:document.createElement('canvas'),X,Y};z.c.width=w;z.c.height=h;z.cx=z.c.getContext('2d');mussNeu=true;}
+  if(mussNeu||ZB_BILD%n===phase){const sc=ctx;ctx=z.cx;ctx.setTransform(1,0,0,1,0,0);ctx.clearRect(0,0,w,h);ctx.setTransform(DPR,0,0,DPR,-X,-Y);try{malen();}finally{ctx=sc;}}
+  ctx.save();ctx.setTransform(1,0,0,1,0,0);ctx.drawImage(z.c,X,Y);ctx.restore();}
+const tafelBewegt=(t,I)=>Math.abs(TAFEL.colA-(I.art==='uhr'?1:0))>0.01||Math.abs(TAFEL.fcA-(I.art==='uhr'||I.z.length<2?1:0))>0.01||[...TAFEL.slots.values()].some(sl=>sl.ch==='?'||t-sl.t0<sl.rat+0.75||sl.ch===' ');
+const zusatzAktiv=C=>{const n=symFor(vorhersage(C.d)[0]);return (['regen','gewitter','schnee'].includes(n)&&C.hr>=13&&C.hr<23.5)||adventTag(C.d)>0||marktAn(C.d)||(eisAn(C)&&C.hr>=10&&C.hr<16)||schneeStufe(C)>=0;};
+
+// ---------- Advent und Weihnachten: Adventskalender, Christkindlmarkt ----------
+const adventTag=d=>d.getMonth()===11&&d.getDate()<=24?d.getDate():0;
+const ADV_FARBE={y:[255,214,110],g:[70,150,90],r:[210,60,60],b:[150,95,55],w:[250,246,236],o:[255,160,60],s:[200,214,236],n:[110,150,235],h:[240,196,170],k:[44,44,52]};
+// 24 Türl-Motive, eins pro Tag (am 6. der Nikolaus-Stiefel, am 24. der große Stern)
+const ADV_MOTIV=[
+ ['....y....','...yyy...','yyyyyyyyy','.yyyyyyy.','..yyyyy..','.yyy.yyy.','.yy...yy.'],                                  // 1 Stern
+ ['....y....','....g....','...ggg...','..ggrgg..','...ggg...','..gggrg..','.grggggg.','ggggggrgg','....b....'],             // 2 Baum
+ ['....y....','...yyy...','..yyyyy..','..yyyyy..','.yyyyyyy.','yyyyyyyyy','....y....'],                                  // 3 Glocke
+ ['.bb...bb.','bbbb.bbbb','bwwwwwwwb','bbbbbbbbb','.bwbwbwb.','..bbbbb..','...bbb...','....b....'],                       // 4 Lebkuchenherz
+ ['....o....','...oyo...','....y....','...rrr...','...rwr...','...rrr...','...rrr...','..ggggg..'],                       // 5 Kerze
+ ['..wwww...','..wwww...','..rrrr...','..rrrr...','..rrrr...','..rrrrrr.','.rrrrrrrr','.bbbbbbbb'],                       // 6 Nikolaus-Stiefel
+ ['r.......r','rrrrrrrrr','.rrrrrrr.','..b...b..','bbbbbbbbb'],                                                          // 7 Schlitten
+ ['s...s...s','.s..s..s.','..s.s.s..','sssssssss','..s.s.s..','.s..s..s.','s...s...s'],                                  // 8 Schneeflocke
+ ['...yyy...','..yy.....','.yy......','.yy......','.yy......','..yy.....','...yyy...'],                                  // 9 Mond
+ ['...yyy...','...hhh...','ww.www.ww','.wwwwwww.','..wwwww..','..wwwww..','.wwwwwww.'],                                  // 10 Engel
+ ['..y...y..','...y.y...','rrrryrrrr','rrrryrrrr','yyyyyyyyy','rrrryrrrr','rrrryrrrr','rrrryrrrr'],                       // 11 Geschenk
+ ['..rwr....','.w...r...','.r...w...','.....r...','.....w...','.....r...','.....w...','.....r...'],                       // 12 Zuckerstange
+ ['....g....','...bbb...','..bobob..','..bbbbb..','..obobo..','..bbbbb..','...bob...','....b....'],                       // 13 Tannenzapfen
+ ['...bbb...','...wbw...','.bbbbbbb.','b..bwb..b','...bbb...','...bwb...','..bb.bb..','.bb...bb.'],                       // 14 Lebkuchenmann
+ ['...kkk...','..kkkkk..','...www...','...wow...','..wwwww..','.wwwwwww.','.wwwwwww.','..wwwww..'],                       // 15 Schneemann
+ ['....b....','...bbb...','..b...b..','..byyyb..','..byoyb..','..byyyb..','..bbbbb..'],                                  // 16 Laterne
+ ['.gg...gg.','ggg...ggg','.gggrggg.','...rrr...','....r....'],                                                          // 17 Stechpalme
+ ['b.b...b.b','.bb...bb.','..b...b..','...bbb...','..bbbbb..','...bbb...','....r....'],                                  // 18 Rentier
+ ['....y....','...yyy...','..rrrrr..','.rrwrrrr.','.rrrrrrr.','.ryyyyyr.','.rrrrrrr.','..rrrrr..','...rrr...'],             // 19 Christbaumkugel
+ ['.......w.','......rr.','.....rrr.','....rrrr.','...rrrrr.','..rrrrrr.','.wwwwwwww'],                                  // 20 Zipfelmütze
+ ['......y..','.....yyy.','....yyyyy','...y.yyy.','..y..y.y.','.y.......','y........'],                                  // 21 Sternschnuppe
+ ['..w.w.w..','.w.w.w...','.rrrrr...','.rrrrrrr.','.rrrrr.r.','.rrrrrrr.','.rrrrr...','..rrr....'],                       // 22 Glühwein-Tasse
+ ['.y.y.y.y.','.r.r.r.r.','.r.r.r.r.','ggggggggg','.ggrgrgg.'],                                                          // 23 Adventskranz
+ ['.....y.....','.....y.....','....yyy....','....yyy....','yyyyyyyyyyy','.yyyyyyyyy.','..yyyyyyy..','..yyyyyyy..','.yyyy.yyyy.','.yyy...yyy.','yy.......yy']]; // 24 großer Stern
+function shoreY(x){const q=clamp(x/(W*0.4),0,1);return (1-q)*(1-q)*H*0.93+2*(1-q)*q*H*0.9+q*q*H;} // gleiche Kurve wie das Ufer
+// Lichterkette: 24 Lichter am vorderen Ufer, am n-ten Dezember brennen n davon. Türl: um 7:30 steigt das Motiv des Tages leuchtend aus dem See,
+// steht etwa 10 Minuten und zerfällt dann in Funken.
+function adventKalender(C,cs,t){const n=adventTag(C.d);if(!n)return;const px=zellMaler(cs),{hr,sa}=C,dunkel=smooth(4,-4,sa);
+  for(let i=0;i<24;i++){const x=W*(0.015+0.37*i/23),pf=i%6/6,y=shoreY(x)-H*0.035+Math.sin(pf*Math.PI)*H*0.008;
+    if(i<n){const f=0.8+0.2*Math.sin(t*3+i*1.9),a=(0.35+0.65*dunkel)*f;px(x,y,[255,214,140],a);px.licht(Math.floor(x/cs)*cs+cs/2,Math.floor(y/cs)*cs+cs/2,cs*2.5,cs*2.5,[255,190,110],0.3*a*dunkel);} // Schein gleich nach dem Licht (bei groben Rastern überlappen sie)
+    else px(x,y,[120,110,95],0.35);}
+  const m=hr*60-450;if(m<0||m>12){px.fertig();return;}
+  const G=ADV_MOTIV[n-1],g=n===24?3:2,wM=G[0].length,steig=smooth(0,0.6,m),weg=smooth(10,12,m),X=W*0.66,Yb=H*0.8-steig*H*0.14,gl=0.7+0.3*Math.sin(t*2.2);
+  px.licht(X,Yb-G.length*cs*(g/2),cs*20*(g/2),cs*20*(g/2),[255,210,140],0.35*gl*(1-weg)*steig);
+  G.forEach((row,j)=>[...row].forEach((ch,i)=>{if(ch==='.')return;const r=rng(i*13+j*7)(),fall=weg*(1+r*2),a=(1-weg*(0.6+r*0.4))*Math.min(1,steig*1.5)*(0.85+0.15*Math.sin(t*3+i+j));
+    for(let b=0;b<g;b++)for(let e=0;e<g;e++)px(X+((i-(wM-1)/2)*g+e)*cs+(r-0.5)*fall*cs*10,Yb+((j-G.length)*g+b)*cs-fall*cs*8,ADV_FARBE[ch],a);}));
+  if(m<1)for(let q=0;q<12;q++){const r=rng(q*17+3)();px(X+(r-0.5)*cs*14,H*0.8+cs*(q%3),[230,240,255],0.6*(1-m)*Math.max(0,Math.sin(t*6+q)));} // Wasser sprudelt
+  px.fertig();}
+// Christkindlmarkt auf der Fraueninsel. Standard: Adventswochenenden (Sa und So) 11–20 Uhr; Termine und Zeiten in config.json ("markt").
+let MARKT={an:true,termine:'advent',von:11*60,bis:20*60},MARKT_TEST=false;
+function marktGrund(d){if(MARKT_TEST)return '?markt=1';if(!MARKT.an)return '';const mm=d.getHours()*60+d.getMinutes();if(mm<MARKT.von||mm>=MARKT.bis)return '';
+  if(Array.isArray(MARKT.termine)){const k=String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');return MARKT.termine.includes(k)?'Termin '+k:'';}
+  const dow=d.getDay();if(dow!==0&&dow!==6)return '';const y=d.getFullYear(),a4=new Date(y,11,25-((new Date(y,11,25).getDay()+6)%7)-1),a1=new Date(a4.getFullYear(),a4.getMonth(),a4.getDate()-22),tag=new Date(y,d.getMonth(),d.getDate());
+  return tag>=a1&&tag<=new Date(y,11,21)?'Adventswochenende':'';}
+const marktAn=d=>!!marktGrund(d);
+function christkindlmarkt(C,cs,t){if(!marktAn(C.d))return;const px=zellMaler(cs),{iy,sa}=C,dk=smooth(6,-3,sa),r=rng(51);
+  ctx.save();ctx.globalCompositeOperation='lighter';softEllipse(W*0.415,iy-cs*2,W*0.09,cs*6,[255,170,90],0.35*dk);softEllipse(W*0.415,iy+cs*4,W*0.07,cs*3,[255,170,90],0.18*dk);ctx.restore(); // warmer Schein über der Insel
+  for(let i=0;i<5;i++){const x=W*(0.372+i*0.018);for(let e=0;e<2;e++)px(x+e*cs,iy-cs*4,[i%2?150:60,i%2?40:110,i%2?40:60],0.8*(0.4+0.6*dk));} // Budendächer rot und grün
+  for(let i=0;i<22;i++){const x=W*(0.365+0.1*r()),y=iy-cs*(1+Math.floor(r()*3)),c=[[255,200,120],[255,170,90],[255,230,170],[230,90,70]][i%4],f=0.7+0.3*Math.sin(t*(2+r()*3)+i);
+    px(x,y,c,(0.55+0.45*dk)*f);px(x,iy+cs*(2+i%4),c,0.3*dk*f);} // Lichter und Spiegelbild
+  for(let q=0;q<22;q++){const r2=rng(q*29+5),ph=(t*0.05+r2())%1,x=W*(0.375+0.08*r2())+Math.sin(t*0.4+q)*cs*2,y=iy-cs*5-ph*H*0.06;px(x,y,mix(C.S.hor,[255,255,255],0.6),0.35*(1-ph)*(0.5+0.5*dk));} // Glühwein-Dampf
+  for(let b=0;b<2;b++){const P=180,ph=((t+b*P/2)%P)/P,u=ph<0.5?ph*2:(1-ph)*2,ease=u*u*(3-2*u),x=lerp(W*0.1,W*0.39,ease),y=lerp(iy+H*0.08,iy+cs*3,ease); // zwei Boote mit Laternen pendeln
+    for(let i=-2;i<=2;i++)px(x+i*cs,y,mix(C.silh,[0,0,0],0.2),0.9);px(x-cs,y-cs,[255,220,160],0.7+0.3*dk);px(x+cs,y-cs,[255,220,160],0.7+0.3*dk);
+    px.licht(x,y-cs,cs*4,cs*3,[255,190,110],0.3*dk);for(let k=1;k<5;k++)px(x,y+cs*(1+k),[255,200,120],0.25*dk*(1-k/5));}
+  px.fertig();}
+
+// ---------- Winter mit echten Daten: Schneemann, Eis in der Bucht, Föhn ----------
+// Aus den Tageswerten (7 Tage zurück) und der Schneehöhe jetzt, einmal je Stunde und Abruf berechnet. ?schnee=1…4, ?eis=1, ?foehn=1 erzwingen.
+let SCHNEE_TEST=0,EIS_TEST=false,FOEHN_TEST=false;
+const WINTER={k:'',v:null};
+function winter(d){const D=WX&&WX.D&&WETTER.echt?WX.D:null,key=dayKey(d)+'|'+d.getHours()+'|'+(D?WX.fetched:0);if(WINTER.k===key)return WINTER.v;
+  const v={stufe:-1,grund:'',eis:false,eisGrund:''};
+  if(SCHNEE_TEST){v.stufe=SCHNEE_TEST-1;v.grund='?schnee='+SCHNEE_TEST;}
+  if(EIS_TEST){v.eis=true;v.eisGrund='?eis=1';}
+  if(D){const heute=dayKey(d),i0=D.findIndex(x=>x.dk===heute);
+    if(i0>=0){const jetzt=wxAt(instant(d)),sdJetzt=jetzt&&jetzt.sd!==null&&jetzt.sd!==undefined?jetzt.sd:D[i0].sd||0;
+      // Schneemann: am Morgen nach dem ersten Schneetag der letzten Schneeperiode gebaut; jeder Tag mit Höchstwert über 2 °C lässt ihn ein Stück schmelzen
+      if(!SCHNEE_TEST){let last=-1;for(let i=i0;i>=0;i--)if((D[i].sd||0)>=SCHNEE.hoehe_ab||(i===i0&&sdJetzt>=SCHNEE.hoehe_ab)){last=i;break;}
+        if(last>=0){let s0=last;while(s0>0&&(D[s0-1].sd||0)>=SCHNEE.hoehe_ab)s0--;
+          if(i0>s0&&!(i0===s0+1&&d.getHours()<7)){let tau=0;for(let i=s0+1;i<=i0;i++)if(D[i].max>SCHNEE.tau_ab&&(i<i0||d.getHours()>=12))tau++;
+            if(sdJetzt<SCHNEE.hoehe_ab)tau=Math.max(tau,2);const st=Math.min(tau,4);if(st<4){v.stufe=st;v.grund='Schnee seit '+String(D[s0].dk%100)+'.'+String(Math.floor(D[s0].dk/100)%100)+'., '+tau+' Tauwetter-Tag'+(tau===1?'':'e')+', jetzt '+Math.round(sdJetzt*100)+' cm';}}}}
+      // Eis: friert nach 4 Eistagen in Folge zu, taut nach 2 Tagen mit Höchstwert über 3 °C
+      if(!EIS_TEST){let run=0,warm=0,zu=false;for(let i=0;i<=i0;i++){const mx=D[i].max;if(!zu){run=mx<=EIS.eistag_bis?run+1:0;if(run>=EIS.tage){zu=true;warm=0;}}else{warm=mx>EIS.tau_ab?warm+1:0;if(warm>=EIS.tau_tage){zu=false;run=0;}}}
+        if(zu){v.eis=true;v.eisGrund=run+' Eistage in Folge'+(warm?', '+warm+' Tauwetter-Tag':'');}}}}
+  WINTER.k=key;WINTER.v=v;return v;}
+const schneeStufe=C=>winter(C.d).stufe; // -1 = kein Schneemann, 0 = ganz, 1 = kleiner, 2 = Hut schief, 3 = nur noch Hut und Karotte
+const eisAn=C=>winter(C.d).eis;
+const foehnAn=C=>FOEHN_TEST||!!(C.live&&C.live.foehn>0.5);
+// Schneemann am Ufer: ab und zu zwinkert er; bei Tauwetter schmilzt er in drei Stufen
+const SCHNEEMANN=[
+ ['..kkk..','..kkk..','.kkkkk.','..kwk..','..wwwo.','..rrr..','b.www.b','.bwkwb.','.wwwww.','.wwkww.','.wwwww.','..www..'],  // ganz
+ ['..kkk..','..kkk..','.kkkkk.','..kwk..','..wwwo.','..rrr..','b.www.b','.bwkwb.','.wwwww.','..www..'],                      // kleiner
+ ['...kkk.','..kkk..','.kkkk..','..kwk..','..wwwo.','..rrr..','..www..','.wwkww.','.wwwww.','..www..'],                      // Hut schief
+ ['.......','.......','.......','.......','..kkk..','.kkkk..','.....o.','.wwwwww','wwwwwww']];                  // nur noch Hut und Karotte im Rest-Schnee
+function schneemann(C,cs,t){const st=schneeStufe(C);if(st<0)return;const px=zellMaler(cs),L=C.L,X=W*0.25,Yb=shoreY(W*0.25)-cs,F={k:[30,30,36],w:mix([250,252,255],[0,0,0],(1-L)*0.6),o:[240,130,40],r:[200,50,50],b:[90,60,40]};
+  const G=SCHNEEMANN[st],g=2,zwinker=st<3&&(t%7)<0.25; // ab und zu zwinkert er (das rechte Auge wird zum Strich)
+  G.forEach((row,j)=>[...row].forEach((ch,i)=>{if(ch==='.')return;for(let b=0;b<g;b++)for(let e=0;e<g;e++){if(zwinker&&j===3&&i===4&&ch==='k'&&b===0){px(X+((i-3)*g+e)*cs,Yb+((j-G.length)*g+b)*cs,F.w,0.95);continue;}
+    px(X+((i-3)*g+e)*cs,Yb+((j-G.length)*g+b)*cs,F[ch],0.95);}}));
+  px(X-cs*7,Yb,F.w,0.6);px(X+cs*8,Yb-cs,F.w,0.5);px.fertig();} // ein paar Schneereste daneben
+// Schnee am Ufer, solange der Schneemann steht (beim Schmelzen dünner)
+function W_schneeUfer(C){const st=schneeStufe(C);if(st<0)return;const L=C.L,c=mix([235,240,248],[0,0,0],(1-L)*0.6);ctx.fillStyle=rgba(c,[0.85,0.72,0.55,0.35][st]);ctx.beginPath();ctx.moveTo(0,H*0.93);ctx.quadraticCurveTo(W*0.18,H*0.9,W*0.4,H);ctx.lineTo(0,H);ctx.closePath();ctx.fill();}
+// Eisstockschießen: die vordere Bucht ist zugefroren; Leute nur von 10 bis 16 Uhr auf dem Eis, am Wochenende mehr
+function W_eis(C){if(!eisAn(C))return;const L=C.L,c=mix(mix([186,204,222],C.S.hor,0.45),[0,0,0],(1-L)*0.55);ctx.fillStyle=rgba(c,0.6);ctx.beginPath();ctx.moveTo(0,H*0.82);ctx.quadraticCurveTo(W*0.46,H*0.84,W*0.74,H);ctx.lineTo(0,H);ctx.closePath();ctx.fill();
+  ctx.strokeStyle=rgba(mix(c,[255,255,255],0.4),0.6);ctx.lineWidth=1;const r=rng(7);for(let i=0;i<6;i++){ctx.beginPath();let x=W*0.05+r()*W*0.4,y=H*(0.87+r()*0.1);ctx.moveTo(x,y);for(let k=0;k<4;k++){x+=W*(0.02+r()*0.04);y+=H*(r()-0.5)*0.01;ctx.lineTo(x,y);}ctx.stroke();}}
+function eisstock(C,cs,t){if(!eisAn(C)||C.hr<10||C.hr>=16)return;const p1=zellMaler(cs),g=2,px=(x,y,c,a)=>{for(let b=0;b<g;b++)for(let e=0;e<g;e++)p1(x+e*cs,y+b*cs,c,a);},Z=g*cs,mantel=[40,40,52],hauben=[[200,50,50],[50,90,170],[60,140,80],[220,170,60]];
+  const leut=(x,y,h,pose)=>{px(x,y-5*Z,hauben[h],1);px(x,y-4*Z,[235,200,170],0.95);for(let k=1;k<=3;k++){px(x,y-k*Z,mantel,1);if(!(k===3&&!pose))px(x+Z,y-k*Z,mantel,1);}if(pose)px(x+2*Z,y-2*Z,mantel,1);px(x,y,mantel,0.9);px(x+Z,y,mantel,0.9);};
+  const yb=H*0.925,P=14,ph=(t%P)/P,schub=ph<0.15,x0=W*0.14,x1=W*0.52,we=C.d.getDay()===0||C.d.getDay()===6;
+  leut(x0-Z*3,yb,0,schub);leut(x1+Z*3,yb-Z*2,1,false);leut(x1+Z*6,yb-Z,2,false);leut(W*0.05,yb+Z*2,3,false);
+  if(we){leut(W*0.3,yb-Z*3,2,false);leut(W*0.34,yb-Z*2,0,false);} // am Wochenende schauen mehr Leute zu
+  px(x1,yb-Z,[20,20,20],0.9);
+  const u=ph<0.15?0:clamp((ph-0.15)/0.45,0,1),e=1-Math.pow(1-u,2.2),sx=lerp(x0,x1-Z*2,e);
+  px(sx,yb,[120,120,128],0.95);px(sx+Z,yb,[120,120,128],0.95);p1(sx+cs,yb-cs,[200,50,50],0.95);p1(sx+Z,yb-cs,[200,50,50],0.95);if(u>0&&u<1)for(let k=1;k<4;k++)px(sx-k*Z*1.5,yb,[230,240,250],0.25*(1-k/4));
+  p1.fertig();}
+// Föhn: klare Luft, tiefblauer Himmel, Berge etwas größer und näher (in scene), Föhnfische über den Bergen
+function W_foehn(C){if(!foehnAn(C))return;const L=C.L,c=mix([250,250,255],C.S.hor,0.15);
+  for(const [fx,fy,sc] of [[0.3,1.75,1],[0.66,1.55,0.8],[0.82,1.95,0.6]]){const x=W*fx,y=C.hy-C.farSc*fy;
+    for(let k=0;k<3;k++)softEllipse(x+k*W*0.01,y-k*C.farSc*0.07,W*0.2*sc*(1-k*0.22),C.farSc*0.045*sc,mix(c,[0,0,0],(1-L)*0.5),0.55*L);}}
+// Info-Zeile (?dev=1): was gerade aktiv ist und warum
+function zusatzText(C){if(!C)return '';const out=[],d=C.d,F=vorhersage(d),f0=F[0],sy=symFor(f0),wv=winter(d),ws=warnStufe(C),g=warnBoe(C);
+  out.push('Vorhersage ('+VH.quelle+'): '+F.map(f=>f.wd+' '+symFor(f)+' '+Math.round(f.max)+'/'+Math.round(f.min)+'°').join(', '));
+  if(['regen','gewitter','schnee'].includes(sy)&&C.hr>=13)out.push('Hinweis im Bild: morgen '+sy);
+  if(ws)out.push('Sturmwarnleuchte: '+(ws===2?'Sturmwarnung (90/min)':'Vorwarnung (40/min)')+(WARN_TEST!==null?' (?warn=)':g!==null?' – Böen bis '+Math.round(g)+' km/h':''));
+  if(wv.stufe>=0)out.push('Schneemann: '+['ganz','kleiner','Hut schief','nur noch Hut und Karotte'][wv.stufe]+' ('+wv.grund+')');
+  if(wv.eis)out.push('Eis in der Bucht ('+wv.eisGrund+')'+(C.hr>=10&&C.hr<16?', Eisstockschießen':''));
+  if(foehnAn(C)){const w=C.live;out.push('Föhn ('+(FOEHN_TEST?'?foehn=1':'Wind '+Math.round(w.wd)+'°, Böen '+Math.round(w.gust)+' km/h, Feuchte '+Math.round(w.rh)+' %, '+(w.foehnWarm>0?'+':'')+Math.round(w.foehnWarm)+' °C')+')');}
+  const mg=marktGrund(d);if(mg)out.push('Christkindlmarkt ('+mg+')');
+  const n=adventTag(d);if(n)out.push('Advent: '+n+' Lichter, Türl um 7:30');
+  if(TAFEL.jetzt&&TAFEL.jetzt.art!=='uhr')out.push('Tafel: '+TAFEL.jetzt.z.join(' '));
+  return out.join(' · ');}
+
 // ---------- Einstellungen (config.json) ----------
 // Wird beim Start geladen. Fehlt ein Eintrag, gilt der eingebaute Standard. Ist einer fehlerhaft, ebenfalls, mit Hinweis in der Info-Zeile.
 // Einträge, die mit "_" beginnen, sind Notizen und werden ignoriert.
 let ORT='Chiemsee',WETTER={echt:true,min:15},CFG_INFO='',started=false;
-const CFG_KEYS=['ort','familie','hochzeitstag','feuerwehrboot','eisvogel','wetter','anzeige','astro','astro_punkte','entdecken'];
+const CFG_KEYS=['ort','familie','hochzeitstag','feuerwehrboot','eisvogel','wetter','anzeige','astro','astro_punkte','entdecken','tafel','markt'];
 const pMMDD=v=>{const m=/^(\d{1,2})-(\d{1,2})$/.exec(String(v).trim());if(!m)return null;const a=+m[1],b=+m[2];return a>=1&&a<=12&&b>=1&&b<=31?String(a).padStart(2,'0')+'-'+String(b).padStart(2,'0'):null;};
 const pDatum=v=>v===''?'':pMMDD(v); // leer = kein Goldtag
 const pUhr=v=>{const m=/^(\d{1,2}):(\d{2})$/.exec(String(v).trim());if(!m)return null;const a=+m[1],b=+m[2];return b<60&&a*60+b<=1440?a*60+b:null;};
@@ -1413,6 +1743,11 @@ function applyConfig(j){const bad=[],notes=[],obj=v=>!!v&&typeof v==='object'&&!
     if(!obj(q)||!pZahl(1,3,true)(q.stern)||!PL_FARBE[q.planet]||!['ost','west'].includes(q.richtung)||pZahl(0,20000)(q.km)===null){bad.push(nm);return;}KAMM.push({stern:q.stern,planet:q.planet,richtung:q.richtung,km:Math.round(q.km)});});
     if(j.astro_punkte.length>8)notes.push('nur die ersten 8 Kamm-Punkte werden gezeigt');}}
   ENTDECKEN=or(take(j.entdecken,pJaNein,'entdecken'),ENTDECKEN);
+  part('tafel',o=>{const n={...TAFEL_CFG};n.an=or(take(o.an,pJaNein,'tafel an'),n.an);n.stunden_wort=or(take(o.stunden_wort,pJaNein,'tafel stunden_wort'),n.stunden_wort);
+    if(o.rituale!==undefined){if(!obj(o.rituale))bad.push('tafel rituale');else{const R={};for(const [k,v] of Object.entries(o.rituale)){if(k[0]==='_')continue;const m=pUhr(k),w=pText(v);
+      if(m===null||w===null){bad.push('tafel rituale '+k);continue;}R[String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0')]=w.toUpperCase();}n.rituale=R;}}TAFEL_CFG=n;});
+  part('markt',o=>{const n={...MARKT};n.an=or(take(o.an,pJaNein,'markt an'),n.an);n.von=or(take(o.von,pUhr,'markt von'),n.von);n.bis=or(take(o.bis,pUhr,'markt bis'),n.bis);
+    if(o.termine!==undefined){if(o.termine==='advent')n.termine='advent';else if(Array.isArray(o.termine)){const T=o.termine.map(pMMDD);if(T.some(x=>x===null))bad.push('markt termine');n.termine=T.filter(Boolean);}else bad.push('markt termine');}MARKT=n;});
   part('wetter',w=>{WETTER={echt:or(take(w.echt,pJaNein,'wetter echt'),WETTER.echt),min:or(take(w.aktualisieren_minuten,pZahl(5,180),'wetter aktualisieren_minuten'),WETTER.min)};});
   const unk=Object.keys(j).filter(k=>k[0]!=='_'&&!CFG_KEYS.includes(k));if(unk.length)notes.push('unbekannt: '+unk.join(', '));
   const msg=[];if(bad.length)msg.push('ungültig: '+bad.join(', ')+' (dort gilt der Standard)');CFG_INFO=msg.concat(notes).length?'config.json: '+msg.concat(notes).join('; '):'';}
@@ -1441,9 +1776,14 @@ const HOCHNEBEL={tief_ab:70,mittel_bis:50,druck_ab:1016}; // tiefe Wolken ab %, 
                   // % Bewölkung: darunter keine einzige Wolke, klarer Himmel
 const BARO={stunden:3,steigt:1,faellt:-1,stark:-4,ruhe:0.4,unruhe:0.35,sturm:0.8}; // Druckänderung in hPa über 3 h (stark = Luftdruck-Absturz); ruhe/unruhe/sturm = wie stark das Raster reagiert
 const STURM={wind_ab:50,boeen_ab:62};  // km/h: ab diesem mittleren Wind oder diesen Böen gilt es als Sturm (Böen ab 62 km/h = Windstärke 8)
+const WARN={vor:46,sturm:63,stunden_vor:1,stunden_nach:3}; // Sturmwarnleuchte wie am Chiemsee: Böen ab 46 km/h (25 kn) Vorwarnung, ab 63 km/h (34 kn) Sturmwarnung; höchste Böe der letzten Stunde und der nächsten 3
+const FOEHN={richtung_von:140,richtung_bis:250,boeen_ab:30,feuchte_bis:55,waermer_um:4,sicht_ab:30000}; // Wind aus S bis SW (Grad), Böen km/h, rel. Feuchte %, °C wärmer als im Mittel der 3 Tage davor (Höchstwerte), Sicht m
+const SCHNEE={hoehe_ab:0.02,tau_ab:2};  // Schneemann: ab 2 cm Schneehöhe; Tage mit Höchstwert über 2 °C lassen ihn schmelzen (3 Stufen)
+const EIS={tage:4,eistag_bis:0,tau_ab:3,tau_tage:2}; // Bucht friert nach 4 Eistagen in Folge (Höchstwert ≤ 0 °C), taut nach 2 Tagen mit Höchstwert über 3 °C
 const REGENBOGEN={sonne_min:2,sonne_max:42,wolken_max:85,nach_regen_h:2,regen_max:0.45}; // Sonnenhöhe in Grad, Bewölkung in %, wie lange nach dem Regen (h), bis zu welcher Regenstärke schon währenddessen (Sonnenregen)
 const SEE_TEMP={kalt:0,warm:25,staerke:0.05};                                      // °C; staerke = wie deutlich der See kühler oder wärmer wirkt
-const WX_VARS='weather_code,cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high,precipitation,rain,showers,snowfall,wind_speed_10m,wind_gusts_10m,temperature_2m,pressure_msl,visibility',WX_KEY='lichtzeit_wetter';
+const WX_VARS='weather_code,cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high,precipitation,rain,showers,snowfall,wind_speed_10m,wind_gusts_10m,temperature_2m,pressure_msl,visibility,snow_depth,relative_humidity_2m,wind_direction_10m',WX_KEY='lichtzeit_wetter';
+const WX_TAGE='weather_code,temperature_2m_max,temperature_2m_min,wind_gusts_10m_max,snow_depth_max'; // Tageswerte: Vorhersage, Schneemann, Eis, Föhn
 let WX=null,WX_ERR='',WXM={ts:NaN,v:null};
 // Ein Messwert -> Bildwerte. per = Faktor auf "pro Stunde" (aktuelle Werte gelten für 15 Minuten, stündliche für eine Stunde)
 function wxDerive(r,per){const code=r.code;if(code===null||!isFinite(r.t))return null;
@@ -1461,10 +1801,14 @@ function wxDerive(r,per){const code=r.code;if(code===null||!isFinite(r.t))return
     storm:thunder?0.7:wtype===4?0.35+0.25*rain:snow>0?0.3:wtype===2?0.15:0,
     mist:Math.max(fog?0.75:0,mistV*(rain>0.1||snow>0.1?0.5:1)),
     wind:r.wind===null?0:clamp((r.wind-WIND_RUHIG)/(WIND_STURM-WIND_RUHIG),0,1),kmh:r.wind,gust:r.gust===undefined?null:r.gust,th:thunder?1:0,temp:r.temp,p:r.p,
-    sturm:Math.max(r.wind===null?0:smooth(STURM.wind_ab-8,STURM.wind_ab,r.wind),r.gust===null||r.gust===undefined?0:smooth(STURM.boeen_ab-8,STURM.boeen_ab,r.gust))};}
+    sturm:Math.max(r.wind===null?0:smooth(STURM.wind_ab-8,STURM.wind_ab,r.wind),r.gust===null||r.gust===undefined?0:smooth(STURM.boeen_ab-8,STURM.boeen_ab,r.gust)),
+    sd:r.sd===undefined?null:r.sd,rh:r.rh===undefined?null:r.rh,wd:r.wd===undefined?null:r.wd,vis:r.vis===undefined?null:r.vis};}
+// Tageswerte (7 Tage zurück bis 3 Tage voraus): Tag als dayKey (Berliner Datum), Wettercode, Höchst-/Tiefstwert, stärkste Böe, größte Schneehöhe
+function wxTage(j){const D=j&&j.daily;if(!D||!Array.isArray(D.time))return [];const num=v=>typeof v==='number'&&isFinite(v)?v:null,g=(k,i)=>num((D[k]||[])[i]);
+  return D.time.map((t,i)=>({dk:dayKey(wall(t*1000)),code:g('weather_code',i),max:g('temperature_2m_max',i),min:g('temperature_2m_min',i),boe:g('wind_gusts_10m_max',i),sd:g('snow_depth_max',i)})).filter(x=>x.code!==null&&x.max!==null);}
 function wxBuild(j){const h=j&&j.hourly,c=j&&j.current;if(!h||!Array.isArray(h.time)||!h.time.length)throw new Error('unerwartete Antwort');
   const num=v=>typeof v==='number'&&isFinite(v)?v:null;
-  const raw=(g,t)=>({t,code:g('weather_code'),cloud:g('cloud_cover'),low:g('cloud_cover_low'),mid:g('cloud_cover_mid'),high:g('cloud_cover_high'),pr:g('precipitation'),rain:g('rain'),sh:g('showers'),snow:g('snowfall'),wind:g('wind_speed_10m'),gust:g('wind_gusts_10m'),temp:g('temperature_2m'),p:g('pressure_msl'),vis:g('visibility')});
+  const raw=(g,t)=>({t,code:g('weather_code'),cloud:g('cloud_cover'),low:g('cloud_cover_low'),mid:g('cloud_cover_mid'),high:g('cloud_cover_high'),pr:g('precipitation'),rain:g('rain'),sh:g('showers'),snow:g('snowfall'),wind:g('wind_speed_10m'),gust:g('wind_gusts_10m'),temp:g('temperature_2m'),p:g('pressure_msl'),vis:g('visibility'),sd:g('snow_depth'),rh:g('relative_humidity_2m'),wd:g('wind_direction_10m')});
   let S=h.time.map((t,i)=>wxDerive(raw(k=>num((h[k]||[])[i]),t*1000),1));
   if(c&&num(c.time)!==null){const s=wxDerive(raw(k=>num(c[k]),c.time*1000),3600/(num(c.interval)||900));if(s)S=S.filter(q=>q&&Math.abs(q.t-s.t)>=6e5).concat(s);}
   S=S.filter(Boolean).sort((a,b)=>a.t-b.t);if(!S.length)throw new Error('keine Wetterdaten');return S;}
@@ -1473,13 +1817,19 @@ function wxSeg(ts){const S=WX.S;if(ts<S[0].t||ts>S[S.length-1].t)return null;let
 const wxNum=(g,k)=>g.a[k]===null?g.b[k]:g.b[k]===null?g.a[k]:lerp(g.a[k],g.b[k],g.u);
 function wxCalc(ts){if(WX_FORCE)return WX_FORCE;if(!WX||!WETTER.echt||WX.lat!==LAT||WX.lng!==LNG||Date.now()-WX.fetched>WX_MAX_ALTER_H*36e5)return null;
   const g=wxSeg(ts);if(!g)return null;const n=g.u<0.5?g.a:g.b,o={code:n.code,wtype:n.wtype};
-  for(const k of['cloud','low','oben','bedeckt','hn','rain','snow','mm','storm','mist','wind','kmh','gust','sturm','th','temp','p'])o[k]=g.a[k]===undefined&&g.b[k]===undefined?null:wxNum(g,k);
+  for(const k of['cloud','low','oben','bedeckt','hn','rain','snow','mm','storm','mist','wind','kmh','gust','sturm','th','temp','p','sd','rh','vis'])o[k]=g.a[k]===undefined&&g.b[k]===undefined?null:wxNum(g,k);
+  o.wd=n.wd===undefined?null:n.wd;o.foehn=foehnWert(o,ts); // Windrichtung: nächster Messwert (nicht über 360° hinweg mitteln)
   // Barometer: Luftdruck jetzt minus Luftdruck vor 3 Stunden
   const g0=wxSeg(ts-BARO.stunden*36e5),p0=g0?wxNum(g0,'p'):null;o.dp=o.p!==null&&p0!==null?o.p-p0:null;
   // Regenbogen: nur wenn es gerade aufgehört hat zu regnen und nicht zu bewölkt ist (Sonnenstand prüft scene)
   let bow=0;if(o.snow<0.05&&o.rain<REGENBOGEN.regen_max){if(o.rain>=0.05)bow=0.8;else for(let h=1/12;h<=REGENBOGEN.nach_regen_h;h+=1/12){const q=wxSeg(ts-h*36e5);if(!q)break;if(wxNum(q,'rain')>=0.05){bow=1-smooth(REGENBOGEN.nach_regen_h*0.3,REGENBOGEN.nach_regen_h,h);break;}}
     bow*=1-smooth(REGENBOGEN.wolken_max-10,REGENBOGEN.wolken_max+5,o.cloud);}
   o.bow=bow;return wxExtras(o);}
+// Föhn: Wind aus S bis SW mit spürbaren Böen, trockene Luft, deutlich wärmer als die Tage davor, sehr gute Sicht (alle Bedingungen zusammen)
+function foehnWert(o,ts){if(o.wd===null||o.rh===null||o.gust===null||o.temp===null)return 0;const D=WX&&WX.D||[],k=dayKey(wall(ts)),i=D.findIndex(x=>x.dk===k);
+  if(i<3)return 0;const vor=(D[i-1].max+D[i-2].max+D[i-3].max)/3,waerme=Math.max(o.temp,D[i].max)-vor;o.foehnWarm=waerme;
+  const r=o.wd>=FOEHN.richtung_von&&o.wd<=FOEHN.richtung_bis?1:0,sicht=o.vis===null?1:smooth(FOEHN.sicht_ab*0.8,FOEHN.sicht_ab,o.vis);
+  return r*smooth(FOEHN.boeen_ab-5,FOEHN.boeen_ab+5,o.gust)*(1-smooth(FOEHN.feuchte_bis-5,FOEHN.feuchte_bis+5,o.rh))*smooth(FOEHN.waermer_um-1,FOEHN.waermer_um+1,waerme)*sicht;}
 // Druck-Trend, Unruhe des Rasters und See-Farbton
 function wxExtras(o){const dp=o.dp;
   o.trend=dp===null?'':dp>BARO.steigt?'steigend':dp<BARO.stark?'stark fallend':dp<BARO.faellt?'fallend':'stabil';
@@ -1497,14 +1847,14 @@ function wxText(d){const w=wxAt(instant(d)),f=(v,n=0)=>v===null?'?':v.toFixed(n)
   if(!w)return 'Wetter: '+WT[wtypeOf(d)]+' (simuliert'+(!WETTER.echt?', echtes Wetter aus':WX_ERR?', '+WX_ERR:'')+')';
   const name=w.wtype===3?'Gewitter':w.sturm>0.5?'Sturm':w.snow>0.05?'Schnee':w.rain>0.05?'Regen':(w.code===45||w.code===48)?'Nebel':w.hn>0.5?'Hochnebel':w.bedeckt>0.5?'bedeckt':WT[w.wtype];
   return (WX_FORCE?'Wetter (erzwungen mit ?wetter='+WX_FORCE.name+')':'Wetter (echt, Stand '+new Date(WX.fetched+CLOCK_OFF).toLocaleTimeString('de-DE',{timeZone:TZ,hour:'2-digit',minute:'2-digit'})+(WX_ERR?', '+WX_ERR:'')+')')+': '+name+', '+f(w.temp)+' °C, Wolken '+f(w.cloud)+' %'+(w.low!==null&&w.low!==undefined?' (tief '+f(w.low)+' %, mittel '+f(w.oben)+' %)':'')+', '+(w.mm>0.05?'Niederschlag '+f(w.mm,1)+' mm/h, ':'')+'Wind '+f(w.kmh)+' km/h'+(w.gust!==null&&w.gust!==undefined?' (Böen '+f(w.gust)+')':'')+', Luftdruck '+f(w.p)+' hPa'+(w.dp!==null?', '+w.trend+' ('+(w.dp>0?'+':'')+f(w.dp,1)+' hPa in '+BARO.stunden+' h)':'');}
-function wxLoad(){try{const c=JSON.parse(localStorage.getItem(WX_KEY)||'null');if(c&&c.lat===LAT&&c.lng===LNG&&c.j){WX={fetched:c.fetched,lat:LAT,lng:LNG,S:wxBuild(c.j)};WXM.ts=NaN;}}catch(e){}}
+function wxLoad(){try{const c=JSON.parse(localStorage.getItem(WX_KEY)||'null');if(c&&c.lat===LAT&&c.lng===LNG&&c.j){WX={fetched:c.fetched,lat:LAT,lng:LNG,S:wxBuild(c.j),D:wxTage(c.j)};WXM.ts=NaN;}}catch(e){}}
 function wxFetch(){if(!WETTER.echt)return Promise.resolve();let tm=0;
   const done=()=>{clearTimeout(tm);setTimeout(wxFetch,(WX_ERR?Math.min(5,WETTER.min):WETTER.min)*6e4);},fail=e=>{WX_ERR='Abruf fehlgeschlagen: '+(e.name==='AbortError'?'Zeitüberschreitung':e instanceof TypeError?'keine Verbindung':e.message);console.warn(WX_ERR);};
   try{const ctl=window.AbortController?new AbortController():null;tm=setTimeout(()=>{if(ctl)ctl.abort();},15000);
-    const url='https://api.open-meteo.com/v1/forecast?latitude='+LAT+'&longitude='+LNG+'&current='+WX_VARS+'&hourly='+WX_VARS+'&past_hours=24&forecast_hours=24&timezone=Europe%2FBerlin&timeformat=unixtime';
+    const url='https://api.open-meteo.com/v1/forecast?latitude='+LAT+'&longitude='+LNG+'&current='+WX_VARS+'&hourly='+WX_VARS+'&daily='+WX_TAGE+'&past_hours=24&forecast_hours=24&past_days=7&forecast_days=4&timezone=Europe%2FBerlin&timeformat=unixtime';
     return fetch(url,{cache:'no-store',signal:ctl?ctl.signal:undefined})
       .then(r=>{if(!r.ok)throw new Error('HTTP '+r.status);return r.json();})
-      .then(j=>{const S=wxBuild(j),now=Date.now();WX={fetched:now,lat:LAT,lng:LNG,S};WXM.ts=NaN;WX_ERR='';
+      .then(j=>{const S=wxBuild(j),now=Date.now();WX={fetched:now,lat:LAT,lng:LNG,S,D:wxTage(j)};WXM.ts=NaN;WX_ERR='';
         // Ohne Server-Zeitstempel: grobe Uhrprüfung über den 15-Minuten-Zeitpunkt der Wetterdaten (nur bei mehr als 20 min Abweichung)
         const ct=j.current&&j.current.time;if(CLOCK_SRC!=='Server'&&typeof ct==='number'){const off=ct*1000+450e3-now;if(Math.abs(off)>20*6e4){CLOCK_OFF=off;CLOCK_SRC='Wetterdaten';}}try{localStorage.setItem(WX_KEY,JSON.stringify({fetched:now,lat:LAT,lng:LNG,j}));}catch(e){}})
       .catch(fail).then(done);}
@@ -1517,6 +1867,11 @@ function urlAnzeige(){const set=(k,key,p,auto)=>{const v=Q.get(k);if(v===null)re
   const ls=Q.get('lesen');if(ls!==null){if(['webgl','cpu','auto','async'].includes(ls)){LESEN.wunsch=ls;if(ls!=='auto'&&ls!=='async'){LESEN.jetzt=ls;LESEN.fertig=true;}}else URL_INFO.push('?lesen='+ls+' ungültig');}
   const g=Q.get('gpu');if(g!==null){if(['0','1','aus','an'].includes(g))GPU_WUNSCH=g==='1'||g==='an';else URL_INFO.push('?gpu='+g+' ungültig');}
   const sz=Q.get('szene');if(sz!==null){if(['halb','voll','auto'].includes(sz))SZENE_HALB_WUNSCH=sz;else URL_INFO.push('?szene='+sz+' ungültig');}
+  // Test-Parameter für die neuen Momente (?vorhersage= wird schon beim Laden gelesen)
+  const wa=Q.get('warn');if(wa!==null){if(['0','1','2'].includes(wa))WARN_TEST=+wa;else URL_INFO.push('?warn='+wa+' ungültig');}
+  const sn=Q.get('schnee');if(sn!==null){if(['1','2','3','4'].includes(sn))SCHNEE_TEST=+sn;else URL_INFO.push('?schnee='+sn+' ungültig');}
+  if(Q.get('eis')==='1')EIS_TEST=true;if(Q.get('foehn')==='1')FOEHN_TEST=true;if(Q.get('markt')==='1')MARKT_TEST=true;
+  const tf=Q.get('tafel');if(tf)TAFEL_TEST={text:tf.toUpperCase()};
   const en=Q.get('entdecken');if(en!==null){if(['0','1','aus','an'].includes(en))ENTDECKEN=en==='1'||en==='an';else URL_INFO.push('?entdecken='+en+' ungültig');}}
 function start(){if(started)return;started=true;urlAnzeige();if(ANZ.raster_px||ANZ.aufl)resize();$('sname').textContent=ORT;document.title='Lichtzeit – '+ORT;toSliders(curT());setMode();keepAwake();requestAnimationFrame(frame);}
 // Start: erst die Einstellungen, dann das Wetter (gespeicherter Stand sofort, neuen Abruf höchstens 3 s abwarten)

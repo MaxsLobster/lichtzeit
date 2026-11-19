@@ -10,8 +10,10 @@
   "eisvogel": { "pro_tag": 3, "minuten": 5 },
   "wetter": { "echt": true, "aktualisieren_minuten": 15 },
   "anzeige": { "raster_px": "auto", "max_fps": 30, "interne_aufloesung": "auto" },
-  "astro": { "planeten": true, "mond_zeichen": true, "kamm_punkte": true },
+  "astro": { "planeten": true, "mond_zeichen": true, "kamm_punkte": false },
   "entdecken": true,
+  "tafel": { "an": true, "stunden_wort": true, "rituale": { "07:00": "SERVUS", "19:00": "GUAD|NACHT" } },
+  "markt": { "an": true, "termine": "advent", "von": "11:00", "bis": "20:00", "_notiz": "termine: \"advent\" = alle Adventswochenenden (Sa und So) oder eine Liste wie [\"11-28\", \"11-29\"]" },
   "astro_punkte": [
     {"stern": 1, "planet": "sonne",   "richtung": "ost",  "km": 82},
     {"stern": 2, "planet": "merkur",  "richtung": "ost",  "km": 119},

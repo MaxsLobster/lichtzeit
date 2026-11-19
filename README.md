@@ -1,20 +1,67 @@
 # Lichtzeit
 
-Ein generatives Kunstwerk: ein Pixel-Raster-Bild vom Chiemsee, das zugleich
-**Uhr** und **Mondphasen-Anzeige** ist. Es läuft dauerhaft im Browser, gedacht
+Ein generatives Kunstwerk: ein Pixel-Raster-Bild vom Chiemsee mit einer
+**Fallblatt-Uhr**, Wetter, Mondphase und Jahreslauf. Es läuft dauerhaft im Browser, gedacht
 für einen 32-Zoll Muse Frame im Hochformat.
 
 **Adresse:** https://maxslobster.github.io/lichtzeit/
 
 ## So liest man die Uhr
 
-- **Stunde:** Der Lichtstrahl von Sonne (6–18 Uhr) oder Mond (18–6 Uhr) fällt
-  auf eine Reihe von 13 Pfählen. Links ist 6 bzw. 18 Uhr, die Mitte (Doppelpfahl)
-  ist 12 bzw. 24 Uhr, rechts ist 18 bzw. 6 Uhr.
-- **Minute:** Der Schornstein des Dampfers zeigt die Minute. Jeder Pfahl steht
-  für 5 Minuten.
+- **Uhrzeit:** Oben links steht die Zeit auf einer Fallblatt-Tafel aus großen
+  Pixelziffern (je 7×10 Zellen, sie rasten auf das Bildraster ein). Die Farbe
+  kommt aus dem Licht der Szene. Beim Minutenwechsel klappt die Ziffer zur Fuge
+  hin um, der Doppelpunkt atmet langsam.
+- **Darunter:** das Wetter der nächsten drei Tage (siehe „Vorhersage“).
+- **Lichtstrahl und Dampfer** sind reine Stimmung: Der Strahl von Sonne bzw.
+  Mond liegt auf dem See, der Dampfer fährt in zwei Stunden einmal quer darüber.
 - **Mond:** Der Mond zeigt seine echte Phase. Bei Vollmond wird das Bild klar
   und silbern. In der Neumond-Nacht wird das Raster etwas gröber und blasser.
+
+## Anzeigetafel: die Uhr schreibt
+
+Die Uhr ist zugleich eine Anzeigetafel. Jede Stelle ist ein eigenes Fallblatt;
+wechselt die Tafel zwischen Uhr und Wort, rattert es kurz wie an einer echten
+Tafel. Zwei Zeilen werden mit `|` getrennt, mehrere Seiten mit `/` (je 5 s).
+Solange ein zweizeiliges Wort steht, blendet die Vorhersage aus. Grüße und
+Rituale sind bairisch, Infos hochdeutsch.
+
+Was wann kommt (in dieser Reihenfolge, das Erste gewinnt):
+
+1. **6:00:** Die Tafel wacht auf und blättert etwa 4 s wild durch.
+2. **Rituale:** 7:00 „SERVUS“ (10 s), 19:00 „GUAD NACHT“ (12 s), einstellbar in `config.json`.
+3. **Advent:** um 7:30 „TÜRL“ mit der Zahl des Tages.
+4. **Anlässe** (die ersten 9 s): „EIS VOGEL“, „FEUER WEHR“ und die Szenen zum
+   Entdecken (z. B. „REIHER“, „GASSI“, „LATERNE“).
+5. **Volle Stunde** (8 s, mit zwei Seiten 10 s): ein Wort zur Lage. Die Auswahl
+   wechselt stündlich: Festtage („1. ADVENT“, „NIKO LAUS“, „HEILIG ABEND“,
+   „FROHE WEIHNACHT“, „GUADN RUTSCH“, „PROSIT NEUJAHR“, an Geburtstagen
+   „ALLES GUTE“), Wetter („FÖHN“, „GEWITTER“, „STURM“, „SCHNEE“, „REGEN“,
+   „HOCH NEBEL“, „NEBEL“, „FROST“, „SONNE“), Himmel („VOLL MOND“, „NEU MOND“,
+   „VENUS“) und Tageslicht (vormittags „SONNEN AUFGANG“ mit Uhrzeit, nachmittags
+   „SONNEN UNTERGANG“ mit Uhrzeit).
+
+## Vorhersage
+
+Unter der Uhr stehen die nächsten drei Tage: Wochentag, Symbol und
+Höchsttemperatur. Symbole: klar, heiter, Wolke, Regen, Schnee, Gewitter, Frost.
+**Frost** (Tiefstwert höchstens 0 °C, kein Niederschlag) hat ein Eiskristall-
+Symbol; statt des Höchstwerts steht dann der Tiefstwert, beides in Eisblau. Bei
+Schnee mit Frost steht der Tiefstwert ebenfalls in Eisblau. Die Werte kommen mit
+dem normalen Wetterabruf von Open-Meteo; ohne Daten sind sie simuliert.
+
+**Hinweise im Bild für morgen** (ab etwa 13 Uhr zunehmend):
+
+- **Regen:** eine dunkle Wolkenwand hinter den rechten Bergen, darunter ein
+  Regenschleier.
+- **Schnee:** helle Schneewolken über dem Kamm, Flocken über der rechten
+  Bildhälfte, und die Schneegrenze an den Bergen sinkt.
+- **Frost** hat bewusst keinen Hinweis im Bild, nur das Symbol.
+
+**Sturmwarnleuchte** am Ufer der Herreninsel, wie die echten Leuchten am
+Chiemsee: Vorwarnung ab Böen von 46 km/h (25 Knoten) mit 40 Blitzen pro
+Minute, Sturmwarnung ab 63 km/h (34 Knoten) mit 90 pro Minute. Maßgeblich ist
+die stärkste Böe der letzten Stunde und der nächsten drei Stunden.
 
 ## Wetter und Barometer
 
@@ -68,7 +115,7 @@ und welche zurückgestellt sind.
 ## Dateien
 
 - `index.html` – das Kunstwerk (eine Datei, ohne Build-Werkzeuge)
-- `config.json` – Einstellungen (Ort, Familie, Termine, Wetter, Anzeige, Himmel, Szenen)
+- `config.json` – Einstellungen (Ort, Familie, Termine, Wetter, Anzeige, Himmel, Szenen, Tafel, Christkindlmarkt)
 - `README.md` – diese Anleitung
 
 ## Einstellungen ändern
@@ -88,7 +135,9 @@ Alle veränderbaren Daten stehen in `config.json`. So änderst du sie:
 | `eisvogel` | Wie oft am Tag (`pro_tag`, zwischen 7 und 19 Uhr) und wie lange (`minuten`). |
 | `wetter` | `echt`: echtes Wetter an (`true`) oder aus (`false`). `aktualisieren_minuten`: wie oft das Wetter abgerufen wird (mindestens 5). |
 | `anzeige` | Rastergröße, Bildrate und interne Auflösung, siehe unten. `"auto"` passt sich dem Bildschirm an. |
-| `astro` | Schalter für die Himmelselemente: `planeten`, `mond_zeichen`, `kamm_punkte` (je `true` oder `false`). |
+| `astro` | Schalter für die Himmelselemente: `planeten`, `mond_zeichen`, `kamm_punkte` (je `true` oder `false`; Kamm-Punkte sind aus). |
+| `tafel` | Anzeigetafel: `an` (Wörter überhaupt), `stunden_wort` (Wort zur vollen Stunde), `rituale` (Uhrzeit → Wort, z. B. `"07:00": "SERVUS"`, zwei Zeilen mit `\|`). |
+| `markt` | Christkindlmarkt: `an`, `termine` (`"advent"` = alle Adventswochenenden, oder eine Liste wie `["11-28", "11-29"]`), `von`, `bis` (`"HH:MM"`). |
 | `astro_punkte` | Die Lichtpunkte auf dem Bergkamm, siehe „Himmel“. |
 | `entdecken` | Die kleinen Szenen (siehe „Entdecken“) an (`true`) oder aus (`false`). |
 
@@ -123,7 +172,12 @@ Automatik fürs Raster ab.
 (WebGL2), das ist auf schwachen Geräten viel schneller. Die gemalte Landschaft
 wird *asynchron* ausgelesen: Der Prozessor wartet nicht mehr auf die
 Grafikeinheit, sondern nimmt das Ergebnis ein Bild später (33 ms, unsichtbar).
-Genau dieses Warten hatte den Muse ausgebremst. Grafikchips rechnen mit
+Genau dieses Warten hatte den Muse ausgebremst.
+
+**Uhr und Zusätze:** Die Fallblatt-Uhr, die Vorhersage und die Advents- und
+Winterbilder werden nicht in jedem Bild neu gemalt, sondern in eigene
+Zwischenbilder, die nur jedes zweite bis sechste Bild erneuert werden. Klappt
+eine Ziffer um, wird jedes Bild neu gemalt, damit das Umklappen flüssig bleibt. Grafikchips rechnen mit
 etwas weniger Nachkommastellen: Im Pixelvergleich mit dem Original sind die
 meisten Momente identisch, sonst weichen einzelne Zellen um eine Farbstufe ab
 (unsichtbar). Ohne WebGL2 rechnet automatisch der Prozessor, dann exakt wie das
@@ -166,7 +220,7 @@ Kleines findet:
   jeden Tag anders.
 - Bei Regen oder Sturm gibt es keine Paddler, Flugzeuge oder Spaziergänger.
   Dann kommt eine andere Szene dieser Tageszeit.
-- Die Szenen verdecken nie den Strahl, die Pfähle oder den Dampfer. Sie suchen
+- Die Szenen verdecken nie den Strahl, den Dampfer oder die Uhr. Sie suchen
   sich einen Platz daneben, und was in den Strahl gerät, verschwindet im
   Glitzern.
 - Beim Pixelsturz um Mitternacht machen sie 85 Sekunden Pause.
@@ -195,13 +249,41 @@ ausschalten, für alle über `"entdecken": false` in `config.json`.
   etwa 3 Uhr Nachzügler. Am Neujahrsmorgen liegt Rauch über dem See, am Abend
   des 1.1. steigen noch vereinzelte Raketen.
 
-Strahl, Pfähle, Dampfer und Sonne bzw. Mond bleiben dabei immer frei und lesbar.
+Strahl, Dampfer, Uhr und Sonne bzw. Mond bleiben dabei immer frei.
 
 **Vorab ansehen:** Im Test-Modus springt **Seltenheit finden** zum nächsten
 besonderen Moment (Seltenheiten, Gespenst, Halloween, Heiligabend, Christkind,
 Silvester, Neujahrsfeuerwerk, Rauch, Regenbogen in der Feuerwehr-Fontäne).
 Jeder Moment kommt einmal dran; die Uhr läuft von dort aus weiter. **Jetzt**
 führt zurück.
+
+## Advent und Winter
+
+- **Adventskalender:** Am vorderen Ufer hängt eine Lichterkette mit 24 Lichtern;
+  am n-ten Dezember brennen n davon. Jeden Morgen um 7:30 öffnet sich ein Türl:
+  Das Motiv des Tages steigt leuchtend aus dem See, steht etwa 10 Minuten und
+  zerfällt dann in Funken. 24 Motive, eins pro Tag (am 6. der Nikolaus-Stiefel,
+  am 24. der große Stern).
+- **Christkindlmarkt auf der Fraueninsel:** warmer Schein über der Insel,
+  rot-grüne Budendächer, Lichter mit Spiegelung, Glühwein-Dampf, zwei Boote mit
+  Laternen pendeln. Standard: Adventswochenenden (Sa und So), 11–20 Uhr; Termine
+  und Zeiten in `config.json` (`markt`).
+- **Schneemann:** Liegt am Ort echter Schnee (ab 2 cm), steht am Morgen nach dem
+  ersten Schneetag ein Schneemann am Ufer, mit Schnee drumherum. Ab und zu
+  zwinkert er. Bei Tauwetter (Tage über 2 °C) schmilzt er in drei Stufen:
+  kleiner, Hut schief, zuletzt nur noch Hut und Karotte im Rest-Schnee.
+- **Eisstockschießen:** Nach mindestens 4 Eistagen in Folge (Höchstwert
+  höchstens 0 °C) friert die vordere Bucht zu, von 10 bis 16 Uhr wird darauf
+  Eisstock geschossen, am Wochenende schauen mehr Leute zu. Nach 2 Tagen über
+  3 °C taut das Eis wieder.
+- **Föhn:** klare Luft, tiefblauer Himmel, die Berge wirken größer und näher,
+  über ihnen stehen Föhnfische (linsenförmige Wolken). Erkannt wird Föhn, wenn
+  alles zusammenkommt: Wind aus Süd bis Südwest (140–250°), Böen ab etwa 30 km/h,
+  relative Feuchte höchstens etwa 55 %, mindestens 4 °C wärmer als im Mittel der
+  drei Tage davor und sehr gute Sicht (ab 30 km).
+
+Alle Grenzwerte (`WARN`, `FOEHN`, `SCHNEE`, `EIS`) stehen im Abschnitt „Echtes
+Wetter“ in `index.html`.
 
 ## Himmel
 
@@ -216,7 +298,8 @@ hellste Element.
 - **Mond in unseren Zeichen:** Steht der Mond im Sonnenzeichen eines
   Familiensterns, schimmert dieser Stern leise. Das Sonnenzeichen ergibt sich
   aus dem Geburtstag in `config.json`.
-- **Punkte auf dem Bergkamm:** Kleine Lichter für die nächsten
+- **Punkte auf dem Bergkamm** (seit der Fallblatt-Uhr ausgeschaltet, mit
+  `"kamm_punkte": true` wieder an): Kleine Lichter für die nächsten
   Astrokartographie-Linien der Familie. Osten links, Westen rechts; je näher die
   Linie am Chiemsee verläuft, desto näher zur Bildmitte und desto heller. Nachts
   sichtbar, tagsüber kaum. In `config.json` steht pro Punkt nur Stern, Planet,
@@ -275,10 +358,17 @@ Parameter werden an die Adresse angehängt: der erste mit `?`, weitere mit `&`.
 
 | Parameter | Wirkung |
 |---|---|
-| `?dev=1` | Test-Modus: Steuerleiste (Tag, Uhrzeit, Zeitraffer, Lesehilfe, Mitternacht ansehen, Seltenheit finden), Info-Zeile mit Wetter und Luftdruck-Trend, oben rechts die Bildrate. Ein Tipp aufs Bild blendet die Steuerung aus. |
+| `?dev=1` | Test-Modus: Steuerleiste (Tag, Uhrzeit, Zeitraffer, Mitternacht ansehen, Seltenheit finden), Info-Zeile mit Wetter, Luftdruck-Trend und allem, was gerade aktiv ist und warum (Vorhersage, Warnleuchte, Schneemann, Eis, Föhn, Markt, Tafel), oben rechts die Bildrate. Ein Tipp aufs Bild blendet die Steuerung aus. |
 | `?t=2026-12-24T17:30` | Zeit simulieren. Die Uhr läuft ab diesem Moment weiter. Auch möglich: `?t=17:30` (heute) oder `?t=0:00:20`. |
 | `?raster=`, `?fps=`, `?aufloesung=`, `?gpu=`, `?lesen=` | Anzeige für dieses Gerät, siehe „Anzeige und Leistung“. |
 | `?entdecken=0` | Die kleinen Szenen für dieses Gerät aus (`1` = an). |
+| `?vorhersage=regen:6:2,schnee:1:-2,frost:3:-5` | Vorhersage für die nächsten drei Tage erzwingen (Name:Höchst:Tiefst; Namen `klar`, `heiter`, `wolke`, `regen`, `schnee`, `gewitter`, `frost`). Der erste Tag steuert auch die Hinweise für morgen. |
+| `?warn=1` bzw. `?warn=2` | Sturmwarnleuchte: Vorwarnung bzw. Sturmwarnung (`0` = aus). |
+| `?schnee=1` | Schneemann und Schnee am Ufer (`2`, `3`, `4` = die Schmelzstufen). |
+| `?eis=1` | Zugefrorene Bucht, Eisstockschießen (10–16 Uhr). |
+| `?foehn=1` | Föhn. |
+| `?markt=1` | Christkindlmarkt (unabhängig vom Termin). |
+| `?tafel=GUAD\|NACHT` | Die Tafel zeigt dieses Wort 15 s lang (zwei Zeilen mit `\|`, Seiten mit `/`). |
 | `?wetter=gewitter` | Wetter erzwingen: `gewitter`, `regen`, `nebel`, `klar`, `schnee`, `bedeckt`, `hochnebel`, `sturm` oder `regenbogen`. Gewitter, Regen und Sturm kommen mit fallendem Luftdruck. |
 
 Beispiele:
@@ -286,15 +376,19 @@ Beispiele:
 - `https://maxslobster.github.io/lichtzeit/?dev=1`
 - `https://maxslobster.github.io/lichtzeit/?t=2026-12-24T18:00&wetter=schnee`
 - `https://maxslobster.github.io/lichtzeit/?t=23:58&dev=1` – zwei Minuten vor dem Pixelsturz
+- `https://maxslobster.github.io/lichtzeit/?dev=1&t=2026-12-06T07:29:55` – das Türl am Nikolaustag
+- `https://maxslobster.github.io/lichtzeit/?dev=1&t=2027-01-14T14:00&eis=1&schnee=1` – Eisstock und Schneemann
 
 ## Stand
 
-Lichtzeit ist fertig und läuft. Die Kontroll-Screenshots der Abnahme (Mittag,
-Sonnenuntergang, 23:50, 0:00:20, Gewitter, Nebel, Schnee, Heiligabend) liegen
-lokal in `gazers/abnahme/`.
+Lichtzeit ist fertig und läuft. Die Kontroll-Screenshots der ersten Abnahme
+liegen lokal in `gazers/abnahme/`, die der Fallblatt-Uhr (November 2026) in
+`gazers/abnahme/fallblatt/`. Der Stand davor ist als Git-Tag `v-vor-fallblatt`
+gesichert.
 
 Seit Oktober 2026 weicht das Bild bewusst vom ursprünglichen Prototyp
 `lichtzeit.html` ab: Die Pixel-Effekte sind seltener und schwächer, und es gibt
-die Szenen zum Entdecken. Alles andere ist unverändert. Geprüft wird das mit
+die Szenen zum Entdecken; seit November 2026 zeigt eine Fallblatt-Uhr die Zeit
+statt der Pfähle. Geprüft wird das mit
 einem Pixelvergleich gegen den jeweils vorherigen Stand (Werkzeuge in
 `gazers/werkzeuge/tests/`).
