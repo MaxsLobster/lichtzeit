@@ -1718,7 +1718,9 @@ function zusatzText(C){if(!C)return '';const out=[],d=C.d,F=vorhersage(d),f0=F[0
 // Wird beim Start geladen. Fehlt ein Eintrag, gilt der eingebaute Standard. Ist einer fehlerhaft, ebenfalls, mit Hinweis in der Info-Zeile.
 // Einträge, die mit "_" beginnen, sind Notizen und werden ignoriert.
 let ORT='Chiemsee',WETTER={echt:true,min:15},CFG_INFO='',started=false;
-const CFG_KEYS=['ort','familie','hochzeitstag','feuerwehrboot','eisvogel','wetter','anzeige','astro','astro_punkte','entdecken','tafel','markt'];
+// Wetter-Ort (config.json "wetter_ort"): nur für die Open-Meteo-Abrufe (Wetter, Vorhersage, Schnee, Eis, Föhn). Sonne, Mond, Planeten und Titel bleiben am Bild-Ort ("ort"). Fehlt er, gilt "ort".
+let WORT=null,WLAT=null,WLNG=null;const wLat=()=>WLAT===null?LAT:WLAT,wLng=()=>WLNG===null?LNG:WLNG,wName=()=>WLAT===null?ORT:(WORT||ORT);
+const CFG_KEYS=['ort','wetter_ort','familie','hochzeitstag','feuerwehrboot','eisvogel','wetter','anzeige','astro','astro_punkte','entdecken','tafel','markt'];
 const pMMDD=v=>{const m=/^(\d{1,2})-(\d{1,2})$/.exec(String(v).trim());if(!m)return null;const a=+m[1],b=+m[2];return a>=1&&a<=12&&b>=1&&b<=31?String(a).padStart(2,'0')+'-'+String(b).padStart(2,'0'):null;};
 const pDatum=v=>v===''?'':pMMDD(v); // leer = kein Goldtag
 const pUhr=v=>{const m=/^(\d{1,2}):(\d{2})$/.exec(String(v).trim());if(!m)return null;const a=+m[1],b=+m[2];return b<60&&a*60+b<=1440?a*60+b:null;};
@@ -1731,6 +1733,8 @@ function applyConfig(j){const bad=[],notes=[],obj=v=>!!v&&typeof v==='object'&&!
   const part=(k,fn)=>{if(j[k]===undefined)return;if(!obj(j[k])){bad.push(k);return;}fn(j[k]);};
   if(!obj(j)){CFG_INFO='config.json hat nicht das erwartete Format, Standardwerte aktiv';return;}
   part('ort',o=>{ORT=or(take(o.name,pText,'ort.name'),ORT);LAT=or(take(o.breite,pZahl(-90,90),'ort.breite'),LAT);LNG=or(take(o.laenge,pZahl(-180,180),'ort.laenge'),LNG);});
+  part('wetter_ort',o=>{const b=take(o.breite,pZahl(-90,90),'wetter_ort.breite'),l=take(o.laenge,pZahl(-180,180),'wetter_ort.laenge');
+    if(b===undefined||l===undefined){if(b!==undefined||l!==undefined)bad.push('wetter_ort (breite und laenge nötig)');return;}WLAT=b;WLNG=l;WORT=or(take(o.name,pText,'wetter_ort.name'),null);});
   if(j.familie!==undefined){if(!Array.isArray(j.familie))bad.push('familie');else{
     FAMILIE=FAMILIE.map((def,k)=>{const p=j.familie[k],nm='familie '+(k+1);if(p===undefined)return def;if(!obj(p)){bad.push(nm);return def;}
       const q={...def};q.name=or(take(p.name,pText,nm+' name'),q.name);q.geburtstag=or(take(p.geburtstag,pDatum,nm+' geburtstag'),q.geburtstag);
@@ -1782,7 +1786,10 @@ const HOCHNEBEL={tief_ab:70,mittel_bis:50,druck_ab:1016}; // tiefe Wolken ab %, 
 const BARO={stunden:3,steigt:1,faellt:-1,stark:-4,ruhe:0.4,unruhe:0.35,sturm:0.8}; // Druckänderung in hPa über 3 h (stark = Luftdruck-Absturz); ruhe/unruhe/sturm = wie stark das Raster reagiert
 const STURM={wind_ab:50,boeen_ab:62};  // km/h: ab diesem mittleren Wind oder diesen Böen gilt es als Sturm (Böen ab 62 km/h = Windstärke 8)
 const WARN={vor:46,sturm:63,stunden_vor:1,stunden_nach:3}; // Sturmwarnleuchte wie am Chiemsee: Böen ab 46 km/h (25 kn) Vorwarnung, ab 63 km/h (34 kn) Sturmwarnung; höchste Böe der letzten Stunde und der nächsten 3
-const FOEHN={richtung_von:140,richtung_bis:250,boeen_ab:30,feuchte_bis:55,waermer_um:4,sicht_ab:30000}; // Wind aus S bis SW (Grad), Böen km/h, rel. Feuchte %, °C wärmer als im Mittel der 3 Tage davor (Höchstwerte), Sicht m
+// Nebel ohne Sichtweite (DWD liefert sie ab Dezember 2026 nicht mehr): sehr feuchte Luft, kaum Wind, tiefe Wolken, wenig Niederschlag.
+// Abgeglichen am 19.11.2026 mit 60 Tagen Open-Meteo (Moosen): vormittags 216 von 250 Nebelstunden getroffen, 21 Fehlalarme, 35 von 38 Nebelvormittagen.
+const NEBEL_FEUCHT={feuchte_ab:92,feuchte_voll:99,wind_bis:8,wind_aus:15,tief_ab:40,staerke:0.8}; // rel. Feuchte %, Wind km/h (darüber kein Nebel), tiefe Wolken %, höchste Nebelstärke
+const FOEHN={richtung_von:140,richtung_bis:250,boeen_ab:30,feuchte_bis:55,waermer_um:4,sicht_ab:30000,fenster_tief_bis:30}; // Wind aus S bis SW (Grad), Böen km/h, rel. Feuchte %, °C wärmer als im Mittel der 3 Tage davor (Höchstwerte), Sicht m; ohne Sicht: tiefe Wolken höchstens % (Föhnfenster)
 const SCHNEE={hoehe_ab:0.02,tau_ab:2};  // Schneemann: ab 2 cm Schneehöhe; Tage mit Höchstwert über 2 °C lassen ihn schmelzen (3 Stufen)
 const EIS={tage:4,eistag_bis:0,tau_ab:3,tau_tage:2}; // Bucht friert nach 4 Eistagen in Folge (Höchstwert ≤ 0 °C), taut nach 2 Tagen mit Höchstwert über 3 °C
 const REGENBOGEN={sonne_min:2,sonne_max:42,wolken_max:85,nach_regen_h:2,regen_max:0.45}; // Sonnenhöhe in Grad, Bewölkung in %, wie lange nach dem Regen (h), bis zu welcher Regenstärke schon währenddessen (Sonnenregen)
@@ -1799,12 +1806,13 @@ function wxDerive(r,per){const code=r.code;if(code===null||!isFinite(r.t))return
   const snow=Math.max(snowCm>0.02?clamp(0.25+0.4*Math.sqrt(snowCm),0,1):0,snowC?0.3:0);      // cm/h -> Schneefall
   const wtype=thunder?3:rainC?4:(snowC||fog||code===3)?2:(code===1||code===2)?1:code===0?0:cloud<20?0:cloud<60?1:2;
   const mistV=r.vis===null?0:1-smooth(1000,6000,r.vis);                                       // schlechte Sicht -> Nebel
+  const N=NEBEL_FEUCHT,mistF=r.vis!==null||r.rh===null||r.rh===undefined||r.wind===null?0:N.staerke*smooth(N.feuchte_ab,N.feuchte_voll,r.rh)*(1-smooth(N.wind_bis,N.wind_aus,r.wind))*(r.low===null||r.low===undefined?1:smooth(N.tief_ab-20,N.tief_ab,r.low)); // ohne Sichtweite: Nebel aus Feuchte und Wind
   // Bedeckt: geschlossene Wolkendecke. Hochnebel: bedeckt, aber nur tiefe Wolken, hoher Luftdruck und kein Niederschlag
   const low=r.low===undefined?null:r.low,oben=r.mid||0,bedeckt=thunder?0:smooth(BEDECKT_AB-5,BEDECKT_AB+5,cloud);
   const hn=bedeckt*(low===null?0:smooth(HOCHNEBEL.tief_ab-15,HOCHNEBEL.tief_ab+5,low))*(1-smooth(HOCHNEBEL.mittel_bis,HOCHNEBEL.mittel_bis+30,oben))*(r.p===null?0:smooth(HOCHNEBEL.druck_ab-4,HOCHNEBEL.druck_ab+2,r.p))*(rain<0.05&&snow<0.05?1:0);
   return{t:r.t,code,wtype,cloud,rain,snow,mm:liq,low,oben,bedeckt,hn,
     storm:thunder?0.7:wtype===4?0.35+0.25*rain:snow>0?0.3:wtype===2?0.15:0,
-    mist:Math.max(fog?0.75:0,mistV*(rain>0.1||snow>0.1?0.5:1)),
+    mist:Math.max(fog?0.75:0,(mistV+mistF)*(rain>0.1||snow>0.1?0.5:1)),nebelQ:r.vis!==null?'Sicht':mistF>0?'Feuchte':'',
     wind:r.wind===null?0:clamp((r.wind-WIND_RUHIG)/(WIND_STURM-WIND_RUHIG),0,1),kmh:r.wind,gust:r.gust===undefined?null:r.gust,th:thunder?1:0,temp:r.temp,p:r.p,
     sturm:Math.max(r.wind===null?0:smooth(STURM.wind_ab-8,STURM.wind_ab,r.wind),r.gust===null||r.gust===undefined?0:smooth(STURM.boeen_ab-8,STURM.boeen_ab,r.gust)),
     sd:r.sd===undefined?null:r.sd,rh:r.rh===undefined?null:r.rh,wd:r.wd===undefined?null:r.wd,vis:r.vis===undefined?null:r.vis};}
@@ -1820,7 +1828,7 @@ function wxBuild(j){const h=j&&j.hourly,c=j&&j.current;if(!h||!Array.isArray(h.t
 // Zwischen zwei Messwerten weich überblenden, damit sich das Bild nicht sprunghaft ändert
 function wxSeg(ts){const S=WX.S;if(ts<S[0].t||ts>S[S.length-1].t)return null;let i=0;while(i<S.length-2&&S[i+1].t<ts)i++;const a=S[i],b=S[Math.min(i+1,S.length-1)];return{a,b,u:b.t>a.t?clamp((ts-a.t)/(b.t-a.t),0,1):0};}
 const wxNum=(g,k)=>g.a[k]===null?g.b[k]:g.b[k]===null?g.a[k]:lerp(g.a[k],g.b[k],g.u);
-function wxCalc(ts){if(WX_FORCE)return WX_FORCE;if(!WX||!WETTER.echt||WX.lat!==LAT||WX.lng!==LNG||Date.now()-WX.fetched>WX_MAX_ALTER_H*36e5)return null;
+function wxCalc(ts){if(WX_FORCE)return WX_FORCE;if(!WX||!WETTER.echt||WX.lat!==wLat()||WX.lng!==wLng()||Date.now()-WX.fetched>WX_MAX_ALTER_H*36e5)return null;
   const g=wxSeg(ts);if(!g)return null;const n=g.u<0.5?g.a:g.b,o={code:n.code,wtype:n.wtype};
   for(const k of['cloud','low','oben','bedeckt','hn','rain','snow','mm','storm','mist','wind','kmh','gust','sturm','th','temp','p','sd','rh','vis'])o[k]=g.a[k]===undefined&&g.b[k]===undefined?null:wxNum(g,k);
   o.wd=n.wd===undefined?null:n.wd;o.foehn=foehnWert(o,ts); // Windrichtung: nächster Messwert (nicht über 360° hinweg mitteln)
@@ -1831,9 +1839,10 @@ function wxCalc(ts){if(WX_FORCE)return WX_FORCE;if(!WX||!WETTER.echt||WX.lat!==L
     bow*=1-smooth(REGENBOGEN.wolken_max-10,REGENBOGEN.wolken_max+5,o.cloud);}
   o.bow=bow;return wxExtras(o);}
 // Föhn: Wind aus S bis SW mit spürbaren Böen, trockene Luft, deutlich wärmer als die Tage davor, sehr gute Sicht (alle Bedingungen zusammen)
+// Ohne Sichtweite (ab Dezember 2026) steht dafür das Föhnfenster: höchstens wenige tiefe Wolken und kein Niederschlag.
 function foehnWert(o,ts){if(o.wd===null||o.rh===null||o.gust===null||o.temp===null)return 0;const D=WX&&WX.D||[],k=dayKey(wall(ts)),i=D.findIndex(x=>x.dk===k);
   if(i<3)return 0;const vor=(D[i-1].max+D[i-2].max+D[i-3].max)/3,waerme=Math.max(o.temp,D[i].max)-vor;o.foehnWarm=waerme;
-  const r=o.wd>=FOEHN.richtung_von&&o.wd<=FOEHN.richtung_bis?1:0,sicht=o.vis===null?1:smooth(FOEHN.sicht_ab*0.8,FOEHN.sicht_ab,o.vis);
+  const r=o.wd>=FOEHN.richtung_von&&o.wd<=FOEHN.richtung_bis?1:0,sicht=o.vis!==null?smooth(FOEHN.sicht_ab*0.8,FOEHN.sicht_ab,o.vis):(o.low===null?1:1-smooth(FOEHN.fenster_tief_bis,FOEHN.fenster_tief_bis+30,o.low))*(o.mm!==null&&o.mm>0.1?0:1);
   return r*smooth(FOEHN.boeen_ab-5,FOEHN.boeen_ab+5,o.gust)*(1-smooth(FOEHN.feuchte_bis-5,FOEHN.feuchte_bis+5,o.rh))*smooth(FOEHN.waermer_um-1,FOEHN.waermer_um+1,waerme)*sicht;}
 // Druck-Trend, Unruhe des Rasters und See-Farbton
 function wxExtras(o){const dp=o.dp;
@@ -1850,18 +1859,18 @@ const WX_FORCE=(()=>{const k=(Q.get('wetter')||'').trim().toLowerCase(),x=WX_PRE
 function wxAt(ts){if(ts!==WXM.ts){WXM.ts=ts;WXM.v=wxCalc(ts);}return WXM.v;}
 function wxText(d){const w=wxAt(instant(d)),f=(v,n=0)=>v===null?'?':v.toFixed(n).replace('.',',');
   if(!w)return 'Wetter: '+WT[wtypeOf(d)]+' (simuliert'+(!WETTER.echt?', echtes Wetter aus':WX_ERR?', '+WX_ERR:'')+')';
-  const name=w.wtype===3?'Gewitter':w.sturm>0.5?'Sturm':w.snow>0.05?'Schnee':w.rain>0.05?'Regen':(w.code===45||w.code===48)?'Nebel':w.hn>0.5?'Hochnebel':w.bedeckt>0.5?'bedeckt':WT[w.wtype];
-  return (WX_FORCE?'Wetter (erzwungen mit ?wetter='+WX_FORCE.name+')':'Wetter (echt, Stand '+new Date(WX.fetched+CLOCK_OFF).toLocaleTimeString('de-DE',{timeZone:TZ,hour:'2-digit',minute:'2-digit'})+(WX_ERR?', '+WX_ERR:'')+')')+': '+name+', '+f(w.temp)+' °C, Wolken '+f(w.cloud)+' %'+(w.low!==null&&w.low!==undefined?' (tief '+f(w.low)+' %, mittel '+f(w.oben)+' %)':'')+', '+(w.mm>0.05?'Niederschlag '+f(w.mm,1)+' mm/h, ':'')+'Wind '+f(w.kmh)+' km/h'+(w.gust!==null&&w.gust!==undefined?' (Böen '+f(w.gust)+')':'')+', Luftdruck '+f(w.p)+' hPa'+(w.dp!==null?', '+w.trend+' ('+(w.dp>0?'+':'')+f(w.dp,1)+' hPa in '+BARO.stunden+' h)':'');}
-function wxLoad(){try{const c=JSON.parse(localStorage.getItem(WX_KEY)||'null');if(c&&c.lat===LAT&&c.lng===LNG&&c.j){WX={fetched:c.fetched,lat:LAT,lng:LNG,S:wxBuild(c.j),D:wxTage(c.j)};WXM.ts=NaN;}}catch(e){}}
+  const name=w.wtype===3?'Gewitter':w.sturm>0.5?'Sturm':w.snow>0.05?'Schnee':w.rain>0.05?'Regen':(w.code===45||w.code===48||w.mist>0.4)?'Nebel':w.hn>0.5?'Hochnebel':w.bedeckt>0.5?'bedeckt':WT[w.wtype];
+  return (WX_FORCE?'Wetter (erzwungen mit ?wetter='+WX_FORCE.name+')':'Wetter (echt, '+wName()+', Stand '+new Date(WX.fetched+CLOCK_OFF).toLocaleTimeString('de-DE',{timeZone:TZ,hour:'2-digit',minute:'2-digit'})+(WX_ERR?', '+WX_ERR:'')+')')+': '+name+', '+f(w.temp)+' °C, Wolken '+f(w.cloud)+' %'+(w.low!==null&&w.low!==undefined?' (tief '+f(w.low)+' %, mittel '+f(w.oben)+' %)':'')+', '+(w.mm>0.05?'Niederschlag '+f(w.mm,1)+' mm/h, ':'')+'Wind '+f(w.kmh)+' km/h'+(w.gust!==null&&w.gust!==undefined?' (Böen '+f(w.gust)+')':'')+', Sicht '+(w.vis!==null?f(w.vis/1000)+' km':'fehlt (Nebel aus Feuchte '+f(w.rh)+' %)')+', Luftdruck '+f(w.p)+' hPa'+(w.dp!==null?', '+w.trend+' ('+(w.dp>0?'+':'')+f(w.dp,1)+' hPa in '+BARO.stunden+' h)':'');}
+function wxLoad(){try{const c=JSON.parse(localStorage.getItem(WX_KEY)||'null');if(c&&c.lat===wLat()&&c.lng===wLng()&&c.j){WX={fetched:c.fetched,lat:wLat(),lng:wLng(),S:wxBuild(c.j),D:wxTage(c.j)};WXM.ts=NaN;}}catch(e){}}
 function wxFetch(){if(!WETTER.echt)return Promise.resolve();let tm=0;
   const done=()=>{clearTimeout(tm);setTimeout(wxFetch,(WX_ERR?Math.min(5,WETTER.min):WETTER.min)*6e4);},fail=e=>{WX_ERR='Abruf fehlgeschlagen: '+(e.name==='AbortError'?'Zeitüberschreitung':e instanceof TypeError?'keine Verbindung':e.message);console.warn(WX_ERR);};
   try{const ctl=window.AbortController?new AbortController():null;tm=setTimeout(()=>{if(ctl)ctl.abort();},15000);
-    const url='https://api.open-meteo.com/v1/forecast?latitude='+LAT+'&longitude='+LNG+'&current='+WX_VARS+'&hourly='+WX_VARS+'&daily='+WX_TAGE+'&past_hours=24&forecast_hours=24&past_days=7&forecast_days=4&timezone=Europe%2FBerlin&timeformat=unixtime';
+    const url='https://api.open-meteo.com/v1/forecast?latitude='+wLat()+'&longitude='+wLng()+'&current='+WX_VARS+'&hourly='+WX_VARS+'&daily='+WX_TAGE+'&past_hours=24&forecast_hours=24&past_days=7&forecast_days=4&timezone=Europe%2FBerlin&timeformat=unixtime';
     return fetch(url,{cache:'no-store',signal:ctl?ctl.signal:undefined})
       .then(r=>{if(!r.ok)throw new Error('HTTP '+r.status);return r.json();})
-      .then(j=>{const S=wxBuild(j),now=Date.now();WX={fetched:now,lat:LAT,lng:LNG,S,D:wxTage(j)};WXM.ts=NaN;WX_ERR='';
+      .then(j=>{const S=wxBuild(j),now=Date.now();WX={fetched:now,lat:wLat(),lng:wLng(),S,D:wxTage(j)};WXM.ts=NaN;WX_ERR='';
         // Ohne Server-Zeitstempel: grobe Uhrprüfung über den 15-Minuten-Zeitpunkt der Wetterdaten (nur bei mehr als 20 min Abweichung)
-        const ct=j.current&&j.current.time;if(CLOCK_SRC!=='Server'&&typeof ct==='number'){const off=ct*1000+450e3-now;if(Math.abs(off)>20*6e4){CLOCK_OFF=off;CLOCK_SRC='Wetterdaten';}}try{localStorage.setItem(WX_KEY,JSON.stringify({fetched:now,lat:LAT,lng:LNG,j}));}catch(e){}})
+        const ct=j.current&&j.current.time;if(CLOCK_SRC!=='Server'&&typeof ct==='number'){const off=ct*1000+450e3-now;if(Math.abs(off)>20*6e4){CLOCK_OFF=off;CLOCK_SRC='Wetterdaten';}}try{localStorage.setItem(WX_KEY,JSON.stringify({fetched:now,lat:wLat(),lng:wLng(),j}));}catch(e){}})
       .catch(fail).then(done);}
   catch(e){fail(e);done();return Promise.resolve();}}
 

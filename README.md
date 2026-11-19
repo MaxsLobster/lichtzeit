@@ -65,9 +65,12 @@ die stärkste Böe der letzten Stunde und der nächsten drei Stunden.
 
 ## Wetter und Barometer
 
-Lichtzeit holt alle 15 Minuten das echte Wetter am Chiemsee von
+Lichtzeit holt alle 15 Minuten das echte Wetter von
 [Open-Meteo](https://open-meteo.com) (kostenlos, ohne Anmeldung) und übersetzt
-es ins Bild:
+es ins Bild. Abgerufen wird am **Wetter-Ort** aus `config.json` (`wetter_ort`,
+derzeit Moosen bei Riedering). Fehlt der Eintrag, gilt der Bild-Ort (`ort`,
+Chiemsee). Wetter, Vorhersage, Schneemann, Eis und Föhn kommen vom Wetter-Ort;
+Sonne, Mond, Planeten und der Titel bleiben am Chiemsee.
 
 - **Wolken** – je mehr Bewölkung, desto mehr und größere Wolken; unter 10 % ist der Himmel ganz klar
 - **Bedeckt** (ab etwa 85 % Bewölkung) – geschlossene graue Decke, gedämpfte Farben, statt der Sonnenscheibe nur ein schwacher heller Fleck; der Strahl bleibt weich, aber ablesbar
@@ -75,7 +78,12 @@ es ins Bild:
 - **Regen** – Pixelregen und Regenschleier, Pixel „tropfen“
 - **Schnee** – fallende Flocken
 - **Wind** – Pixel verwehen, Böenfelder auf dem See, Schilf wiegt sich
-- **Nebel, schlechte Sicht** – Pixel lösen sich auf
+- **Nebel, schlechte Sicht** – Pixel lösen sich auf (nur am Vormittag, bis die
+  Sonne ihn auflöst). Erkannt an der Sichtweite oder am Nebel-Wettercode. Der
+  Deutsche Wetterdienst liefert die Sichtweite ab Dezember 2026 nicht mehr.
+  Fehlt sie, erkennt Lichtzeit Nebel an sehr feuchter Luft (ab etwa 92 %, voll
+  bei 99 %), kaum Wind (unter etwa 8–15 km/h) und tiefen Wolken (ab etwa 40 %).
+  Im Abgleich mit 60 Tagen echter Daten traf das 35 von 38 Nebelvormittagen.
 - **Gewitter** – Glitch und Blitze. Kündigt sich ein Gewitter an, türmen sich die Wolken schon vorher auf.
 - **Sturm** – ab etwa 50 km/h Wind oder Böen ab 62 km/h (Windstärke 8) fliegen die Pixel
 - **Regenbogen** – bis zu 2 Stunden nach einem Regen oder bei Sonnenregen
@@ -91,7 +99,7 @@ Der letzte Stand wird im Browser gespeichert. Ist kein Internet da, läuft das
 Bild mit diesem Stand weiter. Ist er älter als 6 Stunden oder gibt es keinen,
 zeigt Lichtzeit das eingebaute, simulierte Wetter. Das Bild ist nie leer.
 
-Die Grenzwerte (Wind, Sturm, Bedeckt, Hochnebel, Barometer, Regenbogen, See-Farbton) stehen gesammelt
+Die Grenzwerte (Wind, Sturm, Bedeckt, Hochnebel, Nebel ohne Sichtweite, Barometer, Regenbogen, Föhn, See-Farbton) stehen gesammelt
 oben im Abschnitt „Echtes Wetter“ in `index.html`.
 
 ## Pixel-Effekte
@@ -130,7 +138,8 @@ Alle veränderbaren Daten stehen in `config.json`. So änderst du sie:
 
 | Eintrag | Bedeutung |
 |---|---|
-| `ort` | Name und Koordinaten. Bestimmen Sonnen- und Mondstand. |
+| `ort` | Name und Koordinaten des Bildes. Bestimmen Sonnen- und Mondstand, Planeten und den Titel. |
+| `wetter_ort` | Name und Koordinaten (`breite`, `laenge`) für das echte Wetter, die Vorhersage, Schneemann, Eis und Föhn. Fehlt der Eintrag, gilt `ort`. Es braucht beide Koordinaten, sonst gilt ebenfalls `ort`. |
 | `familie` | Die drei Sterne. Die ersten beiden rücken am Hochzeitstag zusammen. Der dritte ist der kleine Stern: Mit `geburtsjahr` wächst er bis zum 18. Geburtstag. Am Geburtstag leuchtet der Stern golden. |
 | `hochzeitstag` | An diesem Tag leuchten die ersten beiden Sterne golden. |
 | `feuerwehrboot` | Zeitfenster (`von`, `bis`) und Dauer in `minuten`. Die genaue Uhrzeit wird jeden Tag neu ausgelost. |
@@ -282,7 +291,10 @@ führt zurück.
   über ihnen stehen Föhnfische (linsenförmige Wolken). Erkannt wird Föhn, wenn
   alles zusammenkommt: Wind aus Süd bis Südwest (140–250°), Böen ab etwa 30 km/h,
   relative Feuchte höchstens etwa 55 %, mindestens 4 °C wärmer als im Mittel der
-  drei Tage davor und sehr gute Sicht (ab 30 km).
+  drei Tage davor und sehr gute Sicht (ab 30 km). Ohne Sichtweite (ab Dezember
+  2026) zählt stattdessen das Föhnfenster: höchstens etwa 30 % tiefe Wolken und
+  kein Niederschlag. In 14 Monaten Archivdaten erkannten beide Wege genau
+  dieselben Stunden.
 
 Alle Grenzwerte (`WARN`, `FOEHN`, `SCHNEE`, `EIS`) stehen im Abschnitt „Echtes
 Wetter“ in `index.html`.

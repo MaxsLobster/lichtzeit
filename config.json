@@ -1,5 +1,6 @@
 {
   "ort": { "name": "Chiemsee", "breite": 47.87, "laenge": 12.43 },
+  "wetter_ort": { "name": "Moosen (Riedering)", "breite": 47.86, "laenge": 12.26, "_notiz": "nur für Wetter, Vorhersage, Schnee, Eis und Föhn; Sonne, Mond, Planeten und Titel bleiben bei ort. Fehlt der Eintrag, gilt ort." },
   "familie": [
     { "name": "Stern 1", "geburtstag": "06-19" },
     { "name": "Stern 2", "geburtstag": "05-17" },
