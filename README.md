@@ -1,7 +1,7 @@
 # Lichtzeit
 
-Ein generatives Kunstwerk: ein Pixel-Raster-Bild vom Chiemsee mit einer
-**Fallblatt-Uhr**, Wetter, Mondphase und Jahreslauf. Es läuft dauerhaft im Browser, gedacht
+Ein generatives Kunstwerk: ein Pixel-Raster-Bild vom Chiemsee (an drei Tagen pro Woche
+von der Höri am Untersee) mit einer **Fallblatt-Uhr**, Wetter, Mondphase und Jahreslauf. Es läuft dauerhaft im Browser, gedacht
 für einen 32-Zoll Muse Frame im Hochformat.
 
 **Adresse:** https://maxslobster.github.io/lichtzeit/
@@ -125,10 +125,43 @@ Das klare Bild ist der Normalfall. Harte Pixel-Effekte sind selten und kurz:
 Im Test-Modus (`?dev=1`) steht in der Info-Zeile, welcher Effekt gerade wirkt
 und welche zurückgestellt sind.
 
+## Zwei Bildorte: Chiemsee und Höri
+
+Lichtzeit zeigt an vier Tagen pro Woche den **Chiemsee** und an drei Tagen die **Höri**:
+den Blick über den Untersee nach Steckborn in der Schweiz, vorne eine Wiese mit Hecke
+und eine große Eiche.
+
+- **Wann welcher Ort:** Jede Woche (Montag bis Sonntag) werden drei Tage für die Höri
+  ausgelost. Der Zufall hängt nur von Kalenderwoche und Jahr ab, deshalb zeigt jedes Gerät
+  dasselbe, auch nach dem Neuladen. Ein Tag geht von 4:00 bis 4:00, gewechselt wird nachts
+  um 4 Uhr, auch ohne Neuladen. An den Festtagen (24. bis 26. Dezember, Silvester, Neujahr)
+  ist immer Chiemsee, weil die Feste dort stattfinden. Feste Tage aus `config.json`
+  (`feste_tage`) kommen zu den ausgelosten Tagen dazu.
+- **Gleich an beiden Orten:** Fallblatt-Uhr, Tafel, 3-Tage-Vorhersage, Wetter (aus
+  Moosen), Sonne und Mond, Wolkenschatten, Föhn, Alpenglühen, Advent, Schnee und
+  Schneemann, Sturmwarnleuchte, Silvester.
+- **Höri:** Die Eiche trägt Laub nach Jahreszeit (frisch, Sommer, Gold, braun, kahl) und
+  wirft einen Schatten wie eine Sonnenuhr. Sonne und Mond verschwinden hinter der Krone.
+  Auf dem See ist meist Ruhe, ab und zu kommt etwas vorbei:
+  - das **Schiff der URh** (Untersee und Rhein), in der Saison (etwa 10. April bis 20. Oktober) jede Stunde von 9 bis 19 Uhr
+    um :10, gerade Stunden nach Stein am Rhein (rechts), ungerade nach Konstanz (links); im
+    Winter nur um 11:10 und 14:10;
+  - **Segler**, je mehr Wind, desto öfter (bei Flaute, Regen oder Sturm keiner), an
+    sonnigen Sommerwochenenden nachmittags auch zwei;
+  - **Schwäne** (Mai bis Juli mit Küken), ein **Haubentaucher**, der abtaucht, ein
+    **Ruderer** am Morgen, der **Fischer** im Morgengrauen (Montag bis Samstag) mit Möwen,
+    ein **Kormoran** auf der Boje, der bei Sonne die Flügel ausbreitet;
+  - am Himmel **Möwen**, im Winterhalbjahr **Wildgänse**, im Sommer abends **Schwalben**;
+  - ein **Eichhörnchen** am Stamm, im Herbst fallen Eicheln.
+- **Nur am Chiemsee:** Raddampfer, Eis und Eisstock, Christkindlmarkt, Kirchenglocken,
+  Feuerwehrboot und Eisvogel, die Szenen zum Entdecken, die Oktober-Gespenster und das
+  Pixel-Sortieren zur Blauen Stunde. Um 7 Uhr grüßt die Tafel auf der Höri mit
+  `SERVUS HÖRI`.
+
 ## Dateien
 
 - `index.html` – das Kunstwerk (eine Datei, ohne Build-Werkzeuge)
-- `config.json` – Einstellungen (Ort, Familie, Termine, Wetter, Anzeige, Himmel, Szenen, Tafel, Christkindlmarkt)
+- `config.json` – Einstellungen (Ort, Orte-Wechsel, Familie, Termine, Wetter, Anzeige, Himmel, Szenen, Tafel, Christkindlmarkt)
 - `README.md` – diese Anleitung
 - `manifest.webmanifest`, `sw.js`, `icon-192.png`, `icon-512.png` – damit Lichtzeit
   als App im Vollbild läuft (siehe „Als App am Muse“)
@@ -144,6 +177,7 @@ Alle veränderbaren Daten stehen in `config.json`. So änderst du sie:
 | Eintrag | Bedeutung |
 |---|---|
 | `ort` | Name und Koordinaten des Bildes. Bestimmen Sonnen- und Mondstand, Planeten und den Titel. |
+| `orte` | Wechsel der Bildorte: `wechsel` (`false` = immer Chiemsee), `andere_tage_pro_woche` (Standard 3), `andere` (Liste der anderen Orte, bisher nur `"hoeri"`; bei mehreren kommen sie reihum dran), `feste_tage` (Datum `"JJJJ-MM-TT"` → Ort, z. B. `"2026-11-20": "hoeri"`; zusätzlich zu den ausgelosten Tagen). Unbekannte Namen werden ignoriert und in der Info-Zeile gemeldet. |
 | `wetter_ort` | Name und Koordinaten (`breite`, `laenge`) für das echte Wetter, die Vorhersage, Schneemann, Eis und Föhn. Fehlt der Eintrag, gilt `ort`. Es braucht beide Koordinaten, sonst gilt ebenfalls `ort`. |
 | `familie` | Die drei Sterne. Die ersten beiden rücken am Hochzeitstag zusammen. Der dritte ist der kleine Stern: Mit `geburtsjahr` wächst er bis zum 18. Geburtstag. Am Geburtstag leuchtet der Stern golden. |
 | `hochzeitstag` | An diesem Tag leuchten die ersten beiden Sterne golden. |
@@ -426,8 +460,10 @@ Parameter werden an die Adresse angehängt: der erste mit `?`, weitere mit `&`.
 
 | Parameter | Wirkung |
 |---|---|
-| `?dev=1` | Test-Modus: Steuerleiste (Tag, Uhrzeit, Zeitraffer, Mitternacht ansehen, Seltenheit finden), Info-Zeile mit Wetter, Luftdruck-Trend und allem, was gerade aktiv ist und warum (Vorhersage, Warnleuchte, Schneemann, Eis, Föhn, Wolkenschatten, Alpenglühen, Markt, Tafel), oben rechts die Bildrate. Ein Tipp aufs Bild blendet die Steuerung aus. |
+| `?dev=1` | Test-Modus: Steuerleiste (Tag, Uhrzeit, Zeitraffer, Mitternacht ansehen, Seltenheit finden), Info-Zeile mit Wetter, Ort (welcher, warum, und die Orte der Woche), Luftdruck-Trend und allem, was gerade aktiv ist und warum (Vorhersage, Warnleuchte, Schneemann, Eis, Föhn, Wolkenschatten, Alpenglühen, Markt, Tafel), oben rechts die Bildrate. Ein Tipp aufs Bild blendet die Steuerung aus. |
 | `?t=2026-12-24T17:30` | Zeit simulieren. Die Uhr läuft ab diesem Moment weiter. Auch möglich: `?t=17:30` (heute) oder `?t=0:00:20`. |
+| `?ort=hoeri` | Ort erzwingen (`chiemsee` oder `hoeri`). Ohne `?ort` zeigt `?t=` den Ort, der zu diesem Zeitpunkt dran wäre. |
+| `?wind=0.9` | Höri: Windstärke für die Segler (`0` bis `1`; ab `0,15` fahren welche, je mehr, desto öfter). |
 | `?raster=`, `?fps=`, `?aufloesung=`, `?gpu=`, `?lesen=` | Anzeige für dieses Gerät, siehe „Anzeige und Leistung“. |
 | `?entdecken=0` | Die kleinen Szenen für dieses Gerät aus (`1` = an). |
 | `?vorhersage=regen:6:2,schnee:1:-2,frost:3:-5` | Vorhersage für die nächsten drei Tage erzwingen (Name:Höchst:Tiefst; Namen `klar`, `heiter`, `wolke`, `regen`, `schnee`, `gewitter`, `frost`). Der erste Tag steuert auch die Hinweise für morgen. |
@@ -451,14 +487,18 @@ Beispiele:
 - `https://maxslobster.github.io/lichtzeit/?dev=1&t=11:30&schatten=1` – Wolkenschatten
 - `https://maxslobster.github.io/lichtzeit/?dev=1&t=16:05&glut=1` – Alpenglühen heute Abend (Ende November; die Uhr läuft, nach etwa 50 Minuten ist es vorbei)
 - `https://maxslobster.github.io/lichtzeit/?dev=1&t=2026-12-24T17:00` – Heiligabend mit Dampfer-Lichterkette
+- `https://maxslobster.github.io/lichtzeit/?ort=hoeri&dev=1&t=2027-07-10T12:18` – Höri: URh-Schiff nach Stein am Rhein
+- `https://maxslobster.github.io/lichtzeit/?ort=hoeri&dev=1&t=2027-07-08T15:41:20&wind=0.9` – Höri: Segler
+- `https://maxslobster.github.io/lichtzeit/?ort=hoeri&dev=1&t=2027-10-12T10:35:10` – Höri: Herbstlaub, Eichhörnchen, Eicheln
 
 ## Stand
 
 Lichtzeit ist fertig und läuft. Die Kontroll-Screenshots der ersten Abnahme
 liegen lokal in `gazers/abnahme/`, die der Fallblatt-Uhr (November 2026) in
 `gazers/abnahme/fallblatt/`, die von Auftrag 2 (kleinere Uhr, Halbinsel,
-Raddampfer, Wolkenschatten, Alpenglühen) in `gazers/abnahme/auftrag-2/`. Die
-Stände davor sind als Git-Tags `v-vor-fallblatt` und `v-vor-auftrag-2` gesichert.
+Raddampfer, Wolkenschatten, Alpenglühen) in `gazers/abnahme/auftrag-2/`, die von
+Auftrag 3 (zweiter Ort Höri, Orte-Wechsel) in `gazers/abnahme/auftrag-3/`. Die
+Stände davor sind als Git-Tags `v-vor-fallblatt`, `v-vor-auftrag-2` und `v-vor-auftrag-3` gesichert.
 
 Seit Oktober 2026 weicht das Bild bewusst vom ursprünglichen Prototyp
 `lichtzeit.html` ab: Die Pixel-Effekte sind seltener und schwächer, und es gibt
