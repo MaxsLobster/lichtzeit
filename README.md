@@ -289,12 +289,14 @@ führt zurück.
   3 °C taut das Eis wieder.
 - **Föhn:** klare Luft, tiefblauer Himmel, die Berge wirken größer und näher,
   über ihnen stehen Föhnfische (linsenförmige Wolken). Erkannt wird Föhn, wenn
-  alles zusammenkommt: Wind aus Süd bis Südwest (140–250°), Böen ab etwa 30 km/h,
+  alles zusammenkommt: Wind aus Süd bis Südwest (140–250°), Böen ab etwa 10 km/h,
   relative Feuchte höchstens etwa 55 %, mindestens 4 °C wärmer als im Mittel der
   drei Tage davor und sehr gute Sicht (ab 30 km). Ohne Sichtweite (ab Dezember
   2026) zählt stattdessen das Föhnfenster: höchstens etwa 30 % tiefe Wolken und
   kein Niederschlag. In 14 Monaten Archivdaten erkannten beide Wege genau
-  dieselben Stunden.
+  dieselben Stunden. In Moosen sind das etwa 47 Föhn-Stunden an 13 Tagen im Jahr,
+  fast alle zwischen April und September: Im Winter ist die Luft am Boden meist
+  feuchter als 55 %.
 
 Alle Grenzwerte (`WARN`, `FOEHN`, `SCHNEE`, `EIS`) stehen im Abschnitt „Echtes
 Wetter“ in `index.html`.
