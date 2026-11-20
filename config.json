@@ -1,6 +1,6 @@
 {
   "ort": { "name": "Chiemsee", "breite": 47.87, "laenge": 12.43 },
-  "orte": { "wechsel": true, "andere_tage_pro_woche": 3, "andere": ["hoeri"], "feste_tage": { "2026-11-20": "hoeri" }, "_notiz": "Bildorte: pro Woche (Mo–So) 4 Tage Chiemsee, an andere_tage_pro_woche ausgelosten Tagen ein Ort aus andere (bei mehreren reihum). Ein Tag geht von 4:00 bis 4:00. 24.–26.12., 31.12. und 1.1. immer Chiemsee. feste_tage: Datum (JJJJ-MM-TT) und Ort, gilt zusätzlich zu den ausgelosten Tagen. wechsel: false = immer Chiemsee. Bekannte Orte: chiemsee, hoeri. Zum Testen ?ort=hoeri" },
+  "orte": { "wechsel": true, "andere_tage_pro_woche": 3, "andere": ["hoeri"], "feste_tage": { "2026-11-20": "inntal" }, "_notiz": "Bildorte: pro Woche (Mo–So) 4 Tage Chiemsee, an andere_tage_pro_woche ausgelosten Tagen ein Ort aus andere (bei mehreren reihum). Ein Tag geht von 4:00 bis 4:00. 24.–26.12., 31.12. und 1.1. immer Chiemsee. feste_tage: Datum (JJJJ-MM-TT) und Ort, gilt zusätzlich zu den ausgelosten Tagen. wechsel: false = immer Chiemsee. Bekannte Orte: chiemsee, hoeri, inntal (eigene Seite inntal/, Lichtzeit leitet dorthin weiter). Zum Testen ?ort=hoeri oder ?ort=inntal" },
   "wetter_ort": { "name": "Moosen (Riedering)", "breite": 47.86, "laenge": 12.26, "_notiz": "nur für Wetter, Vorhersage, Schnee, Eis und Föhn; Sonne, Mond, Planeten und Titel bleiben bei ort. Fehlt der Eintrag, gilt ort." },
   "familie": [
     { "name": "Stern 1", "geburtstag": "06-19" },

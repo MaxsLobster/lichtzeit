@@ -517,7 +517,9 @@ const ORTE={
     pos:{warnX:0.665,schneemann:()=>[W*0.62,H*0.88],tuerlY:0.675,zusatzOben:0.3,
       kette:(i,pf)=>[W*(0.07+0.52*i/23),H*(0.36+0.06*Math.sin(i/23*Math.PI))+Math.sin(pf*Math.PI)*H*0.007]}, // Lichterkette in der Eiche
     rituale:{'07:00':'SERVUS|HÖRI'},
-    aus:{eis:true,markt:true,glocken:true,entdecken:true,extras:true,sortieren:true,gespenst:true}}}; // kein Eis und Eisstock, kein Christkindlmarkt, keine Kirchenglocken, keine Entdecken-Szenen und Chiemsee-Extras (auch nicht auf der Tafel), keine Oktober-Gespenster an der Inselkirche, kein Pixel-Sortieren (verschmiert die Äste)
+    aus:{eis:true,markt:true,glocken:true,entdecken:true,extras:true,sortieren:true,gespenst:true}}, // kein Eis und Eisstock, kein Christkindlmarkt, keine Kirchenglocken, keine Entdecken-Szenen und Chiemsee-Extras (auch nicht auf der Tafel), keine Oktober-Gespenster an der Inselkirche, kein Pixel-Sortieren (verschmiert die Äste)
+  // Externer Ort: kein Bildpaket, sondern eine eigene Seite. Ist er dran, leitet Lichtzeit dorthin weiter (ortWeiter); die Seite kehrt beim Tageswechsel um 4:00 zurück.
+  inntal:{name:'Inntal',extern:'inntal/'}};
 for(const o of Object.values(ORTE))o.pos={...ORTE.chiemsee.pos,...o.pos};
 let ORT_ID='chiemsee',OP=ORTE.chiemsee;
 
@@ -2073,11 +2075,16 @@ function wochenPlan(tag){const wd=(tag.getDay()+6)%7,mo=new Date(tag.getFullYear
     frei.slice(0,n).sort((a,b)=>a-b).forEach((i,s)=>{const T=P.tage[i];if(festtagOrt(T.x))return;T.ort=A[(wn*n+s)%A.length];});}
   ORT_WOCHE.set(k,P);return P;}
 function ortFuer(d){if(ORT_TEST)return{ort:ORT_TEST,grund:'erzwungen mit ?ort='};const tag=ortTag(d);return wochenPlan(tag).tage[(tag.getDay()+6)%7];}
-function ortSetzen(d){const k=(ORT_TEST||'')+'|'+dayKey(d)+'|'+(d.getHours()<4?0:1);if(ORT_JETZT.k===k)return;ORT_JETZT.k=k;
-  const o=ortFuer(d),id=ORTE[o.ort]?o.ort:'chiemsee';ORT_JETZT.grund=o.grund;if(id!==ORT_ID){ORT_ID=id;OP=ORTE[id];}
-  if(ORT_JETZT.titel!==OP.name){ORT_JETZT.titel=OP.name;const e=$('sname');if(e)e.textContent=OP.name;document.title='Lichtzeit – '+OP.name;}}
+function ortSetzen(d){const k=(ORT_TEST||'')+'|'+dayKey(d)+'|'+(d.getHours()<4?0:1);if(ORT_JETZT.k!==k){ORT_JETZT.k=k;
+  const o=ortFuer(d),id=ORTE[o.ort]?o.ort:'chiemsee';ORT_JETZT.grund=o.grund;if(id!==ORT_ID){ORT_ID=id;OP=ORTE[id].extern?ORTE.chiemsee:ORTE[id];} // externer Ort: bis zur Weiterleitung (und beim Blättern im Test-Modus) steht der Chiemsee da
+  const nm=ORTE[ORT_ID].name;if(ORT_JETZT.titel!==nm){ORT_JETZT.titel=nm;const e=$('sname');if(e)e.textContent=nm;document.title='Lichtzeit – '+nm;}}
+  const ex=ORTE[ORT_ID].extern;if(ex)ortWeiter(ex);}
+// Weiterleitung auf die Seite eines externen Ortes (Adress-Parameter wie ?t=, ?tempo=, ?ort= kommen mit). Nicht, solange im Test-Modus geblättert oder Zeitraffer läuft.
+function ortWeiter(ziel){if(ORT_JETZT.weiter||(DEV&&(mode!=='live'||playing)))return;ORT_JETZT.weiter=true;location.replace(ziel+location.search);}
+// Gleich nach dem Laden der Einstellungen prüfen (vor dem Wetter), damit die Weiterleitung schnell geht
+function ortFrueh(){try{const oq=(Q.get('ort')||'').trim().toLowerCase();if(ORTE[oq])ORT_TEST=oq;ortSetzen(wall(curT()));}catch(e){}}
 function ortText(d){const P=wochenPlan(ortTag(d)),kurz=['Mo','Di','Mi','Do','Fr','Sa','So'];
-  return 'Ort: '+OP.name+' ('+ORT_JETZT.grund+'), Woche '+P.w+': '+P.tage.map((T,i)=>kurz[i]+' '+(ORTE[T.ort]?ORTE[T.ort].name:T.ort)+(T.grund==='Festtag'?' (Festtag)':T.grund==='fester Tag'?' (fest)':'')).join(', ');}
+  return 'Ort: '+ORTE[ORT_ID].name+' ('+ORT_JETZT.grund+')'+(ORTE[ORT_ID].extern?', eigene Seite '+ORTE[ORT_ID].extern+(DEV&&(mode!=='live'||playing)?' (beim Blättern keine Weiterleitung, hier der Chiemsee)':''):'')+', Woche '+P.w+': '+P.tage.map((T,i)=>kurz[i]+' '+(ORTE[T.ort]?ORTE[T.ort].name:T.ort)+(T.grund==='Festtag'?' (Festtag)':T.grund==='fester Tag'?' (fest)':'')).join(', ');}
 // Geräteuhr prüfen: Weicht sie mehr als eine Minute vom Server-Zeitstempel ab, rechnet Lichtzeit mit der Serverzeit
 const CLOCK_MAX=60e3,DEV_TZ=(()=>{try{return Intl.DateTimeFormat().resolvedOptions().timeZone||'?';}catch(e){return '?';}})();
 function clockFromServer(r,t0,t1){const h=r&&r.headers&&r.headers.get('Date'),s=h?Date.parse(h):NaN;if(isNaN(s))return;
@@ -2212,7 +2219,7 @@ function start(){if(started)return;started=true;urlAnzeige();if(ANZ.raster_px||A
 // Start: erst die Einstellungen, dann das Wetter (gespeicherter Stand sofort, neuen Abruf höchstens 3 s abwarten)
 function boot(){if(WX_FORCE)return null;wxLoad();const f=wxFetch();return WX&&wxAt(nowT())?null:Promise.race([f,new Promise(r=>setTimeout(r,3000))]);}
 setTimeout(start,8000); // Sicherheitsnetz: das Bild startet auf jeden Fall
-try{loadConfig().then(boot).then(start,start);}catch(e){start();}
+try{loadConfig().then(()=>{ortFrueh();return boot();}).then(start,start);}catch(e){start();}
 </script>
 </body>
 </html>
