@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#000000"><link rel="icon" href="../icon-192.png">
+<title>Lichtzeit – Simssee</title>
+<style>
+/* Vollbild wie Lichtzeit: das Bild (1080×1800) passt seitenrichtig in den Bildschirm, keine Scrollbalken, kein Mauszeiger */
+html,body{margin:0;width:100%;height:100%;background:#000;overflow:hidden;cursor:none;touch-action:none;-webkit-user-select:none;user-select:none;overscroll-behavior:none}
+canvas{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);display:block}
+</style></head><body>
+<canvas id="c" width="1080" height="1800"></canvas>
+<script>
+const BILD={sommer:'bg_sommer.jpg',winter:'bg_winter.jpg',schnee:'bg_schnee.jpg'}; // gemalte Hintergründe (1080×1800)
+const DATA={"see": [[216.3, 228.7], [277.2, 155.2], [360.4, 131.3], [443.9, 171.3], [466.7, 208.8], [476.3, 270.0], [460.6, 354.6], [457.0, 439.6], [436.0, 505.7], [428.1, 548.0], [429.8, 581.5], [490.1, 666.2], [474.9, 738.6], [478.7, 793.6], [519.0, 850.0], [511.1, 892.3], [441.0, 968.5], [437.9, 1041.4], [410.5, 1113.3], [360.9, 1135.6], [313.3, 1109.2], [305.8, 999.3], [291.9, 895.3], [283.8, 797.6], [287.9, 700.4], [285.1, 621.1], [289.2, 523.9], [274.8, 432.0], [235.0, 363.4], [213.8, 289.5]], "pflug": [[620.8, 382.6], [627.2, 427.8], [628.8, 460.0], [643.3, 505.2], [665.9, 537.4], [672.3, 569.7], [656.2, 605.2], [633.6, 631.0], [598.2, 647.1], [575.6, 666.4], [565.9, 695.5], [559.4, 727.7], [553.0, 769.6], [562.7, 801.9], [582.0, 834.1], [591.7, 905.1], [600.0, 980.0], [602.0, 1060.0], [596.0, 1130.0], [612.0, 1215.0]], "bahn": [[42.8, 1755.2], [179.6, 1395.8], [213.1, 1178.1], [233.9, 972.0], [224.6, 758.6], [219.0, 600.1], [221.3, 399.3], [207.2, 155.3], [284.0, -78.9], [370.8, -275.5], [635.8, -776.2]], "haus": [545.6, 650.3], "haeuser": [[603.6, 25.1, 9.5], [461.8, 130.2, 8.7], [635.0, 132.2, 8.0], [423.9, 132.3, 10.3], [647.4, 146.1, 10.0], [654.0, 166.9, 9.0], [592.7, 173.3, 8.0], [674.7, 174.7, 7.9], [611.4, 177.5, 10.7], [103.1, 179.9, 9.5], [632.1, 182.8, 11.9], [632.0, 188.6, 9.0], [585.1, 190.6, 9.8], [653.3, 193.5, 8.0], [605.6, 199.2, 9.7], [588.1, 209.8, 8.6], [619.8, 217.2, 8.4], [596.2, 229.1, 8.3], [608.0, 242.2, 8.5], [137.9, 242.8, 8.2], [137.4, 260.6, 10.1], [170.8, 261.3, 9.1], [149.0, 273.1, 10.8], [100.4, 274.6, 8.4], [118.2, 276.7, 9.9], [185.6, 278.9, 8.3], [165.4, 280.3, 10.2], [78.7, 293.1, 8.6], [131.4, 297.1, 8.3], [174.3, 297.1, 9.5], [152.4, 301.8, 8.9], [104.4, 303.5, 8.7], [112.2, 319.7, 10.0], [144.0, 321.5, 9.7], [174.3, 323.1, 8.2], [210.5, 328.2, 8.7], [160.8, 337.2, 8.9], [127.1, 339.1, 10.8], [192.0, 344.1, 8.6], [154.7, 358.9, 9.9], [194.2, 362.0, 9.7], [129.8, 364.1, 10.2], [170.3, 379.9, 10.6], [141.6, 380.6, 8.7], [123.6, 383.7, 9.5], [151.7, 394.3, 8.1], [171.2, 412.5, 10.6], [614.0, 423.7, 9.3], [634.7, 434.3, 9.3], [645.3, 448.9, 10.8], [-103.4, 450.9, 10.5], [614.0, 454.8, 9.3], [-122.8, 458.0, 10.2], [-146.9, 472.6, 10.2], [-86.8, 474.4, 8.9], [-106.0, 484.7, 8.7], [36.3, 488.8, 9.6], [-122.7, 489.6, 8.8], [-151.1, 495.6, 9.3], [-191.6, 496.4, 10.6], [-170.2, 503.4, 10.6], [648.7, 528.2, 10.8], [681.8, 528.9, 8.3], [683.8, 549.7, 10.6], [661.8, 551.5, 9.0], [684.1, 573.3, 8.3], [221.8, 573.8, 8.1], [196.1, 578.3, 10.6], [655.4, 579.0, 9.0], [668.2, 590.3, 10.4], [647.2, 595.6, 10.0], [54.5, 624.6, 10.7], [658.6, 649.0, 9.1], [628.8, 650.9, 9.0], [692.1, 652.9, 8.4], [673.2, 658.5, 10.8], [646.5, 663.9, 11.9], [690.8, 670.3, 9.4], [659.7, 671.3, 9.7], [642.7, 675.7, 7.9], [693.7, 688.6, 10.8], [668.1, 691.0, 10.5], [279.6, 710.7, 9.2], [523.6, 727.0, 8.1], [539.9, 732.6, 10.7], [554.1, 751.6, 9.1], [515.1, 754.2, 8.9], [536.8, 762.5, 8.1], [446.0, 1006.0, 12.9], [589.7, 1032.3, 8.1], [609.9, 1040.6, 10.3], [597.1, 1052.8, 8.8], [577.6, 1053.8, 9.4], [620.6, 1053.9, 10.6], [578.8, 1073.8, 8.4], [600.6, 1083.4, 10.4], [619.8, 1089.9, 10.1], [667.2, 1096.3, 7.8], [682.7, 1111.0, 9.9], [646.1, 1118.3, 9.3], [647.7, 1138.2, 10.8], [694.0, 1140.1, 10.0], [238.3, 1147.6, 8.2], [667.3, 1149.8, 9.4], [214.6, 1151.3, 8.7], [197.8, 1164.9, 8.4], [214.6, 1170.4, 8.5], [232.7, 1176.4, 7.8], [198.6, 1182.0, 10.0], [241.3, 1192.1, 9.3], [213.7, 1198.1, 10.6]], "camping": [495.7, 170.4], "kiosk": [498.2, 743.8], "sonne": [0.459, -0.889], "Z": 1.7, "strassen": [[[-772.2, 869.0], [-689.1, 878.2], [-600.0, 875.4], [-515.8, 858.9], [-443.3, 830.5], [-383.1, 793.5], [-333.6, 750.9], [-292.2, 705.0], [-256.8, 657.7], [-225.6, 610.2], [-196.8, 563.5], [-169.0, 518.4], [-140.9, 475.4]], [[-140.9, 475.4], [-101.9, 426.5], [-58.7, 381.2], [-8.0, 341.0], [54.9, 307.5], [138.0, 283.2]], [[138.0, 283.2], [150.5, 211.2], [138.1, 135.8], [147.3, 66.9], [175.3, 3.8], [222.6, -54.6], [291.3, -109.0]], [[291.3, -109.0], [243.6, -176.5], [218.6, -243.2], [213.7, -309.8], [226.6, -376.9], [257.3, -444.5], [307.3, -511.5], [378.3, -575.3], [465.5, -631.6], [548.5, -678.2], [605.7, -717.1], [633.0, -750.0], [635.8, -776.2]], [[138.0, 283.2], [74.5, 223.1], [29.3, 170.3], [-6.6, 120.7], [-38.5, 72.0], [-69.5, 23.2], [-101.4, -26.2], [-135.2, -76.2], [-171.4, -126.5], [-210.2, -176.7], [-251.4, -226.4], [-294.4, -275.0], [-338.6, -322.4], [-383.4, -368.5], [-428.3, -413.5], [-473.1, -457.5]], [[138.0, 283.2], [177.3, 294.9], [181.8, 321.9], [199.2, 348.8], [174.3, 360.8]], [[619.9, 184.8], [604.2, 120.8], [609.5, 59.6], [631.7, 3.4], [666.0, -44.6]], [[666.0, -44.6], [756.7, -105.0], [848.6, -148.5], [935.1, -175.1], [1011.1, -187.8], [1075.6, -189.5], [1130.3, -182.2], [1176.7, -166.8], [1215.7, -143.3], [1247.0, -111.5]], [[619.9, 184.8], [496.0, 186.8], [448.6, 136.0], [381.3, 104.0], [344.5, 38.3], [307.9, -12.8], [289.2, -62.0], [291.3, -109.0]], [[1006.1, 1062.2], [1078.2, 1149.5], [1155.4, 1225.8], [1226.5, 1286.9], [1283.9, 1334.2], [1328.3, 1372.2], [1362.9, 1404.3], [1390.9, 1433.1], [1414.5, 1459.9], [1434.9, 1485.5], [1453.0, 1510.0]], [[1070.9, 459.3], [1206.2, 440.8], [1320.6, 428.0], [1405.7, 418.8], [1468.3, 410.9], [1516.8, 403.1], [1556.9, 395.4], [1592.1, 387.5], [1624.4, 379.5], [1654.8, 371.5], [1683.6, 363.2]], [[565.7, 1332.8], [616.0, 1468.9], [645.9, 1593.0], [662.3, 1697.5], [670.4, 1782.0], [673.4, 1849.5], [672.9, 1903.2], [669.9, 1945.7], [665.2, 1978.6], [658.8, 2002.7], [650.6, 2017.9], [640.2, 2023.7]], [[1006.1, 1062.2], [977.5, 1095.0], [952.2, 1124.1], [925.2, 1150.9], [890.5, 1177.0], [840.8, 1205.0], [769.3, 1238.6], [675.8, 1281.4], [565.7, 1332.8]], [[-311.6, 1496.9], [-290.7, 1499.3], [-265.2, 1500.3], [-234.8, 1499.4], [-199.1, 1496.0], [-157.3, 1489.0], [-108.7, 1477.2], [-53.2, 1459.3], [7.6, 1434.7], [71.1, 1404.2], [136.1, 1370.9], [206.3, 1339.8], [293.0, 1317.5], [414.3, 1313.6], [565.7, 1332.8]], [[619.9, 184.8], [583.0, 236.2], [571.1, 286.5], [583.6, 335.9], [620.8, 382.6]], [[782.0, 634.9], [837.8, 623.6], [898.3, 598.3], [959.8, 560.0], [1018.4, 512.0], [1070.9, 459.3]], [[620.8, 382.6], [627.2, 427.8], [628.8, 460.0], [643.3, 505.2], [665.9, 537.4], [672.3, 569.7], [656.2, 605.2], [633.6, 631.0], [598.2, 647.1], [575.6, 666.4], [565.9, 695.5], [559.4, 727.7], [553.0, 769.6], [562.7, 801.9], [582.0, 834.1], [591.7, 905.1]], [[633.6, 632.6], [694.9, 634.8], [782.0, 634.9]], [[565.3, 658.4], [549.8, 652.2]], [[559.4, 730.9], [533.6, 743.8], [511.1, 747.7], [499.8, 743.2]], [[633.6, 631.0], [646.5, 656.8], [672.3, 679.3], [704.6, 685.8]], [[592.0, 905.0], [600.0, 980.0], [602.0, 1060.0], [596.0, 1130.0], [612.0, 1215.0]], [[238.0, 640.0], [244.0, 760.0], [246.0, 860.0], [250.0, 960.0], [250.0, 1032.0], [240.0, 1100.0], [232.0, 1163.0], [222.0, 1215.0]], [[602.0, 1062.0], [640.0, 1080.0], [700.0, 1086.0], [730.0, 1084.0]], [[250.0, 1030.0], [290.0, 1046.0]]], "kirche": [646.5, 663.9], "hoehe": "data:image/png;base64,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"};
+</script><script>
+// ---------- Lichtzeit – Simssee: Bewegtes über dem gemalten Hintergrund ----------
+const cv=document.getElementById('c'),ctx=cv.getContext('2d'),W=1080,H=1800,K=1.5;
+function fit(){const k=Math.min(innerWidth/W,innerHeight/H);cv.style.width=W*k+'px';cv.style.height=H*k+'px';}addEventListener('resize',fit);fit();
+const TAU=Math.PI*2,rad=Math.PI/180,Q=new URLSearchParams(location.search);
+const clamp=(x,a,b)=>Math.max(a,Math.min(b,x)),smooth=(a,b,x)=>{const t=clamp((x-a)/(b-a),0,1);return t*t*(3-2*t);};
+const mix=(a,b,t)=>[a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t,a[2]+(b[2]-a[2])*t];
+const rgb=(c,a=1)=>`rgba(${c[0]|0},${c[1]|0},${c[2]|0},${a})`;
+const rng=s=>{let x=(s|0)^0x9e3779b9;return()=>{x^=x<<13;x^=x>>>17;x^=x<<5;return ((x>>>0)%100000)/100000;};};
+const LAT=47.868,LON=12.24,ROT=-42.6*rad,cR=Math.cos(ROT),sR=Math.sin(ROT);
+const kart=(vx,vy)=>[vx*cR-vy*sR,vx*sR+vy*cR]; // Karte (Ost, Süd) -> Bild
+
+// ---------- Zeit ----------
+// Alles rechnet in Berliner Zeit, egal welche Zeitzone das Gerät hat. berlin(t) liefert ein Date, dessen Felder (getHours …) die Berliner Uhrzeit zeigen.
+const BZ=(()=>{try{return new Intl.DateTimeFormat('en-US',{timeZone:'Europe/Berlin',hourCycle:'h23',year:'numeric',month:'numeric',day:'numeric',hour:'numeric',minute:'numeric',second:'numeric'});}catch(e){return null;}})(),BZ_M={k:NaN,off:0};
+function bzVers(t){const k=Math.floor(t/36e5);if(BZ_M.k!==k){BZ_M.k=k;let off=0;if(BZ){const p={};for(const x of BZ.formatToParts(new Date(k*36e5)))p[x.type]=+x.value;off=new Date(p.year,p.month-1,p.day,p.hour%24,p.minute,p.second).getTime()-k*36e5;}BZ_M.off=off;}return BZ_M.off;}
+const berlin=t=>new Date(t+bzVers(t));
+const vonBerlin=lok=>{const t=lok-bzVers(lok);return lok-bzVers(t);}; // Berliner Wanduhrzeit (als lokales Date gebaut) -> echte Zeit
+const isoTag=x=>x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+String(x.getDate()).padStart(2,'0');
+// ?t=2026-11-25T08:05[:SS] (Berliner Zeit) oder ?t=08:05 (heute)
+const parseT=s=>{let m=/^(\d{4})-(\d\d)-(\d\d)[T ](\d\d?):(\d\d)(?::(\d\d))?$/.exec(s||''),y,mo,d,h,mi,se;if(m){[y,mo,d,h,mi,se]=[+m[1],m[2]-1,+m[3],+m[4],+m[5],+(m[6]||0)];}
+  else{m=/^(\d\d?):(\d\d)(?::(\d\d))?$/.exec(s||'');if(!m)return null;const b=berlin(Date.now());[y,mo,d,h,mi,se]=[b.getFullYear(),b.getMonth(),b.getDate(),+m[1],+m[2],+(m[3]||0)];}
+  return vonBerlin(new Date(y,mo,d,h,mi,se).getTime());};
+// Geräteuhr prüfen: weicht sie mehr als eine Minute vom Server-Zeitstempel ab, gilt die Serverzeit (wie Lichtzeit)
+let UHR_KORR=0;function uhrPruefen(){const t0=Date.now();fetch(location.href.split('#')[0],{method:'HEAD',cache:'no-store'}).then(r=>{const s=Date.parse(r.headers.get('Date')||''),t1=Date.now();if(isNaN(s))return;const off=s+500-(t0+t1)/2;UHR_KORR=Math.abs(off)>6e4?off:0;}).catch(()=>{});}
+uhrPruefen();setInterval(uhrPruefen,36e5);
+const echtJetzt=()=>Date.now()+UHR_KORR;
+const T_Q=Q.get('t');let SIM=T_Q&&parseT(T_Q)!==null?{at:parseT(T_Q),dev:Date.now(),k:clamp(+(Q.get('tempo')||1)||1,0.01,5000)}:null;
+const jetzt=()=>SIM?SIM.at+(Date.now()-SIM.dev)*SIM.k:echtJetzt();
+const sekTag=t=>{const d=berlin(t);return d.getHours()*3600+d.getMinutes()*60+d.getSeconds()+d.getMilliseconds()/1000;};
+
+// ---------- Sonne ----------
+function hzk(ra,dec,n){const gmst=(280.46061837+360.98564736629*n)%360,ha=(gmst+LON)*rad-ra,la=LAT*rad;
+  const alt=Math.asin(Math.sin(la)*Math.sin(dec)+Math.cos(la)*Math.cos(dec)*Math.cos(ha)),az=Math.atan2(-Math.sin(ha),Math.tan(dec)*Math.cos(la)-Math.sin(la)*Math.cos(ha));return {alt:alt/rad,az:(az/rad+360)%360};}
+function sonneRD(n){const L0=(280.46+0.9856474*n)%360,g=(357.528+0.9856003*n)*rad,lam=(L0+1.915*Math.sin(g)+0.02*Math.sin(2*g))*rad,eps=(23.439-4e-7*n)*rad;
+  return {lam,ra:Math.atan2(Math.cos(eps)*Math.sin(lam),Math.cos(lam)),dec:Math.asin(Math.sin(eps)*Math.sin(lam))};}
+function sonne(t){const n=t/864e5+2440587.5-2451545,r=sonneRD(n);return hzk(r.ra,r.dec,n);}
+function mond(t){const n=t/864e5+2440587.5-2451545,e=23.4397*rad,Lm=(218.316+13.176396*n)*rad,Mm=(134.963+13.064993*n)*rad,F=(93.272+13.22935*n)*rad;
+  const l=Lm+6.289*rad*Math.sin(Mm),b=5.128*rad*Math.sin(F),ra=Math.atan2(Math.sin(l)*Math.cos(e)-Math.tan(b)*Math.sin(e),Math.cos(l)),dec=Math.asin(Math.sin(b)*Math.cos(e)+Math.cos(b)*Math.sin(e)*Math.sin(l));
+  const sn=sonneRD(n),phi=Math.acos(clamp(Math.sin(sn.dec)*Math.sin(dec)+Math.cos(sn.dec)*Math.cos(dec)*Math.cos(sn.ra-ra),-1,1)),d=((l-sn.lam)%TAU+TAU)%TAU;
+  return {...hzk(ra,dec,n),frac:(1-Math.cos(phi))/2,zunehmend:d<Math.PI};}
+// Uhrzeiten, zu denen die Sonne eine Höhe kreuzt (pro Tag gecacht)
+const KREUZ={};function kreuz(t,h,morgens){const d=berlin(t),key=d.toDateString()+h+morgens;if(KREUZ[key]!==undefined)return KREUZ[key];
+  const t0=vonBerlin(new Date(d.getFullYear(),d.getMonth(),d.getDate()).getTime());let res=null,prev=sonne(t0).alt;
+  for(let m=5;m<=1440;m+=5){const a=sonne(t0+m*6e4).alt;if(morgens&&prev<h&&a>=h){res=t0+(m-5+5*(h-prev)/(a-prev))*6e4;break;}if(!morgens&&prev>h&&a<=h){res=t0+(m-5+5*(prev-h)/(prev-a))*6e4;break;}prev=a;}
+  return KREUZ[key]=res;}
+
+// ---------- Wetter (Open-Meteo) ----------
+// Wetter-Ort: ?lat=&lng= > ../config.json (wetter_ort, sonst ort) > Simssee. Derselbe Ort, von dem Lichtzeit sein Wetter holt.
+const WORT={b:47.868,l:12.24},VORSCHAU=!/github\.io$/.test(location.hostname); // VORSCHAU: außerhalb von github.io ohne Daten eine Beispiel-Vorhersage
+let WX=null,FC=null,FROST=0;
+const istRegen=c=>(c>=51&&c<=67)||(c>=80&&c<=82)||c>=95,istSchnee=c=>(c>=71&&c<=77)||c===85||c===86;
+// current: aktuelles Wetter; hourly: Regen der letzten zwei Stunden (Regenbogen) und der nächsten (aufziehende Front);
+// daily mit past_days=14: Frosttage in Folge (Eis), Tiefstwert heute (Raureif), Vorhersage für die nächsten 3 Tage
+function wxAnwenden(j){try{const c=j.current,b=berlin(echtJetzt()),heute=isoTag(b);
+  WX={code:c.weather_code,temp:c.temperature_2m,wolken:c.cloud_cover,wind:c.wind_speed_10m,dir:c.wind_direction_10m,schnee:c.snow_depth||0,rh:c.relative_humidity_2m,nass:0,bald:0};
+  if(j.hourly&&j.hourly.time){const P=j.hourly.precipitation,i=j.hourly.time.indexOf(heute+'T'+String(b.getHours()).padStart(2,'0')+':00');
+    if(i>=2)WX.nass=(P[i-1]||0)+(P[i-2]||0)+(P[i]||0)*0.5;if(i>=0)WX.bald=(P[i+1]||0)+(P[i+2]||0)*0.5;}
+  const D=j.daily;if(D&&D.time){FC=D.time.map((t,i)=>({tag:t,code:D.weather_code[i],max:D.temperature_2m_max[i],min:D.temperature_2m_min[i]}));
+    const i0=D.time.indexOf(heute);let n=0;for(let i=i0-1;i0>0&&i>=0;i--){if(D.temperature_2m_mean[i]<-1)n++;else break;}FROST=n;}}catch(e){}}
+const fcTag=d=>FC&&FC.find(x=>x.tag===isoTag(d)); // Vorhersage-Eintrag für einen Tag (Berliner Datum)
+function wxHolen(){try{fetch('https://api.open-meteo.com/v1/forecast?latitude='+WORT.b+'&longitude='+WORT.l+'&current=temperature_2m,weather_code,cloud_cover,wind_speed_10m,wind_direction_10m,snow_depth,relative_humidity_2m&hourly=precipitation&daily=weather_code,temperature_2m_max,temperature_2m_min,temperature_2m_mean&past_days=14&forecast_days=4&timezone=Europe%2FBerlin')
+  .then(r=>r.json()).then(j=>{if(!j||!j.current)return;wxAnwenden(j);try{localStorage.setItem('simssee-wx',JSON.stringify({ts:Date.now(),lat:WORT.b,lng:WORT.l,j}));}catch(e){}}).catch(()=>{});}catch(e){}setTimeout(wxHolen,15*6e4);}
+// Zwischenspeicher (höchstens 3 Stunden alt, nur für denselben Ort), dann frisch holen und alle 15 Minuten wieder
+function wxLos(){try{const c=JSON.parse(localStorage.getItem('simssee-wx')||'null');if(c&&c.lat===WORT.b&&c.lng===WORT.l&&Date.now()-c.ts<3*36e5)wxAnwenden(c.j);}catch(e){}wxHolen();}
+(function wxStart(){if(Q.get('lat')&&Q.get('lng')&&isFinite(+Q.get('lat'))&&isFinite(+Q.get('lng'))){WORT.b=+Q.get('lat');WORT.l=+Q.get('lng');wxLos();return;}
+  try{fetch('../config.json',{cache:'no-store'}).then(r=>r.json()).then(c=>{const o=c.wetter_ort||c.ort||{},b=+(o.breite??o.lat),l=+(o.laenge??o.lng);if(isFinite(b)&&isFinite(l)&&b&&l){WORT.b=b;WORT.l=l;}}).catch(()=>{}).finally(wxLos);}catch(e){wxLos();}})();
+const FC_FORCE=(()=>{const v=Q.get('vorhersage');if(!v)return null;return v.split(',').map(s=>{const [n,tp]=s.split(':');return {name:n,max:+tp||0};});})();
+const WTAG=['SO','MO','DI','MI','DO','FR','SA'];
+// Aktuelles Wetterbild: art (klar|wolken|bedeckt|regen|schnee|schneefall|nebel), Schneedecke, Eis, Wind, Temperatur
+// Testschalter aus der Adresse: ?wind= ?dir= ?temp= ?eis= ?schneek= ?raureif= ?mnebel= ?foehn= ?rbogen= ?front= ?ballon= ?gans=
+const flag=n=>{const v=Q.get(n);if(v===null||v.trim()==='')return undefined;const x=parseFloat(v.replace(',','.'));return isFinite(x)?x:undefined;};
+function wetter(t){const d=berlin(t),mon=d.getMonth()+1,stunde=sekTag(t)/3600;const w=Q.get('wetter');let art='klar',decke=false,wind=8,dir=250,temp=mon>=5&&mon<=9?20:2,wolken=20,rh=75,nass=0;
+  if(WX&&!w){const c=WX.code;art=c>=95?'gewitter':c===45||c===48?'nebel':istRegen(c)?'regen':istSchnee(c)?'schneefall':WX.wolken>85?'bedeckt':WX.wolken>35?'wolken':'klar';decke=WX.schnee>0.02||istSchnee(c);wind=WX.wind;dir=WX.dir;temp=WX.temp;wolken=WX.wolken;rh=WX.rh||75;nass=WX.nass||0;}
+  if(w){art=w;decke=w==='schnee'||w==='schneefall';wolken={klar:10,wolken:55,bedeckt:95,regen:95,gewitter:100,schnee:30,schneefall:95,nebel:100}[w]||20;if(w==='schnee')art='klar';}
+  if(flag('wind')!==undefined)wind=flag('wind');if(flag('temp')!==undefined)temp=flag('temp');if(flag('dir')!==undefined)dir=flag('dir');
+  let eis=clamp((FROST-2)/6,0,1);if(flag('eis')!==undefined)eis=flag('eis');
+  let schneeK=decke?1:0;if(WX&&!w){schneeK=clamp(WX.schnee/0.04,0,1);if(istSchnee(WX.code))schneeK=Math.max(schneeK,0.2);}if(flag('schneek')!==undefined)schneeK=flag('schneek');decke=schneeK>0.5;
+  let fr=0;if(WX&&!w&&!istRegen(WX.code)&&!istSchnee(WX.code)&&WX.bald>0.3){const mm=(sekTag(t)%3600)/3600;fr=clamp(WX.bald/1,0.4,1)*(0.45+0.55*mm);}if(flag('front')!==undefined)fr=flag('front');
+  const winter=mon>=10||mon<=4,sa=S?S.alt:0;
+  // Raureif: frostige, klare Nacht, keine Schneedecke
+  const fh=fcTag(d);let raureif=schneeK<0.05&&fh&&fh.min<=-1&&wolken<60&&stunde<13&&!w?1:0;if(flag('raureif')!==undefined)raureif=flag('raureif');
+  // Morgennebel überm See: feucht, windstill, Herbst bis Frühjahr, bis die Sonne höher steht
+  let mnebel=!w&&rh>=88&&wind<10&&(mon>=9||mon<=4)&&stunde<12?1:0;if(flag('mnebel')!==undefined)mnebel=flag('mnebel');
+  if(mnebel)mnebel*=1-smooth(4,16,sa);
+  // Föhn: trocken, Südwind, ungewöhnlich mild
+  let foehn=!w&&rh<55&&dir>=120&&dir<=250&&wind>=6&&wolken<70&&temp>=(winter?10:24)?1:0;if(flag('foehn')!==undefined)foehn=flag('foehn');
+  // Regenbogen: kurz nach Regen, Sonne kommt raus und steht tief
+  let rbogen=!w&&nass>0.2&&!istRegen(WX?WX.code:0)&&wolken<90?1:0;if(flag('rbogen')!==undefined)rbogen=flag('rbogen');
+  rbogen*=smooth(0.5,4,sa)*(1-smooth(30,42,sa));
+  if(foehn&&wolken>30)wolken=30;
+  return {art,decke,schneeK,front:fr,wind,dir,temp,wolken,eis,rh,raureif,mnebel,foehn,rbogen,md:kart(Math.sin((dir+180)*rad),-Math.cos((dir+180)*rad)),
+    bedeckt:art==='bedeckt'||art==='regen'||art==='gewitter'||art==='nebel'||art==='schneefall'?1:art==='wolken'?0.35:0};}
+
+// ---------- Daten aus dem Hintergrund ----------
+const D=DATA,BG={};for(const n of ['sommer','winter','schnee']){BG[n]=new Image();BG[n].src=BILD[n];}
+function laenge(P){let L=0;const s=[0];for(let i=1;i<P.length;i++){L+=Math.hypot(P[i][0]-P[i-1][0],P[i][1]-P[i-1][1]);s.push(L);}return {P,s,L};}
+function lauf(Pf,u){u=clamp(u,0,1)*Pf.L;let i=1;while(i<Pf.P.length-1&&Pf.s[i]<u)i++;const a=Pf.P[i-1],b=Pf.P[i],k=(u-Pf.s[i-1])/((Pf.s[i]-Pf.s[i-1])||1);
+  return {x:a[0]+(b[0]-a[0])*k,y:a[1]+(b[1]-a[1])*k,w:Math.atan2(b[1]-a[1],b[0]-a[0])};}
+const PFLUG=laenge(D.pflug),BAHN=laenge(D.bahn);
+const SEE=D.see;function seePfad(c){const n=SEE.length;c.beginPath();c.moveTo(SEE[0][0],SEE[0][1]);
+  for(let i=0;i<n;i++){const p0=SEE[(i-1+n)%n],p1=SEE[i],p2=SEE[(i+1)%n],p3=SEE[(i+2)%n];c.bezierCurveTo(p1[0]+(p2[0]-p0[0])/6,p1[1]+(p2[1]-p0[1])/6,p2[0]-(p3[0]-p1[0])/6,p2[1]-(p3[1]-p1[1])/6,p2[0],p2[1]);}c.closePath();}
+// Wassermaske je Hintergrund: nur echte Wasserpixel (Schilf bleibt frei)
+const WMASKE={};function wasserMaske(n){if(WMASKE[n])return WMASKE[n];const img=BG[n];if(!img.complete||!img.naturalWidth)return null;
+  const m=document.createElement('canvas');m.width=W;m.height=H;const g=m.getContext('2d');g.drawImage(img,0,0,W,H);const id=g.getImageData(0,0,W,H),px=id.data;
+  const p=document.createElement('canvas');p.width=W;p.height=H;const q=p.getContext('2d');q.setTransform(K,0,0,K,0,0);seePfad(q);q.lineWidth=30;q.fillStyle='#000';q.strokeStyle='#000';q.fill();q.stroke();const pin=q.getImageData(0,0,W,H).data;
+  for(let i=0;i<px.length;i+=4){const r=px[i],gg=px[i+1],b=px[i+2],wasser=pin[i+3]>0&&b>r+12&&b>=gg-4;px[i]=px[i+1]=px[i+2]=255;px[i+3]=wasser?255:0;}
+  g.putImageData(id,0,0);return WMASKE[n]=m;}
+function imSee(x,y){let c=false;for(let i=0,j=SEE.length-1;i<SEE.length;j=i++){const a=SEE[i],b=SEE[j];if((a[1]>y)!==(b[1]>y)&&x<(b[0]-a[0])*(y-a[1])/(b[1]-a[1])+a[0])c=!c;}return c;}
+const SEEBOX=(()=>{let x0=1e9,x1=-1e9,y0=1e9,y1=-1e9;for(const p of SEE){x0=Math.min(x0,p[0]);x1=Math.max(x1,p[0]);y0=Math.min(y0,p[1]);y1=Math.max(y1,p[1]);}return {x0,x1,y0,y1};})();
+// Kamine: ein Teil der Häuser
+const KAMINE=(()=>{const r=rng(5);return D.haeuser.filter(()=>r()<0.45).concat([[D.haus[0],D.haus[1],8]]);})();
+
+// ---------- Licht ----------
+let S,L;
+let MO;function licht(t,WE){S=sonne(t);MO=mond(t);const tag=smooth(-8,3,S.alt),gold=smooth(14,2,S.alt)*smooth(-4,1,S.alt);
+  const sv=kart(-Math.sin(S.az*rad),Math.cos(S.az*rad)),sl=Math.hypot(...sv)||1;
+  L={tagK:tag,gold,nacht:1-smooth(-7,-1,S.alt),sx:sv[0]/sl,sy:sv[1]/sl,slen:clamp(1/Math.tan(Math.max(S.alt,4)*rad),0.6,6)};}
+function tönung(WE){ // Tag, Abendgold, Nacht, trübes Wetter als Multiplikation
+  let c=[255,255,255];c=mix(c,[255,206,160],L.gold*0.5*(1-WE.bedeckt*0.7));{const mh=MO&&MO.alt>0?MO.frac:0,hell=WE.schneeK*(0.2+0.26*mh)*(1-WE.bedeckt*0.6);c=mix(c,mix([52,64,118],[98,118,172],WE.schneeK*0.8),(1-L.tagK)*0.82*(1-hell));}c=mix(c,[206,210,218],WE.bedeckt*0.45*L.tagK);
+  ctx.save();ctx.globalCompositeOperation='multiply';ctx.fillStyle=rgb(c);ctx.fillRect(0,0,720,1200);ctx.restore();}
+
+// ---------- Bausteine ----------
+const schattenFarbe='rgba(50,40,70,0.32)';
+function auto(x,y,w,farbe,lichter,laenge_=9,breite=4.6){ctx.save();ctx.translate(x,y);ctx.rotate(w);
+  if(L.tagK>0.2){ctx.fillStyle=schattenFarbe;ctx.save();ctx.translate(L.sx*2.5,L.sy*2.5);ctx.fillRect(-laenge_/2,-breite/2,laenge_,breite);ctx.restore();}
+  ctx.fillStyle=rgb(farbe);ctx.beginPath();ctx.roundRect(-laenge_/2,-breite/2,laenge_,breite,1.4);ctx.fill();
+  ctx.fillStyle=rgb(mix(farbe,[220,230,240],0.45));ctx.fillRect(laenge_*0.08,-breite/2+0.7,laenge_*0.22,breite-1.4);
+  if(lichter){ctx.globalCompositeOperation='lighter';const g=ctx.createRadialGradient(laenge_/2+8,0,0,laenge_/2+8,0,14);g.addColorStop(0,'rgba(255,236,190,0.55)');g.addColorStop(1,'rgba(255,236,190,0)');ctx.fillStyle=g;ctx.beginPath();ctx.moveTo(laenge_/2,0);ctx.lineTo(laenge_/2+22,-8);ctx.lineTo(laenge_/2+22,8);ctx.closePath();ctx.fill();}
+  ctx.restore();}
+
+// Zug am Westufer: halbstündlich je Richtung
+function zug(t){const s=sekTag(t),m=(s/60)%60;for(const [ab,dir] of [[7,1],[37,1],[22,-1],[52,-1]]){const ph=(m-ab)*60;if(ph<0||ph>110)continue;
+  const u0=dir>0?ph/110:1-ph/110;for(let i=0;i<4;i++){const p=lauf(BAHN,clamp(u0-dir*i*0.018,0,1));if(p.y<-20||p.y>1220)continue;
+    ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.w);if(L.tagK>0.2){ctx.fillStyle=schattenFarbe;ctx.fillRect(-6+L.sx*3,-2.4+L.sy*3,12,4.8);}
+    ctx.fillStyle=i===0?'#c8403a':'#d24e44';ctx.beginPath();ctx.roundRect(-6,-2.4,12,4.8,1.2);ctx.fill();ctx.fillStyle='#f2ece4';ctx.fillRect(-5,-0.5,10,1);
+    if(L.nacht>0.3){ctx.globalCompositeOperation='lighter';ctx.fillStyle=`rgba(255,226,160,${0.7*L.nacht})`;ctx.fillRect(-5,-2.6,10,1.2);ctx.fillRect(-5,1.4,10,1.2);}
+    ctx.restore();}}}
+
+// Räumdienst bei Schnee: alle 50 Minuten von 6 bis 18 Uhr
+function raeumdienst(t,WE){if(!WE.decke)return;const s=sekTag(t),k=Math.floor((s-6*3600-20*60)/3000),ph=s-6*3600-20*60-k*3000;if(k<0||s>18*3600||ph>170)return;
+  const u=k%2?1-ph/170:ph/170,p=lauf(PFLUG,u);auto(p.x,p.y,p.w+(k%2?Math.PI:0),[236,140,40],L.nacht>0.35,12,5.2);
+  if(Math.floor(s*2.5)%2){ctx.save();ctx.globalCompositeOperation='lighter';const g=ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,10);g.addColorStop(0,'rgba(255,190,60,0.9)');g.addColorStop(1,'rgba(255,190,60,0)');ctx.fillStyle=g;ctx.fillRect(p.x-10,p.y-10,20,20);ctx.restore();}}
+
+// Heißluftballon an ruhigen, klaren Morgen und Abenden – groß, weil er uns nah ist
+function ballon(t,WE){if(!flag('ballon')&&(WE.wind>15||WE.wolken>55||WE.art!=='klar'&&WE.art!=='wolken'))return;
+  const liste=flag('ballon')?[[SIM?SIM.at-4*6e4:t,[[226,76,60],[250,206,90]]]]:[[kreuz(t,4,true),[[226,76,60],[250,206,90]]],[kreuz(t,16,false),[[60,120,190],[240,240,232]]]];
+  for(const [st,farbe] of liste){if(!st)continue;const ph=(t-st)/(25*6e4);if(ph<0||ph>1)continue;
+    const md=WE.md,x=360-md[0]*380+md[0]*760*ph+70*Math.sin(ph*5),y=600-md[1]*480+md[1]*960*ph,hoch=90+50*Math.sin(ph*Math.PI),R=30;
+    if(x<-60||x>780||y<-60||y>1260)continue;
+    const so=hoch*Math.min(L.slen,3)*0.8;ctx.fillStyle=`rgba(50,40,70,${0.22*L.tagK})`;ctx.beginPath();ctx.ellipse(x+L.sx*so,y+L.sy*so,R*0.95,R*0.8,Math.atan2(L.sy,L.sx),0,TAU);ctx.fill();
+    for(let i=0;i<12;i++){ctx.fillStyle=rgb(farbe[i%2]);ctx.beginPath();ctx.moveTo(x,y);ctx.arc(x,y,R,i/12*TAU,(i+1)/12*TAU);ctx.closePath();ctx.fill();}
+    ctx.strokeStyle='rgba(120,60,40,0.25)';ctx.lineWidth=0.8;for(let i=0;i<12;i++){const w=i/12*TAU;ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+Math.cos(w)*R,y+Math.sin(w)*R);ctx.stroke();}
+    const g=ctx.createRadialGradient(x-R*0.35-L.sx*8,y-R*0.35-L.sy*8,0,x,y,R);g.addColorStop(0,'rgba(255,255,255,0.4)');g.addColorStop(0.6,'rgba(255,255,255,0)');g.addColorStop(1,'rgba(40,20,40,0.25)');ctx.fillStyle=g;ctx.beginPath();ctx.arc(x,y,R,0,TAU);ctx.fill();
+    ctx.fillStyle=rgb(farbe[1]);ctx.beginPath();ctx.arc(x,y,R*0.22,0,TAU);ctx.fill();ctx.fillStyle='#5e432f';ctx.beginPath();ctx.roundRect(x-4,y-4,8,8,1.5);ctx.fill();
+    if(Math.sin(t/700)>0.7){ctx.save();ctx.globalCompositeOperation='lighter';const f=ctx.createRadialGradient(x,y,0,x,y,10);f.addColorStop(0,'rgba(255,200,90,0.8)');f.addColorStop(1,'rgba(255,200,90,0)');ctx.fillStyle=f;ctx.fillRect(x-10,y-10,20,20);ctx.restore();}}}
+
+// Leben auf dem See: Schwäne immer gemächlich, Segler bei Wind im Sommerhalbjahr
+function seeleben(t,WE){if(WE.eis>0.6||L.tagK<0.3)return;const s=t/1000;
+  for(let k=0;k<2;k++){const a=s/260+k*0.18,x=(SEEBOX.x0+SEEBOX.x1)/2+60*Math.sin(a*1.3),y=SEEBOX.y0+180+300*(0.5+0.5*Math.sin(a))+k*8,w=Math.atan2(300*Math.cos(a),60*1.3*Math.cos(a*1.3));
+    if(!imSee(x,y))continue;ctx.save();ctx.translate(x+k*6,y);ctx.rotate(w);ctx.strokeStyle='rgba(255,255,255,0.35)';ctx.lineWidth=0.8;ctx.beginPath();ctx.moveTo(-3,0);ctx.lineTo(-18,-5);ctx.moveTo(-3,0);ctx.lineTo(-18,5);ctx.stroke();
+    ctx.fillStyle='#fbfaf6';ctx.beginPath();ctx.ellipse(0,0,3.6,2,0,0,TAU);ctx.fill();ctx.fillRect(2,-0.6,3,1.2);ctx.restore();}
+  const mon=berlin(t).getMonth()+1;if(mon<4||mon>10||WE.wind<8||WE.art==='regen')return;const md=WE.md,ww=Math.atan2(md[1],md[0]);
+  for(let k=0;k<4;k++){const a=s/(160+k*40)+k*2,x=(SEEBOX.x0+SEEBOX.x1)/2+55*Math.sin(a*0.7+k),y=SEEBOX.y0+120+(SEEBOX.y1-SEEBOX.y0-240)*(0.5+0.5*Math.sin(a));if(!imSee(x,y))continue;
+    const kurs=Math.atan2((SEEBOX.y1-SEEBOX.y0-240)*0.5*Math.cos(a),55*0.7*Math.cos(a*0.7+k)),kraengung=Math.sin(ww-kurs);
+    ctx.save();ctx.translate(x,y);ctx.rotate(kurs);
+        ctx.fillStyle='rgba(30,40,60,0.25)';ctx.beginPath();ctx.moveTo(-6+L.sx*3,L.sy*3);ctx.lineTo(8+L.sx*3,L.sy*3);ctx.lineTo(L.sx*3,(kraengung>0?-1:1)*13+L.sy*3);ctx.closePath();ctx.fill();
+    ctx.fillStyle='#f6f2ea';ctx.beginPath();ctx.ellipse(0,0,8,2.8,0,0,TAU);ctx.fill();ctx.fillStyle=['#c44a3a','#2f5a8a','#e0a43a','#3d7a5a'][k];ctx.fillRect(-6,-1,9,2);
+    ctx.fillStyle='rgba(255,252,246,0.97)';ctx.beginPath();ctx.moveTo(-5,0);ctx.lineTo(6,0);ctx.lineTo(0,(kraengung>0?-1:1)*12);ctx.closePath();ctx.fill();
+    ctx.strokeStyle='rgba(120,110,100,0.5)';ctx.lineWidth=0.6;ctx.stroke();ctx.restore();}}
+
+// Eis auf dem See: wächst vom Ufer nach innen, ganz zu mit Eisläufern
+const EISCV=document.createElement('canvas');EISCV.width=W;EISCV.height=H;let EISKEY='';
+function eis(t,WE,saison){if(WE.eis<=0.01)return;const m=wasserMaske(saison);if(!m)return;const key=saison+WE.eis.toFixed(2);
+  if(key!==EISKEY){EISKEY=key;const g=EISCV.getContext('2d');g.setTransform(1,0,0,1,0,0);g.clearRect(0,0,W,H);g.globalCompositeOperation='source-over';g.setTransform(K,0,0,K,0,0);g.lineJoin='round';
+    if(WE.eis>=0.98){g.fillStyle='rgb(206,224,236)';g.fillRect(0,0,720,1200);const r=rng(9);g.strokeStyle='rgba(150,180,204,0.7)';g.lineWidth=0.7;
+      for(let i=0;i<30;i++){let x=SEEBOX.x0+r()*(SEEBOX.x1-SEEBOX.x0),y=SEEBOX.y0+r()*(SEEBOX.y1-SEEBOX.y0);g.beginPath();g.moveTo(x,y);for(let k=0;k<4;k++){x+=(r()-0.5)*40;y+=(r()-0.5)*40;g.lineTo(x,y);}g.stroke();}
+      g.fillStyle='rgba(240,246,250,0.5)';for(let i=0;i<40;i++){const x=SEEBOX.x0+r()*(SEEBOX.x1-SEEBOX.x0),y=SEEBOX.y0+r()*(SEEBOX.y1-SEEBOX.y0);g.beginPath();g.ellipse(x,y,10+r()*30,4+r()*8,r()*3,0,TAU);g.fill();}}
+    else{g.filter='blur(9px)';g.strokeStyle='rgb(206,224,236)';g.lineWidth=WE.eis*170;seePfad(g);g.stroke();g.strokeStyle='rgba(236,244,250,0.7)';g.lineWidth=WE.eis*70;seePfad(g);g.stroke();
+      g.strokeStyle='rgba(206,224,236,0.45)';g.lineWidth=WE.eis*220;seePfad(g);g.stroke();g.filter='none';const r=rng(4);g.fillStyle='rgba(214,230,240,0.8)';for(let i=0;i<Math.round(WE.eis*40);i++){const x=SEEBOX.x0+r()*(SEEBOX.x1-SEEBOX.x0),y=SEEBOX.y0+r()*(SEEBOX.y1-SEEBOX.y0);g.beginPath();g.ellipse(x,y,3+r()*9,2+r()*5,r()*3,0,TAU);g.fill();}}
+    g.setTransform(1,0,0,1,0,0);g.globalCompositeOperation='destination-in';g.drawImage(m,0,0);g.globalCompositeOperation='source-over';}
+  ctx.save();ctx.setTransform(1,0,0,1,0,0);ctx.globalAlpha=0.94;ctx.drawImage(EISCV,0,0);ctx.restore();
+  if(WE.eis>=0.98&&L.tagK>0.4){const s=t/1000;for(let k=0;k<7;k++){const r=rng(k*31+2),cx=(SEEBOX.x0+SEEBOX.x1)/2+(r()-0.5)*90,cy=SEEBOX.y0+150+r()*(SEEBOX.y1-SEEBOX.y0-300),R=14+r()*24,a=s/(6+r()*5)*(r()<0.5?1:-1);
+    if(!imSee(cx,cy))continue;ctx.strokeStyle='rgba(150,170,190,0.45)';ctx.lineWidth=0.6;ctx.beginPath();ctx.ellipse(cx,cy,R,R*0.6,0,a-1.6,a);ctx.stroke();
+    const x=cx+Math.cos(a)*R,y=cy+Math.sin(a)*R*0.6;ctx.fillStyle='rgba(60,70,100,0.3)';ctx.beginPath();ctx.arc(x+L.sx*2,y+L.sy*2,1.8,0,TAU);ctx.fill();ctx.fillStyle=rgb([[200,60,60],[60,90,160],[40,40,48],[230,170,40]][k%4]);ctx.beginPath();ctx.arc(x,y,2,0,TAU);ctx.fill();}}}
+
+// Rauch aus den Kaminen, wenn es kalt ist
+function rauch(t,WE){if(WE.temp>8)return;const s=t/1000,md=kart(Math.sin((WE.dir+180)*rad),-Math.cos((WE.dir+180)*rad)),v=4+WE.wind*0.5;
+  for(let i=0;i<KAMINE.length;i++){const [hx,hy]=KAMINE[i],r=rng(i+3);if(L.nacht>0.5&&r()<0.4)continue;
+    for(let k=0;k<5;k++){const age=((s*0.22+k/5+r())%1);const x=hx+md[0]*age*v*6+Math.sin(age*6+i)*1.5,y=hy-2+md[1]*age*v*6+Math.cos(age*5+i)*1.5;
+      ctx.fillStyle=`rgba(240,240,244,${(1-age)*0.6*(1-L.nacht*0.4)})`;ctx.beginPath();ctx.arc(x,y,1.6+age*5,0,TAU);ctx.fill();}}}
+
+// Rehe am Waldrand in der Dämmerung (Spuren bei Schnee)
+const REHE=[[95,642],[545,614],[160,886]];
+function rehe(t,WE){if(S.alt>3||S.alt<-7)return;const s=t/1000;
+  for(let g=0;g<REHE.length;g++){const [gx,gy]=REHE[g];for(let k=0;k<3;k++){const r=rng(g*17+k),x=gx+(r()-0.5)*18+6*Math.sin(s/40+k+g),y=gy+(r()-0.5)*12+4*Math.cos(s/55+k);
+    if(WE.decke){ctx.fillStyle='rgba(120,130,160,0.35)';for(let i=1;i<8;i++){ctx.fillRect(x-i*3+Math.sin(i)*1.5,y+i*2.2,1,1);}}
+    ctx.fillStyle='rgba(40,30,50,0.3)';ctx.beginPath();ctx.ellipse(x+1.5,y+1.5,4,2.1,0.4,0,TAU);ctx.fill();ctx.fillStyle=rgb([172,122,78]);ctx.beginPath();ctx.ellipse(x,y,4,2.1,0.4,0,TAU);ctx.fill();ctx.beginPath();ctx.arc(x+3.8,y+1.8,1.5,0,TAU);ctx.fill();ctx.fillStyle='#f4ece0';ctx.beginPath();ctx.arc(x-3.4,y-1.4,1,0,TAU);ctx.fill();}}}
+
+// Schlittenhang bei Schnee: nachmittags, am Wochenende länger
+const HANG=[[602,282],[642,372]];
+function schlitten(t,WE){if(!WE.decke)return;const d=berlin(t),s=sekTag(t),we=d.getDay()===0||d.getDay()===6;if(s<(we?10:13.5)*3600||s>16.5*3600||L.tagK<0.5)return;
+  const [a,b]=HANG;ctx.strokeStyle='rgba(170,180,200,0.5)';ctx.lineWidth=0.6;for(let i=0;i<3;i++){ctx.beginPath();ctx.moveTo(a[0]+i*4,a[1]);ctx.lineTo(b[0]+i*4,b[1]);ctx.stroke();}
+  for(let k=0;k<(we?6:4);k++){const ph=((t/1000)/70+k/5)%1,runter=ph<0.25,u=runter?ph/0.25:1-(ph-0.25)/0.75,x=a[0]+(b[0]-a[0])*u+k*3-6,y=a[1]+(b[1]-a[1])*u;
+    ctx.fillStyle=rgb([[220,60,60],[60,110,200],[240,190,40],[60,160,90],[200,90,170],[240,120,40]][k]);ctx.beginPath();ctx.arc(x,y,1.9,0,TAU);ctx.fill();
+    if(runter){ctx.fillStyle='#7a5234';ctx.fillRect(x-2.4,y+1.4,4.8,1.2);}}}
+
+// Krähenschwarm in der Dämmerung: abends zum Schlafplatz, morgens zurück
+function kraehen(t){const abends=S.az>180;let ph;if(abends&&S.alt<2&&S.alt>-3)ph=(2-S.alt)/5;else if(!abends&&S.alt>-4&&S.alt<1)ph=1-(S.alt+4)/5;else return;
+  const x0=760,y0=380,x1=120,y1=760,cx=x0+(x1-x0)*ph,cy=y0+(y1-y0)*ph+40*Math.sin(ph*6),s=t/1000;
+  ctx.strokeStyle='rgba(28,26,34,0.85)';ctx.lineWidth=1;for(let i=0;i<46;i++){const r=rng(i+7),ox=(r()-0.5)*90+18*Math.sin(s*0.7+i),oy=(r()-0.5)*50+12*Math.cos(s*0.9+i*1.3),x=cx+ox,y=cy+oy,f=Math.sin(s*10+i)*1.6;
+    ctx.beginPath();ctx.moveTo(x-3,y-f);ctx.lineTo(x,y);ctx.lineTo(x+3,y-f);ctx.stroke();}}
+
+// Wolken mit Schatten: weiche Sprites, Zugrichtung nach echtem Wind
+const WOLKSPR=[];function wolkSprite(i){if(WOLKSPR[i])return WOLKSPR[i];const r=rng(i*7+3),c=document.createElement('canvas');c.width=420;c.height=260;const g=c.getContext('2d');
+  const blobs=[];for(let k=0;k<11;k++){const a=r()*TAU,d=r();blobs.push([210+Math.cos(a)*d*120,130+Math.sin(a)*d*55,40+r()*42]);}
+  for(const [x,y,R] of blobs){const gr=g.createRadialGradient(x,y,0,x,y,R);gr.addColorStop(0,'rgba(255,255,255,0.55)');gr.addColorStop(0.55,'rgba(255,255,255,0.32)');gr.addColorStop(1,'rgba(255,255,255,0)');g.fillStyle=gr;g.fillRect(x-R,y-R,2*R,2*R);}
+  // leichte Schattierung unten
+  g.globalCompositeOperation='source-atop';const sh=g.createLinearGradient(0,60,0,240);sh.addColorStop(0,'rgba(255,255,255,0)');sh.addColorStop(1,'rgba(150,150,180,0.35)');g.fillStyle=sh;g.fillRect(0,0,420,260);
+  const d=document.createElement('canvas');d.width=420;d.height=260;const h=d.getContext('2d');h.drawImage(c,0,0);h.globalCompositeOperation='source-in';h.fillStyle='rgb(40,34,70)';h.fillRect(0,0,420,260);
+  return WOLKSPR[i]={hell:c,dunkel:d,sk:0.7+r()*0.6};}
+function wolken(t,WE){const n=WE.wolken<25?0:Math.round(2+(WE.wolken-25)/75*8);if(n<1)return;const s=t/1000,md=kart(Math.sin((WE.dir+180)*rad),-Math.cos((WE.dir+180)*rad)),v=0.6+WE.wind*0.08;
+  const dicht=WE.bedeckt>0.9&&WE.art!=='gewitter',pos=[];for(let i=0;i<n;i++){const r=rng(i*13+5),bx=r()*1200-240,by=r()*1700-250;let x=bx+md[0]*s*v,y=by+md[1]*s*v;x=((x+240)%1200+1200)%1200-240;y=((y+250)%1700+1700)%1700-250;pos.push([x,y,i]);}
+  ctx.save();if(L.tagK>0.15&&!dicht){ctx.globalAlpha=0.3*L.tagK;for(const [x,y,i] of pos){const sp=wolkSprite(i),w=420*0.6*sp.sk,h=260*0.6*sp.sk;ctx.drawImage(sp.dunkel,x+L.sx*80-w/2,y+L.sy*80-h/2,w,h);}}
+  const hell=dicht?0.55:0.9;ctx.globalAlpha=hell*(0.35+0.65*L.tagK);ctx.filter=L.tagK<0.5?'brightness('+(0.45+L.tagK)+')':'none';
+  for(const [x,y,i] of pos){const sp=wolkSprite(i),w=420*0.6*sp.sk,h=260*0.6*sp.sk;ctx.drawImage(sp.hell,x-w/2,y-h/2,w,h);}ctx.restore();}
+function niederschlag(t,WE){const s=t/1000,r=rng(77);
+  if(WE.art==='regen'||WE.art==='gewitter'){ctx.strokeStyle=`rgba(200,214,236,${0.35+0.2*L.tagK})`;ctx.lineWidth=0.8;ctx.beginPath();for(let i=0;i<320;i++){const x=(r()*720+s*40)%720,y=(r()*1200+s*(500+r()*200))%1200;ctx.moveTo(x,y);ctx.lineTo(x-2,y+7);}ctx.stroke();
+    ctx.save();seePfad(ctx);ctx.clip();ctx.strokeStyle='rgba(220,232,246,0.4)';for(let i=0;i<40;i++){const ph=(s*0.8+r())%1,x=SEEBOX.x0+r()*(SEEBOX.x1-SEEBOX.x0),y=SEEBOX.y0+r()*(SEEBOX.y1-SEEBOX.y0);ctx.beginPath();ctx.arc(x,y,ph*5,0,TAU);ctx.stroke();}ctx.restore();}
+  if(WE.art==='schneefall'){ctx.fillStyle='rgba(252,252,255,0.85)';for(let i=0;i<260;i++){const x=(r()*720+Math.sin(s*0.7+i)*10+s*8+720)%720,y=(r()*1200+s*(25+r()*25))%1200;ctx.beginPath();ctx.arc(x,y,0.9+r()*1.4,0,TAU);ctx.fill();}}
+  if(WE.art==='nebel'){const c=mix([236,236,232],[70,76,96],1-L.tagK);ctx.fillStyle=rgb(c,0.38);ctx.fillRect(0,0,720,1200);
+    for(let i=0;i<14;i++){const rr=rng(i+40),x=((rr()*900+s*3)%900)-90,y=rr()*1200,R=90+rr()*120;const g=ctx.createRadialGradient(x,y,0,x,y,R);g.addColorStop(0,rgb(c,0.45));g.addColorStop(1,rgb(c,0));ctx.fillStyle=g;ctx.fillRect(x-R,y-R,2*R,2*R);}
+    ctx.save();seePfad(ctx);ctx.clip();ctx.fillStyle=rgb(c,0.22);ctx.fillRect(0,0,720,1200);ctx.restore();}}
+
+// Lichter: jedes Haus hat seine eigene Schlafenszeit
+function lichter(t){if(L.nacht<0.05)return;const s=sekTag(t)/3600;ctx.save();ctx.globalCompositeOperation='lighter';
+  D.haeuser.forEach((h,i)=>{const r=rng(i+101),bewohnt=r()<0.85,aus=20.4+r()*3.1,auf=5.5+r()*1.6,eule=r()<0.07,frueh=r()<0.5;
+    const an=(bewohnt&&s>15&&s<aus)||(eule&&(s>15||s<1.2))||(frueh&&s>auf&&s<9);if(!an)return;
+    const g=ctx.createRadialGradient(h[0],h[1],0,h[0],h[1],6);g.addColorStop(0,`rgba(255,206,130,${0.4*L.nacht})`);g.addColorStop(1,'rgba(255,206,130,0)');ctx.fillStyle=g;ctx.fillRect(h[0]-6,h[1]-6,12,12);
+    ctx.fillStyle=`rgba(255,226,160,${0.9*L.nacht})`;ctx.fillRect(h[0]-0.9,h[1]-0.9,1.8,1.8);});
+  const [hx,hy]=D.haus;if(s>6.3&&s<23){const g=ctx.createRadialGradient(hx,hy,0,hx,hy,14);g.addColorStop(0,`rgba(255,214,140,${0.7*L.nacht})`);g.addColorStop(1,'rgba(255,214,140,0)');ctx.fillStyle=g;ctx.fillRect(hx-14,hy-14,28,28);
+    ctx.fillStyle=`rgba(255,232,170,${L.nacht})`;ctx.fillRect(hx-2,hy-1,1.6,1.6);ctx.fillRect(hx+1,hy-1,1.6,1.6);}
+  ctx.restore();}
+
+// ================= Neue Wetter- und Himmelsdinge =================
+const SEEMITTE=[(SEEBOX.x0+SEEBOX.x1)/2,(SEEBOX.y0+SEEBOX.y1)/2];
+// Glitzerpfad auf dem See (Sonne tagsüber, Mond nachts), Richtung = echter Azimut
+function glitzerBand(t,az,staerke,farbe,anzahl,breite){if(staerke<0.02)return;const v=kart(Math.sin(az*rad),-Math.cos(az*rad)),n=[-v[1],v[0]],s=t/1000;
+  ctx.save();seePfad(ctx);ctx.clip();ctx.globalCompositeOperation='lighter';
+  for(let i=0;i<anzahl;i++){const r=rng(i*7+13),u=(r()-0.5)*1300,q=(r()+r()+r()-1.5)*breite,x=SEEMITTE[0]+v[0]*u+n[0]*q,y=SEEMITTE[1]+v[1]*u+n[1]*q;
+    const fl=Math.max(0,Math.sin(s*(2+r()*4)+r()*20));const a=staerke*fl*fl*(1-Math.abs(q)/(breite*1.6));if(a<0.03)continue;
+    ctx.fillStyle=rgb(farbe,Math.min(1,a*1.4));const l=3+r()*6;ctx.fillRect(x-l/2,y-0.8,l,1.6);}
+  const g=ctx.createLinearGradient(SEEMITTE[0]-n[0]*breite*1.5,SEEMITTE[1]-n[1]*breite*1.5,SEEMITTE[0]+n[0]*breite*1.5,SEEMITTE[1]+n[1]*breite*1.5);
+  g.addColorStop(0,rgb(farbe,0));g.addColorStop(0.5,rgb(farbe,staerke*0.16));g.addColorStop(1,rgb(farbe,0));ctx.fillStyle=g;ctx.fillRect(0,0,720,1200);ctx.restore();}
+function sonnenglitzern(t,WE){if(WE.eis>0.6||S.alt<2)return;const st=(1-WE.bedeckt)*L.tagK*(0.6+0.4*smooth(25,5,S.alt));glitzerBand(t,S.az,st*0.9,[255,248,226],420,34+WE.wind*1.2);}
+function mondpfad(t,WE){if(WE.eis>0.6||MO.alt<1||L.nacht<0.3)return;const st=Math.pow(MO.frac,6)*L.nacht*(1-WE.bedeckt*0.85);glitzerBand(t,MO.az,st*0.6,[226,234,255],180,16+WE.wind*0.8);}
+// Mondphase neben der Uhr
+function mondIcon(cx,cy,r){const f=MO.frac,anti=MO.zunehmend!==(f>0.5);ctx.save();ctx.shadowColor='rgba(20,18,30,0.4)';ctx.shadowBlur=8;
+  ctx.fillStyle='rgba(255,255,255,0.16)';ctx.beginPath();ctx.arc(cx,cy,r,0,TAU);ctx.fill();ctx.shadowBlur=0;ctx.fillStyle='rgba(252,248,232,0.95)';ctx.beginPath();
+  ctx.arc(cx,cy,r,-Math.PI/2,Math.PI/2,!MO.zunehmend);ctx.ellipse(cx,cy,Math.max(0.01,r*Math.abs(2*f-1)),r,0,Math.PI/2,-Math.PI/2,anti);ctx.fill();ctx.restore();}
+// Böen: Katzenpfoten – Felder aus kleinen Kräuselwellen, die mit dem Wind übers Wasser laufen; Flaute: spiegelglatt
+function boeen(t,WE){if(WE.eis>0.6)return;ctx.save();seePfad(ctx);ctx.clip();const s=t/1000;
+  if(WE.wind<4&&WE.art!=='regen'){ctx.fillStyle=`rgba(255,255,255,${0.08*L.tagK})`;ctx.fillRect(0,0,720,1200);ctx.restore();return;}
+  const n=Math.round(clamp((WE.wind-6)/1.6,0,22)),md=WE.md,w=Math.atan2(md[1],md[0]),v=2+WE.wind*0.28,bw=SEEBOX.x1-SEEBOX.x0,bh=SEEBOX.y1-SEEBOX.y0,qx=-md[1],qy=md[0];
+  const stark=clamp(0.35+WE.wind/60,0,1);ctx.lineCap='round';
+  for(let i=0;i<n;i++){const r=rng(i*29+3),per=16+r()*16,ph=((s/per)+r())%1,id=Math.floor(s/per+r()),r2=rng(i*29+id*7);
+    const cx=SEEBOX.x0+r2()*bw+md[0]*v*(ph-0.5)*per,cy=SEEBOX.y0+r2()*bh+md[1]*v*(ph-0.5)*per,lx=30+r2()*55,ly=14+r2()*22,a=Math.sin(ph*Math.PI)*stark;
+    const g=ctx.createRadialGradient(cx,cy,0,cx,cy,lx);g.addColorStop(0,`rgba(26,46,70,${0.26*a})`);g.addColorStop(1,'rgba(30,52,74,0)');ctx.fillStyle=g;ctx.save();ctx.translate(cx,cy);ctx.rotate(w);ctx.scale(1,ly/lx);ctx.translate(-cx,-cy);ctx.beginPath();ctx.arc(cx,cy,lx,0,TAU);ctx.fill();ctx.restore();
+    const m=Math.round(40+lx*1.1);for(let k=0;k<m;k++){const u=(r2()*2-1),q=(r2()*2-1);if(u*u+q*q>1)continue;const px=cx+md[0]*u*lx+qx*q*ly,py=cy+md[1]*u*lx+qy*q*ly,fade=1-(u*u+q*q),l=3+r2()*4;
+      const hell=r2()<0.35;ctx.strokeStyle=hell?`rgba(236,244,250,${0.75*a*Math.sqrt(fade)*L.tagK})`:`rgba(20,38,60,${0.8*a*Math.sqrt(fade)})`;ctx.lineWidth=hell?0.9:1.2;
+      ctx.beginPath();ctx.moveTo(px-qx*l/2,py-qy*l/2);ctx.lineTo(px+qx*l/2,py+qy*l/2);ctx.stroke();}}
+  ctx.restore();}
+// Raureif: weiße Felder nach kalter klarer Nacht, taut zuerst in der Sonne, Schattenhänge bleiben länger
+const REIF={};function reifStufen(saison){if(REIF[saison])return REIF[saison];const img=BG[saison],sn=BG.schnee,m=wasserMaske(saison);if(!img.complete||!sn.complete||!m)return null;
+  const c=document.createElement('canvas');c.width=W;c.height=H;const g=c.getContext('2d');g.drawImage(img,0,0,W,H);const src=g.getImageData(0,0,W,H).data;g.drawImage(sn,0,0,W,H);const weiss=g.getImageData(0,0,W,H).data;
+  const mg=m.getContext('2d').getImageData(0,0,W,H).data,out=[];
+  for(const thr of [2,0.62,0.5,0.4]){const k=document.createElement('canvas');k.width=W;k.height=H;const kg=k.getContext('2d'),id=kg.createImageData(W,H),px=id.data;
+    for(let i=0;i<px.length;i+=4){const lum=(0.3*src[i]+0.59*src[i+1]+0.11*src[i+2])/255;px[i]=weiss[i];px[i+1]=weiss[i+1];px[i+2]=weiss[i+2];px[i+3]=mg[i+3]?0:255*clamp((thr-lum)/0.07,0,1);}
+    kg.putImageData(id,0,0);out.push(k);}
+  return REIF[saison]=out;}
+function raureif(t,WE,saison){if(!WE.raureif||WE.decke)return;const st=reifStufen(saison);if(!st)return;const auf=kreuz(t,0,true);let m=auf?Math.max(0,(t-auf)/(2.6*36e5)):0;if(m>=1.25)return;
+  const f=Math.min(m,1)*3,i=Math.floor(Math.min(f,2.999)),k=f-i,ges=WE.raureif*0.93*(1-smooth(1,1.25,m));ctx.save();ctx.setTransform(1,0,0,1,0,0);
+  ctx.globalAlpha=ges*(1-k);ctx.drawImage(st[i],0,0);ctx.globalAlpha=ges*k;ctx.drawImage(st[i+1],0,0);ctx.restore();}
+// Morgennebel: liegt als Bank über dem See und den feuchten Wiesen, löst sich mit der Sonne auf
+let MNEB=null;function mnebelBild(){if(MNEB)return MNEB;const c=document.createElement('canvas');c.width=W;c.height=H;const g=c.getContext('2d');g.setTransform(K,0,0,K,0,0);
+  g.fillStyle='#fff';g.strokeStyle='#fff';g.lineJoin='round';g.filter='blur(26px)';g.globalAlpha=0.55;g.lineWidth=300;seePfad(g);g.stroke();
+  g.filter='blur(18px)';g.globalAlpha=0.85;g.lineWidth=150;seePfad(g);g.stroke();g.globalAlpha=1;g.lineWidth=70;seePfad(g);g.fill();g.stroke();
+  // Nebelzungen in die feuchten Wiesen und Senken
+  const r=rng(61);g.filter='blur(45px)';for(let i=0;i<34;i++){const a=r()*TAU,u=r(),p=SEE[Math.floor(r()*SEE.length)],R=40+r()*90;g.globalAlpha=0.35+r()*0.4;g.beginPath();g.ellipse(p[0]+Math.cos(a)*(60+u*110),p[1]+Math.sin(a)*(40+u*80),R,R*0.55,a,0,TAU);g.fill();}
+  g.filter='blur(40px)';g.globalAlpha=0.9;for(const [x,y,rx,ry] of [[300,1150,170,80],[430,1110,120,60],[220,1070,100,60],[150,560,90,50],[600,980,90,50]]){g.beginPath();g.ellipse(x,y,rx,ry,0,0,TAU);g.fill();}return MNEB=c;}
+function morgennebel(t,WE){if(WE.mnebel<0.02)return;const s=t/1000;ctx.save();ctx.setTransform(1,0,0,1,0,0);ctx.globalAlpha=WE.mnebel*0.92;ctx.drawImage(mnebelBild(),Math.sin(s/60)*10,Math.cos(s/80)*6);ctx.restore();
+}
+// Regenbogen: großer Bogen auf der sonnenabgewandten Seite
+function regenbogen(t,WE){if(WE.rbogen<0.02)return;const cx=360-L.sx*640,cy=600-L.sy*640,R=900;const F=[[220,60,60],[240,140,50],[245,220,70],[90,190,90],[70,140,220],[90,80,190],[150,80,190]];
+  ctx.save();ctx.filter='blur(3px)';ctx.globalCompositeOperation='screen';for(let i=0;i<F.length;i++){ctx.strokeStyle=rgb(F[i],0.3*WE.rbogen);ctx.lineWidth=9;ctx.beginPath();ctx.arc(cx,cy,R-i*8,0,TAU);ctx.stroke();}
+  ctx.strokeStyle=`rgba(255,255,255,${0.08*WE.rbogen})`;ctx.lineWidth=60;ctx.beginPath();ctx.arc(cx,cy,R-90,0,TAU);ctx.stroke();ctx.restore();}
+// Kondensstreifen wie echt: zwei dünne Triebwerksstreifen, verschmelzen, quellen auf und zerfallen in Wölkchen
+const PUFF=(()=>{const mk=c=>{const k=document.createElement('canvas');k.width=k.height=64;const g=k.getContext('2d'),gr=g.createRadialGradient(32,32,0,32,32,32);gr.addColorStop(0,c+'1)');gr.addColorStop(0.45,c+'0.55)');gr.addColorStop(1,c+'0)');g.fillStyle=gr;g.fillRect(0,0,64,64);return k;};
+  return {hell:mk('rgba(255,255,255,'),dunkel:mk('rgba(46,40,82,')};})();
+function kondens(t,WE){if(WE.bedeckt>0.9||WE.art==='nebel'||L.tagK<0.25)return;const s=t/1000,slot=Math.floor(s/330),v=5;
+  for(let k=slot-2;k<=slot;k++){const r=rng(k*977+1),ts=k*330+r()*200,age=s-ts;if(age<0||age>800)continue;
+    const w=(r()<0.6?0:Math.PI)+(r()-0.5)*1.1,d=[Math.cos(w),Math.sin(w)],n=[-d[1],d[0]],off=(r()-0.5)*900,P0=[360+n[0]*off-d[0]*800,600+n[1]*off-d[1]*800],len=Math.min(age*v,1700);
+    const head=[P0[0]+d[0]*len,P0[1]+d[1]*len],sl=Math.min(260,90*L.slen),dauer=420+r()*420;
+    for(const sch of [1,0]){if(sch&&L.tagK<0.4)continue;const ox=sch?L.sx*sl:0,oy=sch?L.sy*sl:0,spr=sch?PUFF.dunkel:PUFF.hell;
+      for(let x=3;x<len;x+=3.5){const sa=x/v;if(sa>dauer*1.3)break;const rr=rng(k*5000+Math.floor(x/3.5));
+        // Zerfall: lange Wellen löchern den Streifen, einzelne Wölkchen bleiben länger
+        const loch=0.75+0.25*Math.sin(x*0.045+k)*Math.sin(x*0.011+k*2),a0=Math.exp(-sa/75)*smooth(1.5,6,sa)*loch*(1-smooth(380,560,age));if(sa>330)break;
+        const breite=1.6+sa/16+rr()*sa/30,a=clamp(a0,0,1)*(sch?0.07*L.tagK:0.6*(0.55+0.45*L.tagK))*clamp(3.5/(breite*0.8),0.06,1);if(a<0.004)continue;
+        const drift=Math.sin(x*0.02+k)*sa/90+(rr()-0.5)*sa/60,auf=sa<12?2.2*(1-sa/12):0;
+        ctx.globalAlpha=a;for(const sp of (auf>0.3?[-auf,auf]:[0])){const px=head[0]-d[0]*x+n[0]*(drift+sp)+ox,py=head[1]-d[1]*x+n[1]*(drift+sp)+oy,sz=breite*(auf>0.3?0.6:1)*(0.8+rr()*0.5);
+          ctx.drawImage(spr,px-sz,py-sz,sz*2,sz*2);}}}
+    ctx.globalAlpha=1;
+    if(age*v<1700){ctx.fillStyle='rgba(255,255,255,0.95)';ctx.save();ctx.translate(head[0],head[1]);ctx.rotate(w);ctx.beginPath();ctx.ellipse(0,0,3.2,0.8,0,0,TAU);ctx.fill();ctx.fillRect(-0.8,-3.2,1.4,6.4);ctx.restore();}}}
+// Gewitter: dunkle Zellen und Blitze, die das ganze Bild aufhellen
+function gewitter(t,WE){if(WE.art!=='gewitter')return;ctx.save();ctx.globalCompositeOperation='multiply';ctx.fillStyle='rgb(150,150,176)';ctx.fillRect(0,0,720,1200);ctx.restore();
+  const s=t/1000,b=Math.floor(s*4),r=rng(b);if(r()<0.035||rng(b-1)()<0.035&&r()<0.5){const x=r()*720,y=r()*1200;ctx.save();ctx.globalCompositeOperation='lighter';ctx.fillStyle='rgba(220,226,255,0.35)';ctx.fillRect(0,0,720,1200);
+    const g=ctx.createRadialGradient(x,y,0,x,y,380);g.addColorStop(0,'rgba(235,240,255,0.55)');g.addColorStop(1,'rgba(235,240,255,0)');ctx.fillStyle=g;ctx.fillRect(0,0,720,1200);ctx.restore();}}
+// Föhn: Linsenwolken (Föhnfische), stehen fast still
+function foehnwolken(t,WE){if(!WE.foehn)return;const s=t/1000;for(const [bx,by,lw,lh] of [[150,330,250,46],[540,900,300,52],[600,240,170,32]]){const x=bx+Math.sin(s/90)*4,y=by,wi=Math.atan2(WE.md[1],WE.md[0])+Math.PI/2;
+  for(const sch of [1,0]){if(sch&&L.tagK<0.3)continue;ctx.save();ctx.translate(x+(sch?L.sx*110:0),y+(sch?L.sy*110:0));ctx.rotate(wi);ctx.filter='blur('+(sch?6:3)+'px)';
+    for(let k=0;k<4;k++){const sk=1-k*0.2;ctx.fillStyle=sch?`rgba(60,46,80,${0.07*L.tagK})`:rgb(mix([255,250,244],[255,214,190],L.gold),0.16+k*0.1);ctx.beginPath();ctx.ellipse(0,-k*3,lw/2*sk,lh/2*sk,0,0,TAU);ctx.fill();}ctx.restore();}}}
+// Wildgänse: großes V, Frühjahr nach Nordost, Herbst nach Südwest
+function gaense(t){const d=berlin(t),mon=d.getMonth()+1;if(!flag('gans')&&![2,3,4,9,10,11].includes(mon))return;if(L.tagK<0.3)return;const s=t/1000;let ph;
+  if(flag('gans'))ph=((t-(SIM?SIM.at:t))/1000+60)/170;else{const sl=Math.floor(s/4200),r=rng(sl*3+11),st=sl*4200+r()*2400;ph=(s-st)/170;}if(ph<0||ph>1)return;
+  const dir=mon<=6?kart(0.72,-0.7):kart(-0.72,0.7),dl=Math.hypot(...dir),dx=dir[0]/dl,dy=dir[1]/dl,cx=360-dx*820+dx*1640*ph,cy=600-dy*820+dy*1640*ph,nx=-dy,ny=dx;
+  for(let i=-7;i<=7;i++){const k=Math.abs(i),x=cx-dx*k*13+nx*i*10+Math.sin(s*1.3+i)*1.5,y=cy-dy*k*13+ny*i*10+Math.cos(s*1.1+i)*1.5,f=Math.sin(s*6+i*0.7)*2.4;
+    if(L.tagK>0.4){ctx.strokeStyle=`rgba(50,40,70,${0.25*L.tagK})`;ctx.lineWidth=1.6;ctx.beginPath();ctx.moveTo(x+L.sx*55-nx*5,y+L.sy*55-ny*5-f*0);ctx.lineTo(x+L.sx*55,y+L.sy*55);ctx.lineTo(x+L.sx*55+nx*5,y+L.sy*55+ny*5);ctx.stroke();}
+    ctx.strokeStyle='rgba(44,40,46,0.92)';ctx.lineWidth=1.8;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(x-nx*6-dx*f,y-ny*6-dy*f);ctx.lineTo(x,y);ctx.lineTo(x+nx*6-dx*f,y+ny*6-dy*f);ctx.stroke();
+    ctx.fillStyle='#3a3530';ctx.beginPath();ctx.ellipse(x,y,3.2,1.6,Math.atan2(dy,dx),0,TAU);ctx.fill();ctx.fillStyle='#f2efe8';ctx.beginPath();ctx.arc(x+dx*3,y+dy*3,0.9,0,TAU);ctx.fill();}}
+
+// ================= Runde 3: Licht, Schnee, Leben =================
+const STRASSEN=D.strassen.map(laenge).filter(r=>r.L>80);
+// Scheinwerfer im Berufsverkehr (nur wenn es dunkel ist)
+function scheinwerfer(t){if(L.nacht<0.2)return;const d=berlin(t),s=sekTag(t),h=s/3600,we=d.getDay()===0||d.getDay()===6;
+  let rate=(h>=6.3&&h<8.2)||(h>=16.3&&h<18.8)?1:(h>=5.5&&h<6.3)||(h>=18.8&&h<22.5)?0.3:(h>=8.2&&h<16.3)?0.4:0.05;if(we)rate*=0.45;if(rate<0.06)return;
+  const per=45/rate;ctx.save();ctx.globalCompositeOperation='lighter';
+  STRASSEN.forEach((R,ri)=>{const dur=R.L/16,sl=Math.floor(s/per);for(let k=sl-Math.ceil(dur/per)-1;k<=sl;k++){const r=rng(ri*7717+k*31),ts=k*per+r()*per*0.7,u=(s-ts)/dur;if(u<0||u>1)continue;
+    const vor=r()<0.5,p=lauf(R,vor?u:1-u),w=p.w+(vor?0:Math.PI),cx=Math.cos(w),sy=Math.sin(w),a=L.nacht;
+    const g=ctx.createRadialGradient(p.x+cx*9,p.y+sy*9,0,p.x+cx*9,p.y+sy*9,13);g.addColorStop(0,`rgba(255,238,196,${0.4*a})`);g.addColorStop(1,'rgba(255,238,196,0)');ctx.fillStyle=g;ctx.fillRect(p.x+cx*9-13,p.y+sy*9-13,26,26);
+    ctx.fillStyle=`rgba(255,248,226,${0.95*a})`;for(const q of [-1.3,1.3]){ctx.beginPath();ctx.arc(p.x+cx*3-sy*q,p.y+sy*3+cx*q,0.9,0,TAU);ctx.fill();}
+    ctx.fillStyle=`rgba(255,60,40,${0.75*a})`;for(const q of [-1.2,1.2]){ctx.beginPath();ctx.arc(p.x-cx*3.5-sy*q,p.y-sy*3.5+cx*q,0.7,0,TAU);ctx.fill();}}});
+  ctx.restore();}
+// Kirchenglocken: Stundenschlag (6–22 Uhr) und Mittagsläuten, als feine Ringe vom Pietzenkirchner Turm
+function glocken(t){const s=sekTag(t),h=Math.floor(s/3600),m=s-h*3600;if(h<6||h>22)return;const [kx,ky]=D.kirche;let schlaege=[];
+  const n=h%12||12;for(let i=0;i<n;i++)schlaege.push(i*2.4);if(h===12)for(let x=n*2.4+3;x<180;x+=1.1)schlaege.push(x);
+  ctx.save();ctx.globalCompositeOperation='lighter';for(const st of schlaege){const p=(m-st)/4.2;if(p<0||p>1)continue;const R=5+p*80,a=(1-p)*(1-p)*0.75*(0.6+0.4*L.tagK+0.4*L.nacht);
+    ctx.strokeStyle=`rgba(255,246,222,${a})`;ctx.lineWidth=1.4*(1-p)+0.4;ctx.beginPath();ctx.ellipse(kx,ky,R,R*0.92,0,0,TAU);ctx.stroke();}ctx.restore();}
+// Eine Front zieht auf: dunkle Wolkenwand schiebt sich vom Westen (gegen den Wind) ins Bild
+function front(t,WE){const f=WE.front;if(f<0.02)return;const md=WE.md,w=Math.atan2(md[1],md[0]),s=t/1000,xF=-760+240+380*f+Math.sin(s/40)*10;
+  ctx.save();ctx.translate(360,600);ctx.rotate(w);
+  const g=ctx.createLinearGradient(xF-260,0,xF+40,0);g.addColorStop(0,`rgba(44,46,66,${0.72*f})`);g.addColorStop(0.55,`rgba(44,46,66,${0.5*f})`);g.addColorStop(1,'rgba(44,46,66,0)');ctx.fillStyle=g;ctx.fillRect(-900,-900,xF+40+900,1800);
+  for(let i=0;i<60;i++){const r=rng(i*13+900),y=-880+i*30+(r()-0.5)*30,x=xF-30-r()*260+Math.sin(s/30+i)*6,sp=wolkSprite(i%9),sk=0.9+r()*0.8;
+    ctx.globalAlpha=0.7*f;ctx.filter='grayscale(1) brightness('+(0.42+0.25*L.tagK)+')';ctx.drawImage(sp.hell,x-126*sk,y-78*sk,252*sk,156*sk);}
+  ctx.filter='none';ctx.globalAlpha=1;ctx.restore();}
+// Letztes (und erstes) Licht auf den Kuppen: Senken zuerst im Schatten, die Kuppen leuchten am längsten
+const HOEHE=new Image();HOEHE.src=D.hoehe;let HDATA=null,KUP={thr:-1,cv:null};
+function kuppenLicht(t,WE){const a=S.alt;if(a>6||a<-3||WE.bedeckt>0.8)return;if(!HOEHE.complete)return;
+  if(!HDATA){const c=document.createElement('canvas');c.width=180;c.height=300;const g=c.getContext('2d');g.drawImage(HOEHE,0,0);HDATA=g.getImageData(0,0,180,300);}
+  const thr=Math.round(clamp((5-a)/6.3,0,1.08)*100)/100,st=(1-smooth(-1.2,-3,a))*(1-WE.bedeckt);if(st<0.02)return;
+  if(KUP.thr!==thr){if(!KUP.cv){KUP.cv=document.createElement('canvas');KUP.cv.width=180;KUP.cv.height=300;}const g=KUP.cv.getContext('2d'),id=g.createImageData(180,300),src=HDATA.data,px=id.data;
+    for(let i=0;i<px.length;i+=4){const h=src[i]/255;px[i]=48;px[i+1]=44;px[i+2]=96;px[i+3]=255*clamp((thr-h)/0.08,0,1);}g.putImageData(id,0,0);KUP.thr=thr;}
+  ctx.save();ctx.setTransform(1,0,0,1,0,0);ctx.globalAlpha=0.5*st;ctx.filter='blur(10px)';ctx.imageSmoothingQuality='high';ctx.drawImage(KUP.cv,0,0,W,H);ctx.restore();}
+// Himmel spiegelt sich im See: Abendrot, dann blaue Stunde
+const SPIEGEL=document.createElement('canvas');SPIEGEL.width=W;SPIEGEL.height=H;
+function himmelSpiegel(t,WE,saison){const a=S.alt;if(a>9||a<-10||WE.eis>0.6||WE.bedeckt>0.85)return;const m=wasserMaske(saison);if(!m)return;
+  const rot=smooth(9,2,a)*(1-smooth(-1,-4,a)),blau=smooth(0,-3,a)*(1-smooth(-7,-10,a)),st=(1-WE.bedeckt*0.8);if(rot+blau<0.03)return;
+  const g=SPIEGEL.getContext('2d');g.setTransform(1,0,0,1,0,0);g.globalCompositeOperation='source-over';g.clearRect(0,0,W,H);
+  const sx=-L.sx,sy=-L.sy,cx=W/2,cy=H/2,gr=g.createLinearGradient(cx-sx*700,cy-sy*700,cx+sx*700,cy+sy*700);
+  const c1=mix([120,120,200],[255,150,118],rot/(rot+blau+1e-6)),c2=mix([60,64,150],[236,120,140],rot/(rot+blau+1e-6));
+  gr.addColorStop(0,rgb(c2,0.55));gr.addColorStop(1,rgb(c1,0.85));g.fillStyle=gr;g.fillRect(0,0,W,H);g.globalCompositeOperation='destination-in';g.drawImage(m,0,0);
+  ctx.save();ctx.setTransform(1,0,0,1,0,0);ctx.globalAlpha=Math.min(1,rot+blau)*0.42*st;ctx.drawImage(SPIEGEL,0,0);ctx.restore();}
+// Schnee kommt und geht langsam: Teil-Schneedecke über dem Grund-Hintergrund
+function teilSchnee(WE,basis){const k=WE.schneeK;if(k<=0.01||k>=0.99)return;const st=reifStufen(basis);if(!st)return;
+  const f=(1-k)*3,i=Math.min(2,Math.floor(f)),q=f-i,ges=smooth(0,0.12,k);ctx.save();ctx.setTransform(1,0,0,1,0,0);
+  ctx.globalAlpha=ges*(1-q);ctx.drawImage(st[i],0,0);ctx.globalAlpha=ges*q;ctx.drawImage(st[i+1],0,0);ctx.restore();}
+
+// ---------- Uhr und Vorhersage ----------
+function symName(f){if(f.name)return f.name;const c=f.code;if(c>=95)return 'gewitter';if(istSchnee(c))return 'schnee';if(istRegen(c))return 'regen';if(f.min!==undefined&&f.min<=0)return 'frost';return c===3||c===45||c===48?'wolke':c===1||c===2?'heiter':'sonne';}
+function vorhersage(t){const d=berlin(t),out=[];const FF=FC_FORCE||(FC?null:VORSCHAU?[{name:'heiter',max:6},{name:'regen',max:4},{name:'frost',max:1}]:null);
+  for(let k=1;k<=3;k++){const dd=new Date(d.getFullYear(),d.getMonth(),d.getDate()+k),wd=WTAG[dd.getDay()];if(FF){if(FF[k-1])out.push({wd,...FF[k-1]});continue;}const e=fcTag(dd);if(e)out.push({wd,...e});}return out;}
+// Flache Icons im Grant-Stil
+function icon(g,name,cx,cy,s,a){const SONNE=rgb([255,188,64],a),WOLKE=rgb([246,248,252],a),BLAU=rgb([84,144,226],a),EIS=rgb([120,186,248],a),GELB=rgb([255,192,36],a);
+  const sonne=(x,y,r)=>{g.fillStyle=SONNE;g.beginPath();g.arc(x,y,r,0,TAU);g.fill();g.strokeStyle=SONNE;g.lineWidth=Math.max(2,r*0.22);g.lineCap='round';for(let i=0;i<8;i++){const w=i/8*TAU;g.beginPath();g.moveTo(x+Math.cos(w)*r*1.4,y+Math.sin(w)*r*1.4);g.lineTo(x+Math.cos(w)*r*1.85,y+Math.sin(w)*r*1.85);g.stroke();}};
+  const wolke=(x,y,k)=>{g.fillStyle=WOLKE;g.beginPath();g.arc(x-k*0.36,y+k*0.08,k*0.3,0,TAU);g.arc(x+k*0.04,y-k*0.12,k*0.42,0,TAU);g.arc(x+k*0.42,y+k*0.1,k*0.3,0,TAU);g.fill();g.beginPath();g.moveTo(x-k*0.36,y+k*0.38);g.lineTo(x+k*0.42,y+k*0.4);g.lineTo(x+k*0.42,y+k*0.08);g.lineTo(x-k*0.36,y+k*0.08);g.closePath();g.fill();g.beginPath();g.arc(x-k*0.36,y+k*0.23,k*0.15,0,TAU);g.arc(x+k*0.42,y+k*0.25,k*0.15,0,TAU);g.fill();};
+  if(name==='sonne')sonne(cx,cy,s*0.42);
+  else if(name==='heiter'){sonne(cx+s*0.28,cy-s*0.26,s*0.3);wolke(cx-s*0.1,cy+s*0.12,s*0.95);}
+  else if(name==='wolke')wolke(cx,cy,s*1.05);
+  else if(name==='regen'||name==='schnee'||name==='gewitter'){wolke(cx,cy-s*0.28,s);
+    if(name==='regen'){g.strokeStyle=BLAU;g.lineWidth=Math.max(2,s*0.11);g.lineCap='round';for(const dx of [-0.34,0.02,0.38]){g.beginPath();g.moveTo(cx+dx*s,cy+s*0.3);g.lineTo(cx+dx*s-s*0.12,cy+s*0.62);g.stroke();}}
+    else if(name==='schnee'){g.fillStyle=WOLKE;for(const [dx,dy] of [[-0.34,0.4],[0.02,0.6],[0.38,0.4]]){g.beginPath();g.arc(cx+dx*s,cy+dy*s,s*0.09,0,TAU);g.fill();}}
+    else{g.fillStyle=GELB;g.beginPath();g.moveTo(cx+s*0.06,cy+s*0.18);g.lineTo(cx-s*0.16,cy+s*0.5);g.lineTo(cx+s*0.02,cy+s*0.5);g.lineTo(cx-s*0.1,cy+s*0.8);g.lineTo(cx+s*0.22,cy+s*0.4);g.lineTo(cx+s*0.04,cy+s*0.4);g.lineTo(cx+s*0.18,cy+s*0.18);g.closePath();g.fill();}}
+  else if(name==='frost'){g.strokeStyle=EIS;g.lineWidth=Math.max(2,s*0.1);g.lineCap='round';const R=s*0.55;for(let i=0;i<3;i++){const w=i/3*Math.PI+Math.PI/2;g.beginPath();g.moveTo(cx-Math.cos(w)*R,cy-Math.sin(w)*R);g.lineTo(cx+Math.cos(w)*R,cy+Math.sin(w)*R);g.stroke();
+    for(const sg of [1,-1]){const ex=cx+sg*Math.cos(w)*R*0.62,ey=cy+sg*Math.sin(w)*R*0.62;for(const q of [0.6,-0.6]){const w2=w+(sg>0?0:Math.PI)+q;g.beginPath();g.moveTo(ex,ey);g.lineTo(ex+Math.cos(w2)*R*0.3,ey+Math.sin(w2)*R*0.3);g.stroke();}}}}}
+const ICV=document.createElement('canvas');ICV.width=ICV.height=120;
+function vorhersageZeigen(t,farbeTxt){const V=vorhersage(t);if(!V.length)return;const a=0.6+0.4*L.tagK,schatten=g=>{g.shadowColor=rgb([20,18,30],0.45);g.shadowBlur=10;g.shadowOffsetY=2;},txtK=rgb([252,250,244],0.95);
+  ctx.save();ctx.textAlign='center';schatten(ctx);for(let k=0;k<V.length;k++){const cx=100+k*104,f=V[k];
+    ctx.font='400 24px "Helvetica Neue",Roboto,Inter,Arial,sans-serif';if('letterSpacing' in ctx)ctx.letterSpacing='2px';ctx.fillStyle=txtK;ctx.fillText(f.wd,cx,206);
+    {const g=ICV.getContext('2d');g.clearRect(0,0,120,120);icon(g,symName(f),60,60,28,1);ctx.save();schatten(ctx);ctx.globalAlpha=a;ctx.drawImage(ICV,cx-60,252-60);ctx.restore();}const nm=symName(f),fr=f.min!==undefined&&f.min!==null&&f.min<=0&&(nm==='frost'||nm==='schnee');ctx.fillStyle=fr?rgb([150,206,255],0.96):txtK;ctx.fillText(Math.round(fr?f.min:f.max)+'°',cx,312);}ctx.restore();}
+
+let VORH_T=0;
+function uhr(t){const d=berlin(t),txt=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');ctx.save();ctx.setTransform(1,0,0,1,0,0);
+  const g=ctx.createLinearGradient(0,0,0,360);g.addColorStop(0,'rgba(30,26,40,0.42)');g.addColorStop(1,'rgba(30,26,40,0)');ctx.fillStyle=g;ctx.fillRect(0,0,W,360);
+  ctx.font='300 84px "Helvetica Neue",Roboto,Inter,Arial,sans-serif';if('letterSpacing' in ctx)ctx.letterSpacing='3px';const fc=rgb([250,250,246],0.94);ctx.shadowColor='rgba(20,20,30,0.3)';ctx.shadowBlur=10;ctx.fillStyle=fc;ctx.fillText(txt,62,150);const tw=ctx.measureText(txt).width;ctx.restore();ctx.save();ctx.setTransform(1,0,0,1,0,0);mondIcon(62+tw+44,122,20);ctx.restore();
+  ctx.save();ctx.setTransform(1,0,0,1,0,0);vorhersageZeigen(t,fc);ctx.restore();}
+
+// ---------- Bild ----------
+function bild(t){S=sonne(t);MO=mond(t);const WE=wetter(t);licht(t,WE);const mon=berlin(t).getMonth()+1,basis=(mon>=4&&mon<=10)?'sommer':'winter',saison=WE.schneeK>=0.99?'schnee':basis;
+  ctx.setTransform(1,0,0,1,0,0);if(BG[saison].complete){if(WE.foehn)ctx.filter='saturate(1.35) contrast(1.07) brightness(1.03)';ctx.drawImage(BG[saison],0,0,W,H);ctx.filter='none';}ctx.setTransform(K,0,0,K,0,0);
+  teilSchnee(WE,basis);raureif(t,WE,saison);eis(t,WE,saison);boeen(t,WE);sonnenglitzern(t,WE);seeleben(t,WE);rehe(t,WE);schlitten(t,WE);raeumdienst(t,WE);zug(t);rauch(t,WE);
+  morgennebel(t,WE);kuppenLicht(t,WE);
+  tönung(WE);if(WE.foehn){ctx.save();ctx.globalCompositeOperation='soft-light';ctx.fillStyle='rgba(255,190,120,0.25)';ctx.fillRect(0,0,720,1200);ctx.restore();}
+  himmelSpiegel(t,WE,saison);mondpfad(t,WE);lichter(t);scheinwerfer(t);glocken(t);regenbogen(t,WE);
+  gaense(t);ballon(t,WE);kraehen(t);kondens(t,WE);foehnwolken(t,WE);wolken(t,WE);front(t,WE);niederschlag(t,WE);gewitter(t,WE);
+  uhr(t);}
+
+// ---------- Betrieb am Muse ----------
+// Bildschirm wach halten (wie Lichtzeit), kein Kontextmenü
+async function wach(){try{if(navigator.wakeLock&&document.visibilityState==='visible')await navigator.wakeLock.request('screen');}catch(e){}}
+wach();document.addEventListener('visibilitychange',wach);addEventListener('contextmenu',e=>e.preventDefault());
+// Tageswechsel um 4:00: zurück zu Lichtzeit (../), die entscheidet neu, welcher Ort dran ist (Orte-Wechsel). Ist es wieder Simssee, kommt sie hierher zurück.
+// Keine Schleife: zurück geht es nur, wenn seit dem Laden dieser Seite ein neuer Tag begonnen hat. Nur wenn Lichtzeit erreichbar ist (sonst in einer Minute wieder).
+// Mit ?t= (Zeit simuliert) bleibt die Seite stehen.
+const tag4=t=>{const d=berlin(t-4*36e5);return d.getFullYear()*10000+(d.getMonth()+1)*100+d.getDate();};let START_TAG=null;
+setTimeout(()=>{START_TAG=tag4(echtJetzt());},3000); // nach der Uhrprüfung
+setInterval(()=>{if(SIM||START_TAG===null||tag4(echtJetzt())===START_TAG)return;fetch('../',{method:'HEAD',cache:'no-store'}).then(r=>{if(r.ok)location.replace('../'+location.search);}).catch(()=>{});},6e4);
+// höchstens 30 Bilder/s wie Lichtzeit (der Muse läuft rund um die Uhr)
+// ?dev=1: oben rechts Bilder pro Sekunde und Rechenzeit je Bild (zum Messen am Muse)
+const DEV=['1','true','ja'].includes(Q.get('dev')),FPS={n:0,t0:0,ms:0,txt:''};
+function fpsZeigen(q,ms){FPS.n++;FPS.ms+=ms;if(q-FPS.t0>=2000){FPS.txt=(FPS.n*1000/(q-FPS.t0)).toFixed(1)+' Bilder/s · '+(FPS.ms/FPS.n).toFixed(1)+' ms je Bild';FPS.n=0;FPS.ms=0;FPS.t0=q;}
+  ctx.save();ctx.setTransform(1,0,0,1,0,0);ctx.font='500 22px system-ui,sans-serif';ctx.textAlign='right';ctx.fillStyle='rgba(0,0,0,0.45)';ctx.fillRect(W-370,12,358,36);ctx.fillStyle='#fff';ctx.fillText(FPS.txt||'…',W-22,38);ctx.restore();}
+let LETZT=0;function loop(q){requestAnimationFrame(loop);if(q!==undefined&&q-LETZT<30)return;LETZT=q||0;const a=performance.now();bild(jetzt());if(DEV)fpsZeigen(q||a,performance.now()-a);}loop();
+</script></body></html>

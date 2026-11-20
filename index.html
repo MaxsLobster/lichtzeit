@@ -519,7 +519,8 @@ const ORTE={
     rituale:{'07:00':'SERVUS|HÖRI'},
     aus:{eis:true,markt:true,glocken:true,entdecken:true,extras:true,sortieren:true,gespenst:true}}, // kein Eis und Eisstock, kein Christkindlmarkt, keine Kirchenglocken, keine Entdecken-Szenen und Chiemsee-Extras (auch nicht auf der Tafel), keine Oktober-Gespenster an der Inselkirche, kein Pixel-Sortieren (verschmiert die Äste)
   // Externer Ort: kein Bildpaket, sondern eine eigene Seite. Ist er dran, leitet Lichtzeit dorthin weiter (ortWeiter); die Seite kehrt beim Tageswechsel um 4:00 zurück.
-  inntal:{name:'Inntal',extern:'inntal/'}};
+  inntal:{name:'Inntal',extern:'inntal/'},
+  simssee:{name:'Simssee',extern:'simssee/'}};
 for(const o of Object.values(ORTE))o.pos={...ORTE.chiemsee.pos,...o.pos};
 let ORT_ID='chiemsee',OP=ORTE.chiemsee;
 
@@ -2046,35 +2047,34 @@ function applyConfig(j){const bad=[],notes=[],obj=v=>!!v&&typeof v==='object'&&!
   part('markt',o=>{const n={...MARKT};n.an=or(take(o.an,pJaNein,'markt an'),n.an);n.von=or(take(o.von,pUhr,'markt von'),n.von);n.bis=or(take(o.bis,pUhr,'markt bis'),n.bis);
     if(o.termine!==undefined){if(o.termine==='advent')n.termine='advent';else if(Array.isArray(o.termine)){const T=o.termine.map(pMMDD);if(T.some(x=>x===null))bad.push('markt termine');n.termine=T.filter(Boolean);}else bad.push('markt termine');}MARKT=n;});
   part('orte',o=>{const n={...ORTE_CFG},nm=v=>typeof v==='string'?v.trim().toLowerCase():'';n.wechsel=or(take(o.wechsel,pJaNein,'orte wechsel'),n.wechsel);
-    n.n=or(take(o.andere_tage_pro_woche,pZahl(0,7,true),'orte andere_tage_pro_woche'),n.n);
-    if(o.andere!==undefined){if(!Array.isArray(o.andere))bad.push('orte andere');else{const ok=o.andere.filter(x=>ORTE[nm(x)]&&nm(x)!=='chiemsee'),weg=o.andere.filter(x=>!ok.includes(x));
-      if(weg.length)notes.push('orte andere: '+weg.join(', ')+' unbekannt (ignoriert)');n.andere=[...new Set(ok.map(nm))];}}
+    if(o.gewichte!==undefined){if(!obj(o.gewichte))bad.push('orte gewichte');else{const G={};for(const [k,v] of Object.entries(o.gewichte)){if(k[0]==='_')continue;
+      if(!ORTE[nm(k)]){notes.push('orte gewichte: '+k+' unbekannt (ignoriert)');continue;}const g=take(v,pZahl(0,1000),'orte gewichte '+k);if(g!==undefined)G[nm(k)]=g;}n.gewichte=G;}}
+    if(o.andere!==undefined||o.andere_tage_pro_woche!==undefined)notes.push('orte andere und andere_tage_pro_woche gelten nicht mehr (jetzt gewichte)');
     if(o.feste_tage!==undefined){if(!obj(o.feste_tage))bad.push('orte feste_tage');else{const F={};for(const [k,v] of Object.entries(o.feste_tage)){if(k[0]==='_')continue;
       if(!/^\d{4}-\d{2}-\d{2}$/.test(k)){bad.push('orte feste_tage '+k);continue;}if(!ORTE[nm(v)]){notes.push('orte feste_tage '+k+': '+v+' unbekannt (ignoriert)');continue;}F[k]=nm(v);}n.feste=F;}}
-    ORTE_CFG=n;ORT_WOCHE.clear();ORT_JETZT.k='';});
+    ORTE_CFG=n;ORT_KETTE.clear();ORT_JETZT.k='';});
   part('wetter',w=>{WETTER={echt:or(take(w.echt,pJaNein,'wetter echt'),WETTER.echt),min:or(take(w.aktualisieren_minuten,pZahl(5,180),'wetter aktualisieren_minuten'),WETTER.min)};});
   const unk=Object.keys(j).filter(k=>k[0]!=='_'&&!CFG_KEYS.includes(k));if(unk.length)notes.push('unbekannt: '+unk.join(', '));
   const msg=[];if(bad.length)msg.push('ungültig: '+bad.join(', ')+' (dort gilt der Standard)');CFG_INFO=msg.concat(notes).length?'config.json: '+msg.concat(notes).join('; '):'';}
-// ---------- Orte-Wechsel: pro Woche (Mo–So) 4 Tage Chiemsee, 3 Tage andere Orte; ein Tag geht von 4:00 bis 4:00 ----------
-// Welche Tage, lost ein fester Zufall je ISO-Kalenderwoche und Jahr aus: auf jedem Gerät gleich, beim Neuladen gleich. Mehrere andere Orte kommen reihum dran.
-// Festtage (24.–26.12., 31.12., 1.1.) sind immer Chiemsee, der ausgefallene Tag wird nicht nachgeholt. Feste Tage aus config.json gelten zusätzlich zur Auslosung.
+// ---------- Orte-Wechsel: jeden Tag (4:00 bis 4:00) ein Ort, zufällig nach Gewicht, nie zweimal hintereinander derselbe ----------
+// Der Zufall hängt nur vom Datum ab: auf jedem Gerät gleich, beim Neuladen gleich. Damit „nie zweimal hintereinander“ immer stimmt, wird jedes Jahr
+// ab dem 1.1. (Festtag, immer Chiemsee) Tag für Tag ausgewürfelt; jeder Tag lässt den Ort des Vortags aus (und den des Folgetags, wenn der fest steht). Gewichte aus config.json (orte gewichte):
+// höher = öfter, 0 oder fehlend = nie. Vorrang: ?ort= (erzwungen) > feste_tage aus config.json > Festtage (24.–26.12., 31.12., 1.1. Chiemsee) > Zufall.
 // Geprüft wird in jedem Bild (Tageswechsel um 4:00 auch ohne Neuladen; mit ?t= gilt der Ort dieses Zeitpunkts).
-let ORTE_CFG={wechsel:true,n:3,andere:['hoeri'],feste:{}},ORT_TEST=null;const ORT_WOCHE=new Map(),ORT_JETZT={k:'',grund:'',titel:''};
+let ORTE_CFG={wechsel:true,gewichte:{chiemsee:1,hoeri:1,inntal:1,simssee:1},feste:{}},ORT_TEST=null;const ORT_KETTE=new Map(),ORT_JETZT={k:'',grund:'',titel:''};
 const festtagOrt=x=>{const m=x.getMonth()+1,t=x.getDate();return (m===12&&((t>=24&&t<=26)||t===31))||(m===1&&t===1);};
 const isoDatum=x=>x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+String(x.getDate()).padStart(2,'0');
 function ortTag(d){const x=new Date(d.getFullYear(),d.getMonth(),d.getDate(),d.getHours()-4);return new Date(x.getFullYear(),x.getMonth(),x.getDate());} // vor 4 Uhr zählt noch der Vortag
-function wochenPlan(tag){const wd=(tag.getDay()+6)%7,mo=new Date(tag.getFullYear(),tag.getMonth(),tag.getDate()-wd),dn=new Date(mo.getFullYear(),mo.getMonth(),mo.getDate()+3); // der Donnerstag bestimmt die ISO-Woche
-  const j=dn.getFullYear(),w=1+Math.floor(Math.round((dn-new Date(j,0,1))/864e5)/7),k=j*100+w;let P=ORT_WOCHE.get(k);if(P)return P;
-  P={j,w,tage:[]};const frei=[];
-  for(let i=0;i<7;i++){const x=new Date(mo.getFullYear(),mo.getMonth(),mo.getDate()+i),iso=isoDatum(x),f=ORTE_CFG.feste[iso];
-    if(!ORTE_CFG.wechsel)P.tage.push({x,iso,ort:'chiemsee',grund:'Wechsel aus'});
-    else if(f)P.tage.push({x,iso,ort:f,grund:'fester Tag'});
-    else{P.tage.push({x,iso,ort:'chiemsee',grund:festtagOrt(x)?'Festtag':'Rotation'});frei.push(i);}}
-  if(ORTE_CFG.wechsel&&ORTE_CFG.andere.length){const r=rng(j*53+w*7919+4711);for(let i=frei.length-1;i>0;i--){const q=Math.floor(r()*(i+1));[frei[i],frei[q]]=[frei[q],frei[i]];}
-    const n=Math.min(ORTE_CFG.n,frei.length),A=ORTE_CFG.andere,wn=Math.round((mo-new Date(2024,0,1))/(7*864e5)); // Wochen seit Montag, 1.1.2024: Zähler für „reihum“
-    frei.slice(0,n).sort((a,b)=>a-b).forEach((i,s)=>{const T=P.tage[i];if(festtagOrt(T.x))return;T.ort=A[(wn*n+s)%A.length];});}
-  ORT_WOCHE.set(k,P);return P;}
-function ortFuer(d){if(ORT_TEST)return{ort:ORT_TEST,grund:'erzwungen mit ?ort='};const tag=ortTag(d);return wochenPlan(tag).tage[(tag.getDay()+6)%7];}
+function ortFest(x){const f=ORTE_CFG.feste[isoDatum(x)];return !ORTE_CFG.wechsel?{ort:'chiemsee',grund:'Wechsel aus'}:f?{ort:f,grund:'fester Tag'}:festtagOrt(x)?{ort:'chiemsee',grund:'Festtag'}:null;}
+function ortWuerfeln(x,vor){const nf=ortFest(new Date(x.getFullYear(),x.getMonth(),x.getDate()+1)),G0=Object.entries(ORTE_CFG.gewichte).filter(([o,g])=>g>0&&o!==vor);
+  let G=G0.filter(([o])=>!nf||o!==nf.ort);if(!G.length)G=G0;if(!G.length)return vor||'chiemsee'; // nur ein Ort mit Gewicht: dann eben wieder der
+  let z=rng(x.getFullYear()*10000+(x.getMonth()+1)*100+x.getDate())()*G.reduce((s,[,g])=>s+g,0);for(const [o,g] of G){z-=g;if(z<0)return o;}return G[G.length-1][0];}
+function tagOrt(x){const iso=isoDatum(x);if(ORT_KETTE.has(iso))return ORT_KETTE.get(iso);let vor=null;
+  for(let z=new Date(x.getFullYear(),0,1);z<=x;z=new Date(z.getFullYear(),z.getMonth(),z.getDate()+1)){const k=isoDatum(z);let T=ORT_KETTE.get(k);
+    if(!T){T=ortFest(z)||{ort:ortWuerfeln(z,vor),grund:'Zufall'};ORT_KETTE.set(k,T);}
+    vor=T.ort;}
+  return ORT_KETTE.get(iso);}
+function ortFuer(d){if(ORT_TEST)return{ort:ORT_TEST,grund:'erzwungen mit ?ort='};return tagOrt(ortTag(d));}
 function ortSetzen(d){const k=(ORT_TEST||'')+'|'+dayKey(d)+'|'+(d.getHours()<4?0:1);if(ORT_JETZT.k!==k){ORT_JETZT.k=k;
   const o=ortFuer(d),id=ORTE[o.ort]?o.ort:'chiemsee';ORT_JETZT.grund=o.grund;if(id!==ORT_ID){ORT_ID=id;OP=ORTE[id].extern?ORTE.chiemsee:ORTE[id];} // externer Ort: bis zur Weiterleitung (und beim Blättern im Test-Modus) steht der Chiemsee da
   const nm=ORTE[ORT_ID].name;if(ORT_JETZT.titel!==nm){ORT_JETZT.titel=nm;const e=$('sname');if(e)e.textContent=nm;document.title='Lichtzeit – '+nm;}}
@@ -2083,8 +2083,10 @@ function ortSetzen(d){const k=(ORT_TEST||'')+'|'+dayKey(d)+'|'+(d.getHours()<4?0
 function ortWeiter(ziel){if(ORT_JETZT.weiter||(DEV&&(mode!=='live'||playing)))return;ORT_JETZT.weiter=true;location.replace(ziel+location.search);}
 // Gleich nach dem Laden der Einstellungen prüfen (vor dem Wetter), damit die Weiterleitung schnell geht
 function ortFrueh(){try{const oq=(Q.get('ort')||'').trim().toLowerCase();if(ORTE[oq])ORT_TEST=oq;ortSetzen(wall(curT()));}catch(e){}}
-function ortText(d){const P=wochenPlan(ortTag(d)),kurz=['Mo','Di','Mi','Do','Fr','Sa','So'];
-  return 'Ort: '+ORTE[ORT_ID].name+' ('+ORT_JETZT.grund+')'+(ORTE[ORT_ID].extern?', eigene Seite '+ORTE[ORT_ID].extern+(DEV&&(mode!=='live'||playing)?' (beim Blättern keine Weiterleitung, hier der Chiemsee)':''):'')+', Woche '+P.w+': '+P.tage.map((T,i)=>kurz[i]+' '+(ORTE[T.ort]?ORTE[T.ort].name:T.ort)+(T.grund==='Festtag'?' (Festtag)':T.grund==='fester Tag'?' (fest)':'')).join(', ');}
+function ortText(d){const t0=ortTag(d),kurz=['So','Mo','Di','Mi','Do','Fr','Sa'],nm=o=>ORTE[o]?ORTE[o].name:o,G=ORTE_CFG.gewichte,V=[];
+  for(let i=1;i<=6;i++){const x=new Date(t0.getFullYear(),t0.getMonth(),t0.getDate()+i),T=tagOrt(x);V.push(kurz[x.getDay()]+' '+nm(T.ort)+(T.grund==='Zufall'?'':' ('+T.grund+')'));}
+  return 'Ort: '+nm(ORT_ID)+' ('+ORT_JETZT.grund+')'+(ORTE[ORT_ID].extern?', eigene Seite '+ORTE[ORT_ID].extern+(DEV&&(mode!=='live'||playing)?' (beim Blättern keine Weiterleitung, hier der Chiemsee)':''):'')+
+    '; danach: '+V.join(', ')+'; Gewichte: '+(ORTE_CFG.wechsel?Object.keys(G).map(o=>nm(o)+' '+G[o]).join(', ')||'keine':'Wechsel aus');}
 // Geräteuhr prüfen: Weicht sie mehr als eine Minute vom Server-Zeitstempel ab, rechnet Lichtzeit mit der Serverzeit
 const CLOCK_MAX=60e3,DEV_TZ=(()=>{try{return Intl.DateTimeFormat().resolvedOptions().timeZone||'?';}catch(e){return '?';}})();
 function clockFromServer(r,t0,t1){const h=r&&r.headers&&r.headers.get('Date'),s=h?Date.parse(h):NaN;if(isNaN(s))return;

@@ -14,7 +14,8 @@ self.addEventListener('fetch', e => {
   if (r.method !== 'GET') return;
   const u = new URL(r.url), basis = new URL('./', self.registration.scope);
   if (u.origin !== basis.origin) return;
-  const seite = r.mode === 'navigate', config = u.pathname === basis.pathname + 'config.json';
+  // Nur die Lichtzeit-Seite selbst (nicht die eigenen Seiten inntal/ und simssee/, sonst läge deren Fassung als Notkopie der Startseite da)
+  const seite = r.mode === 'navigate' && (u.pathname === basis.pathname || u.pathname === basis.pathname + 'index.html'), config = u.pathname === basis.pathname + 'config.json';
   if (!seite && !config) return;
   // Unter diesem Namen liegt die Notkopie (ohne ?raster=… usw., damit jede Adress-Variante sie findet)
   const name = seite ? basis.href : basis.href + 'config.json';
