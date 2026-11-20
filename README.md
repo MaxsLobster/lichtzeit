@@ -158,10 +158,47 @@ und eine große Eiche.
   Pixel-Sortieren zur Blauen Stunde. Um 7 Uhr grüßt die Tafel auf der Höri mit
   `SERVUS HÖRI`.
 
+## Drittes Bild: Inntal (eigene Seite)
+
+**Adresse:** https://maxslobster.github.io/lichtzeit/inntal/
+
+Ein flaches Vektorbild: der Blick von einem Gipfel übers Inntal zum Kaiser. Es hat eine
+eigene Engine und ist keine Pixel-Raster-Szene. Die Uhrzeit steckt im Licht: Häuser, Bäume
+und Berge werfen ihre Schatten nach dem echten Sonnenstand. Oben links stehen Uhr und
+Vorhersage für 3 Tage. Im Tal fahren Autos auf der A93 und Züge auf der Bahn. Dazu kommen
+Steinadler und Gleitschirm im Wechsel, ein Wanderer am Gipfelkreuz und ab dem 1. Dezember
+ein Christbaum, jeden Tag mit einer Kugel mehr, an Heiligabend mit Stern und Lichterkette.
+
+- **Wetter:** wie Lichtzeit vom `wetter_ort` aus `config.json` (Open-Meteo, alle
+  15 Minuten), die Vorhersage stimmt deshalb mit Lichtzeit überein. Frost zeigt den
+  Tiefstwert in Eisblau.
+- **Im Orte-Wechsel** ist Inntal ein „externer Ort“: Ist er dran (fester Tag oder später
+  in der Rotation), leitet Lichtzeit auf `inntal/` weiter. Beim Tageswechsel um 4:00 geht
+  die Inntal-Seite zurück zu Lichtzeit, und Lichtzeit entscheidet neu. An den Festtagen ist
+  immer Chiemsee.
+- **Am Muse:** Vollbild wie Lichtzeit, Berliner Zeit (auch bei falscher Zeitzone des
+  Geräts), Bildschirm bleibt wach, höchstens 30 Bilder/s. Das Ruhende (Himmel, Berge,
+  Boden, Häuser, Bäume, Schatten) wird nur alle 20 Sekunden neu gemalt. Was sich bewegt,
+  kommt in jedem Bild dazu.
+
+Test-Parameter der Inntal-Seite:
+
+| Parameter | Wirkung |
+|---|---|
+| `?t=2027-07-10T11:05:20` | Zeit simulieren (auch `?t=11:05`), die Uhr läuft weiter. |
+| `?tempo=60` | Zeitraffer zusammen mit `?t=` (60 = eine Minute pro Sekunde). |
+| `?wetter=regen` | Wetter erzwingen: `klar`, `wolken`, `bedeckt`, `nebel`, `regen`, `schnee` (liegender Schnee), `schneefall`. |
+| `?vorhersage=heiter:6,regen:4,frost:1` | Vorhersage erzwingen (Name:Temperatur; `sonne`, `heiter`, `wolke`, `regen`, `schnee`, `gewitter`, `frost`). |
+| `?lat=47.86&lng=12.26` | Anderer Wetter-Ort. |
+
+Beispiele: `inntal/?t=2027-07-10T11:05:20` (Wanderer mit Brezn), `inntal/?t=2027-07-10T11:03:40`
+(Gleitschirm), `inntal/?t=2026-12-24T18:00` (Heiligabend), `inntal/?wetter=nebel` (Nebelmeer).
+
 ## Dateien
 
 - `index.html` – das Kunstwerk (eine Datei, ohne Build-Werkzeuge)
 - `config.json` – Einstellungen (Ort, Orte-Wechsel, Familie, Termine, Wetter, Anzeige, Himmel, Szenen, Tafel, Christkindlmarkt)
+- `inntal/index.html` – das Inntal-Bild (eigene Seite)
 - `README.md` – diese Anleitung
 - `manifest.webmanifest`, `sw.js`, `icon-192.png`, `icon-512.png` – damit Lichtzeit
   als App im Vollbild läuft (siehe „Als App am Muse“)
@@ -177,7 +214,7 @@ Alle veränderbaren Daten stehen in `config.json`. So änderst du sie:
 | Eintrag | Bedeutung |
 |---|---|
 | `ort` | Name und Koordinaten des Bildes. Bestimmen Sonnen- und Mondstand, Planeten und den Titel. |
-| `orte` | Wechsel der Bildorte: `wechsel` (`false` = immer Chiemsee), `andere_tage_pro_woche` (Standard 3), `andere` (Liste der anderen Orte, bisher nur `"hoeri"`; bei mehreren kommen sie reihum dran), `feste_tage` (Datum `"JJJJ-MM-TT"` → Ort, z. B. `"2026-11-20": "hoeri"`; zusätzlich zu den ausgelosten Tagen). Unbekannte Namen werden ignoriert und in der Info-Zeile gemeldet. |
+| `orte` | Wechsel der Bildorte: `wechsel` (`false` = immer Chiemsee), `andere_tage_pro_woche` (Standard 3), `andere` (Liste der anderen Orte, bisher nur `"hoeri"`; `"inntal"` ginge auch; bei mehreren kommen sie reihum dran), `feste_tage` (Datum `"JJJJ-MM-TT"` → Ort, z. B. `"2026-11-20": "hoeri"`; zusätzlich zu den ausgelosten Tagen). Unbekannte Namen werden ignoriert und in der Info-Zeile gemeldet. |
 | `wetter_ort` | Name und Koordinaten (`breite`, `laenge`) für das echte Wetter, die Vorhersage, Schneemann, Eis und Föhn. Fehlt der Eintrag, gilt `ort`. Es braucht beide Koordinaten, sonst gilt ebenfalls `ort`. |
 | `familie` | Die drei Sterne. Die ersten beiden rücken am Hochzeitstag zusammen. Der dritte ist der kleine Stern: Mit `geburtsjahr` wächst er bis zum 18. Geburtstag. Am Geburtstag leuchtet der Stern golden. |
 | `hochzeitstag` | An diesem Tag leuchten die ersten beiden Sterne golden. |
@@ -462,7 +499,7 @@ Parameter werden an die Adresse angehängt: der erste mit `?`, weitere mit `&`.
 |---|---|
 | `?dev=1` | Test-Modus: Steuerleiste (Tag, Uhrzeit, Zeitraffer, Mitternacht ansehen, Seltenheit finden), Info-Zeile mit Wetter, Ort (welcher, warum, und die Orte der Woche), Luftdruck-Trend und allem, was gerade aktiv ist und warum (Vorhersage, Warnleuchte, Schneemann, Eis, Föhn, Wolkenschatten, Alpenglühen, Markt, Tafel), oben rechts die Bildrate. Ein Tipp aufs Bild blendet die Steuerung aus. |
 | `?t=2026-12-24T17:30` | Zeit simulieren. Die Uhr läuft ab diesem Moment weiter. Auch möglich: `?t=17:30` (heute) oder `?t=0:00:20`. |
-| `?ort=hoeri` | Ort erzwingen (`chiemsee` oder `hoeri`). Ohne `?ort` zeigt `?t=` den Ort, der zu diesem Zeitpunkt dran wäre. |
+| `?ort=hoeri` | Ort erzwingen (`chiemsee`, `hoeri` oder `inntal`; bei `inntal` geht es weiter auf die Inntal-Seite). Ohne `?ort` zeigt `?t=` den Ort, der zu diesem Zeitpunkt dran wäre. |
 | `?wind=0.9` | Höri: Windstärke für die Segler (`0` bis `1`; ab `0,15` fahren welche, je mehr, desto öfter). |
 | `?raster=`, `?fps=`, `?aufloesung=`, `?gpu=`, `?lesen=` | Anzeige für dieses Gerät, siehe „Anzeige und Leistung“. |
 | `?entdecken=0` | Die kleinen Szenen für dieses Gerät aus (`1` = an). |
@@ -497,8 +534,9 @@ Lichtzeit ist fertig und läuft. Die Kontroll-Screenshots der ersten Abnahme
 liegen lokal in `gazers/abnahme/`, die der Fallblatt-Uhr (November 2026) in
 `gazers/abnahme/fallblatt/`, die von Auftrag 2 (kleinere Uhr, Halbinsel,
 Raddampfer, Wolkenschatten, Alpenglühen) in `gazers/abnahme/auftrag-2/`, die von
-Auftrag 3 (zweiter Ort Höri, Orte-Wechsel) in `gazers/abnahme/auftrag-3/`. Die
-Stände davor sind als Git-Tags `v-vor-fallblatt`, `v-vor-auftrag-2` und `v-vor-auftrag-3` gesichert.
+Auftrag 3 (zweiter Ort Höri, Orte-Wechsel) in `gazers/abnahme/auftrag-3/`, die von Auftrag 4
+(Inntal) in `gazers/abnahme/auftrag-4/`. Die Stände davor sind als Git-Tags `v-vor-fallblatt`,
+`v-vor-auftrag-2`, `v-vor-auftrag-3` und `v-vor-auftrag-4` gesichert.
 
 Seit Oktober 2026 weicht das Bild bewusst vom ursprünglichen Prototyp
 `lichtzeit.html` ab: Die Pixel-Effekte sind seltener und schwächer, und es gibt

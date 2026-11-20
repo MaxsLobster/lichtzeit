@@ -13,7 +13,7 @@ canvas{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);display:bl
 // Die Uhr ist das Licht: Schatten von Häusern, Bäumen und Bergen folgen dem echten Sonnenstand.
 // Weltkoordinaten: E = Osten, N = Norden, h = Höhe (künstlerischer Maßstab, Gebäude bewusst groß).
 const W=1080,H=1800,LAT=47.65,LON=12.17,rad=Math.PI/180,TAU=Math.PI*2;
-const cv=document.getElementById('c'),ctx=cv.getContext('2d');
+const cv=document.getElementById('c');let ctx=cv.getContext('2d'); // ctx zeigt beim Aufbau der Zwischenbilder kurz auf deren Zeichenfläche
 function fit(){const k=Math.min(innerWidth/W,innerHeight/H);cv.style.width=W*k+'px';cv.style.height=H*k+'px';}addEventListener('resize',fit);fit();
 const Q=new URLSearchParams(location.search);
 const clamp=(x,a,b)=>Math.max(a,Math.min(b,x)),smooth=(a,b,x)=>{const t=clamp((x-a)/(b-a),0,1);return t*t*(3-2*t);};
@@ -183,7 +183,7 @@ function bodenFarbe(typ){if(L.schnee)return [[236,238,242],[228,231,237],[240,24
   if(L.herbst)return [[150,140,82],[196,166,112],[120,116,66],[210,182,128]][typ];return [F.wiese,F.sand,F.oliv,F.feld][typ];}
 
 // ---------- Schattenebene ----------
-const SCH=document.createElement('canvas');SCH.width=W;SCH.height=H;const sx=SCH.getContext('2d');
+const SCH=document.createElement('canvas');SCH.width=W;SCH.height=H;let sx=SCH.getContext('2d'); // Schattenebene (beim Aufbau der Zwischenbilder eine eigene)
 function sPoly(pts){sx.beginPath();pts.forEach((p,i)=>i?sx.lineTo(p[0],p[1]):sx.moveTo(p[0],p[1]));sx.closePath();sx.fill();}
 function huelle(pts){pts=pts.slice().sort((a,b)=>a[0]-b[0]||a[1]-b[1]);const cr=(o,a,b)=>(a[0]-o[0])*(b[1]-o[1])-(a[1]-o[1])*(b[0]-o[0]);const lo=[],hi=[];
   for(const p of pts){while(lo.length>1&&cr(lo[lo.length-2],lo[lo.length-1],p)<=0)lo.pop();lo.push(p);}for(const p of pts.reverse()){while(hi.length>1&&cr(hi[hi.length-2],hi[hi.length-1],p)<=0)hi.pop();hi.push(p);}return lo.slice(0,-1).concat(hi.slice(0,-1));}
@@ -224,7 +224,9 @@ function boden(t){const gb=farbe(L.schnee?[236,238,242]:L.winter?[128,126,84]:L.
   const weg2=(pts,b)=>{for(let i=0;i<pts.length-1;i++){const [a,c]=[pts[i],pts[i+1]];if(c[1]<zahmFuss(c[0])+4)break;const dx=c[0]-a[0],dy=c[1]-a[1],l=Math.hypot(dx,dy),nx=-dy/l*b,ny=dx/l*b;polyW([[a[0]+nx,a[1]+ny],[c[0]+nx,c[1]+ny],[c[0]-nx,c[1]-ny],[a[0]-nx,a[1]-ny]],weg);}};
   weg2([[-170,40],[-90,10],[-30,-8],[28,-18],[80,-30]],4);weg2([[-40,-120],[-30,-60],[-6,-22]],3.5);weg2([[-12,100],[0,40],[8,-8]],3);weg2([[-160,320],[-120,100],[-110,-200],[-80,-500],[-60,-900]],4);
   weg2([[150,320],[175,100],[190,-60],[230,-300],[240,-700]],4);weg2([[160,10],[240,20],[300,40]],3.5);
-  if(L.sonK>0.2){ctx.fillStyle=rgb([250,250,244],0.55*L.sonK);for(let i=0;i<26;i++){const N=340-((i*97+t/160)%1700),E=innE(N)+((i*37)%24-12);if(tief(E,N)<20)continue;const p=pr(E,N),w=Math.max(3,9000/tief(E,N));ctx.fillRect(p[0],p[1],w,Math.max(1,w/5));}}}
+}
+// Glitzern auf dem Inn (bewegt sich, wird jedes Bild gemalt)
+function glitzern(t){if(L.sonK>0.2){ctx.fillStyle=rgb([250,250,244],0.55*L.sonK);for(let i=0;i<26;i++){const N=340-((i*97+t/160)%1700),E=innE(N)+((i*37)%24-12);if(tief(E,N)<20)continue;const p=pr(E,N),w=Math.max(3,9000/tief(E,N));ctx.fillRect(p[0],p[1],w,Math.max(1,w/5));}}}
 
 // ---------- Körper: Häuser mit Sattel- oder Walmdach, drehbar ----------
 function ecken(o){const c=Math.cos(o.rot),s=Math.sin(o.rot),loc=(x,y)=>[o.E+x*c-y*s,o.N+x*s+y*c];return loc;}
@@ -476,21 +478,40 @@ function niederschlag(t){const art=WETTER==='regen'?'regen':(FALL==='schnee'&&!W
 function uhr(t){const d=berlin(t),txt=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
   ctx.save();ctx.font='300 84px "Helvetica Neue",Roboto,Inter,Arial,sans-serif';if('letterSpacing' in ctx)ctx.letterSpacing='3px';const fc=rgb(mix([40,52,66],[250,250,246],0.35+0.55*L.tagK),0.82);ctx.fillStyle=fc;ctx.fillText(txt,62,150);ctx.restore();vorhersageZeigen(t,fc);}
 
-function bild(t){if(!WETTER_FIX)WETTER=WX||'klar';licht(t);ctx.clearRect(0,0,W,H);himmel(t);{const gb=farbe(L.schnee?[236,238,242]:L.winter?[128,126,84]:L.herbst?[146,140,82]:F.wiese,UP,false),y0=CY-FOC*Math.tan(PITCH);const gg=ctx.createLinearGradient(0,y0,0,y0+260);gg.addColorStop(0,rgb(mix(gb,L.bedeckt?[200,204,208]:[200,212,226],0.6*L.tagK)));gg.addColorStop(1,rgb(gb));ctx.fillStyle=gg;ctx.fillRect(0,y0,W,H);}if(WETTER!=='nebel')berge();boden(t);
-  const dyn=verkehr(t),objs=[...HAEUSER.map(o=>({o,art:'haus',z:tief(o.E,o.N)})),...BAEUME.map(o=>({o,art:'baum',z:tief(o.E,o.N)})),...KIRCHEN.map(o=>({o,art:'kirche',z:tief(o.E,o.N)})),
-    ...dyn.map(o=>({o,art:'fz',z:tief(o.E,o.N)})),{art:'erl',z:tief(ERL.pass.E,ERL.pass.N)},{art:'festung',z:tief(FEST.E,FEST.N)}];
-  const zeichne=(x,s)=>x.art==='haus'?haus3d(x.o,s):x.art==='baum'?baum(x.o,s):x.art==='kirche'?kirche(x.o,s):x.art==='fz'?fahrzeug(x.o,s):x.art==='erl'?erl(s):festung(s);
-  // Schattenebene: Bergschatten (als Raster über die Talfläche), Wolken, alle Körper
-  sx.clearRect(0,0,W,H);sx.fillStyle='#000';
-  if(L.sonK>0.05){bodenSchatten();
-    wolkenSchatten(t);for(const x of objs)zeichne(x,true);
-    sx.globalCompositeOperation='source-in';sx.fillStyle=rgb(L.schnee?[160,176,210]:[150,148,166]);sx.fillRect(0,0,W,H);sx.globalCompositeOperation='source-over';
-    ctx.save();ctx.globalCompositeOperation='multiply';ctx.globalAlpha=Math.min(1,L.sonK*1.2);ctx.drawImage(SCH,0,0);ctx.restore();}
-  objs.sort((a,b)=>b.z-a.z);for(const x of objs)zeichne(x,false);
-  if(WETTER==='nebel'){nebel();for(const k of KIRCHEN){const q=pr(k.E,k.N,NEBEL_H);ctx.save();ctx.beginPath();ctx.rect(0,0,W,q[1]);ctx.clip();kirche(k,false);ctx.restore();}}
-  if(L.nacht>0.2){ctx.save();ctx.globalCompositeOperation='lighter';const r=rng(12);for(let i=0;i<90;i++){const d=DORF[i%DORF.length],E=d[0]+r()*(d[1]-d[0]),N=d[2]+r()*(d[3]-d[2]);if(tief(E,N)<20)continue;const p=pr(E,N,5),s=Math.max(4,5000/tief(E,N));
-    const g=ctx.createRadialGradient(p[0],p[1],0,p[0],p[1],s);g.addColorStop(0,rgb([255,200,130],0.5*L.nacht));g.addColorStop(1,'rgba(255,200,130,0)');ctx.fillStyle=g;ctx.fillRect(p[0]-s,p[1]-s,2*s,2*s);}ctx.restore();}
-  luft(t);vorne();{const hs=S.alt<0||S.E<-0.3&&S.U<0.35;christbaum(t,hs);if(WETTER!=='regen')wanderer(t,hs);}niederschlag(t);uhr(t);}
+// ---------- Bild ----------
+// Ruhendes liegt in zwei Zwischenbildern: hinten Himmel, Berge, Boden, Häuser, Bäume, Kirchen, Erl, Festung, ihre Schatten und die Lichter im Tal; vorne der Gipfel.
+// Neu gemalt alle 20 s und bei Wetterwechsel, verteilt auf mehrere Bilder in einen zweiten Satz Zeichenflächen (der alte bleibt sichtbar, bis der neue fertig ist).
+// Bewegtes kommt jedes Bild dazu: Glitzern auf dem Inn, Wolkenschatten, Verkehr auf A93 und Bahn (mit Schatten), Adler und Gleitschirm, dann der Gipfel, Christbaum, Wanderer, Niederschlag, Uhr.
+const zf=()=>{const c=document.createElement('canvas');c.width=W;c.height=H;return c;};
+const ZB={hg:[zf(),zf()],vg:[zf(),zf()],an:0,gen:null,k:'',fertig:false},SCH_B=zf(),sxB=SCH_B.getContext('2d');
+const RUHEND=()=>[...HAEUSER.map(o=>({o,art:'haus',z:tief(o.E,o.N)})),...BAEUME.map(o=>({o,art:'baum',z:tief(o.E,o.N)})),...KIRCHEN.map(o=>({o,art:'kirche',z:tief(o.E,o.N)})),
+  {art:'erl',z:tief(ERL.pass.E,ERL.pass.N)},{art:'festung',z:tief(FEST.E,FEST.N)}].sort((a,b)=>b.z-a.z);
+let RUHEND_L=null;
+const zeichne=(x,s)=>x.art==='haus'?haus3d(x.o,s):x.art==='baum'?baum(x.o,s):x.art==='kirche'?kirche(x.o,s):x.art==='fz'?fahrzeug(x.o,s):x.art==='erl'?erl(s):festung(s);
+// Schatten aus sx (schwarz gemalt) einfärben und auf das Bild multiplizieren
+function schattenAuf(){sx.globalCompositeOperation='source-in';sx.fillStyle=rgb(L.schnee?[160,176,210]:[150,148,166]);sx.fillRect(0,0,W,H);sx.globalCompositeOperation='source-over';
+  ctx.save();ctx.globalCompositeOperation='multiply';ctx.globalAlpha=Math.min(1,L.sonK*1.2);ctx.drawImage(sx.canvas,0,0);ctx.restore();}
+function* ruhendBauen(t){const n=1-ZB.an,h=ZB.hg[n].getContext('2d'),v=ZB.vg[n].getContext('2d');if(!RUHEND_L)RUHEND_L=RUHEND();const objs=RUHEND_L;
+  const schritt=(c,f)=>{const a=ctx,b=sx;ctx=c;sx=sxB;licht(t);try{f();}finally{ctx=a;sx=b;}};
+  schritt(h,()=>{ctx.clearRect(0,0,W,H);himmel(t);const gb=farbe(L.schnee?[236,238,242]:L.winter?[128,126,84]:L.herbst?[146,140,82]:F.wiese,UP,false),y0=CY-FOC*Math.tan(PITCH);const gg=ctx.createLinearGradient(0,y0,0,y0+260);gg.addColorStop(0,rgb(mix(gb,L.bedeckt?[200,204,208]:[200,212,226],0.6*L.tagK)));gg.addColorStop(1,rgb(gb));ctx.fillStyle=gg;ctx.fillRect(0,y0,W,H);if(WETTER!=='nebel')berge();});yield;
+  schritt(h,()=>boden(t));yield;
+  schritt(h,()=>{if(L.sonK>0.05){sx.clearRect(0,0,W,H);sx.fillStyle='#000';bodenSchatten();for(const x of objs)zeichne(x,true);schattenAuf();}});yield;
+  const halb=Math.floor(objs.length/2);schritt(h,()=>{for(let i=0;i<halb;i++)zeichne(objs[i],false);});yield;schritt(h,()=>{for(let i=halb;i<objs.length;i++)zeichne(objs[i],false);});yield;
+  schritt(h,()=>{if(WETTER==='nebel'){nebel();for(const k of KIRCHEN){const q=pr(k.E,k.N,NEBEL_H);ctx.save();ctx.beginPath();ctx.rect(0,0,W,q[1]);ctx.clip();kirche(k,false);ctx.restore();}}
+    if(L.nacht>0.2){ctx.save();ctx.globalCompositeOperation='lighter';const r=rng(12);for(let i=0;i<90;i++){const d=DORF[i%DORF.length],E=d[0]+r()*(d[1]-d[0]),N=d[2]+r()*(d[3]-d[2]);if(tief(E,N)<20)continue;const p=pr(E,N,5),s=Math.max(4,5000/tief(E,N));
+      const g=ctx.createRadialGradient(p[0],p[1],0,p[0],p[1],s);g.addColorStop(0,rgb([255,200,130],0.5*L.nacht));g.addColorStop(1,'rgba(255,200,130,0)');ctx.fillStyle=g;ctx.fillRect(p[0]-s,p[1]-s,2*s,2*s);}ctx.restore();}});yield;
+  schritt(v,()=>{ctx.clearRect(0,0,W,H);vorne();});
+  ZB.an=n;ZB.fertig=true;}
+function bild(t){if(!WETTER_FIX)WETTER=WX||'klar';
+  const k=Math.floor(t/2e4)+'|'+WETTER+'|'+FALL;
+  if(!ZB.fertig||Math.abs(t-ZB.t)>36e5){ZB.k=k;ZB.t=t;ZB.gen=null;const g=ruhendBauen(t);while(!g.next().done);} // beim Start oder nach großem Zeitsprung sofort alles
+  else if(k!==ZB.k&&!ZB.gen){ZB.k=k;ZB.t=t;ZB.gen=ruhendBauen(t);}
+  if(ZB.gen&&ZB.gen.next().done)ZB.gen=null; // je Bild ein Schritt
+  licht(t);ctx.clearRect(0,0,W,H);ctx.drawImage(ZB.hg[ZB.an],0,0);
+  if(WETTER!=='nebel'){glitzern(t);const fz=verkehr(t).map(o=>({o,art:'fz',z:tief(o.E,o.N)})).sort((a,b)=>b.z-a.z);
+    if(L.sonK>0.05){sx.clearRect(0,0,W,H);sx.fillStyle='#000';wolkenSchatten(t);for(const x of fz)zeichne(x,true);schattenAuf();}
+    for(const x of fz)zeichne(x,false);}
+  luft(t);ctx.drawImage(ZB.vg[ZB.an],0,0);{const hs=S.alt<0||S.E<-0.3&&S.U<0.35;christbaum(t,hs);if(WETTER!=='regen')wanderer(t,hs);}niederschlag(t);uhr(t);}
 
 // ---------- Betrieb am Muse ----------
 // Bildschirm wach halten (wie Lichtzeit), kein Kontextmenü
@@ -502,5 +523,6 @@ wach();document.addEventListener('visibilitychange',wach);addEventListener('cont
 const tag4=t=>{const d=berlin(t-4*36e5);return d.getFullYear()*10000+(d.getMonth()+1)*100+d.getDate();};let START_TAG=null;
 setTimeout(()=>{START_TAG=tag4(echtJetzt());},3000); // nach der Uhrprüfung
 setInterval(()=>{if(SIM||START_TAG===null||tag4(echtJetzt())===START_TAG)return;fetch('../',{method:'HEAD',cache:'no-store'}).then(r=>{if(r.ok)location.replace('../'+location.search);}).catch(()=>{});},6e4);
-function loop(){bild(jetzt());requestAnimationFrame(loop);}loop();
+// höchstens 30 Bilder/s wie Lichtzeit (der Muse läuft rund um die Uhr)
+let LETZT=0;function loop(q){requestAnimationFrame(loop);if(q!==undefined&&q-LETZT<30)return;LETZT=q||0;bild(jetzt());}loop();
 </script></body></html>
