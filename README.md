@@ -125,19 +125,20 @@ Das klare Bild ist der Normalfall. Harte Pixel-Effekte sind selten und kurz:
 Im Test-Modus (`?dev=1`) steht in der Info-Zeile, welcher Effekt gerade wirkt
 und welche zurückgestellt sind.
 
-## Zwei Bildorte: Chiemsee und Höri
+## Bildorte: Chiemsee, Höri, Inntal, Simssee
 
-Lichtzeit zeigt an vier Tagen pro Woche den **Chiemsee** und an drei Tagen die **Höri**:
-den Blick über den Untersee nach Steckborn in der Schweiz, vorne eine Wiese mit Hecke
-und eine große Eiche.
+Lichtzeit zeigt jeden Tag einen von vier Orten: den **Chiemsee**, die **Höri** (den Blick
+über den Untersee nach Steckborn in der Schweiz, vorne eine Wiese mit Hecke und eine große
+Eiche), das **Inntal** und den **Simssee**. Inntal und Simssee sind eigene Seiten (siehe unten).
 
-- **Wann welcher Ort:** Jede Woche (Montag bis Sonntag) werden drei Tage für die Höri
-  ausgelost. Der Zufall hängt nur von Kalenderwoche und Jahr ab, deshalb zeigt jedes Gerät
-  dasselbe, auch nach dem Neuladen. Ein Tag geht von 4:00 bis 4:00, gewechselt wird nachts
-  um 4 Uhr, auch ohne Neuladen. An den Festtagen (24. bis 26. Dezember, Silvester, Neujahr)
-  ist immer Chiemsee, weil die Feste dort stattfinden. Feste Tage aus `config.json`
-  (`feste_tage`) kommen zu den ausgelosten Tagen dazu.
-- **Gleich an beiden Orten:** Fallblatt-Uhr, Tafel, 3-Tage-Vorhersage, Wetter (aus
+- **Wann welcher Ort:** Jeden Tag wird ein Ort ausgelost, alle gleich oft, aber nie
+  zweimal hintereinander derselbe. Der Zufall hängt nur vom Datum ab, deshalb zeigt jedes
+  Gerät dasselbe, auch nach dem Neuladen. Ein Tag geht von 4:00 bis 4:00, gewechselt wird
+  nachts um 4 Uhr, auch ohne Neuladen. An den Festtagen (24. bis 26. Dezember, Silvester,
+  Neujahr) ist immer Chiemsee, weil die Feste dort stattfinden. Feste Tage aus
+  `config.json` (`feste_tage`) gehen allem vor. Wie oft welcher Ort drankommt, steht in
+  `config.json` unter `orte` → `gewichte` (siehe „Einstellungen ändern“).
+- **Gleich an Chiemsee und Höri:** Fallblatt-Uhr, Tafel, 3-Tage-Vorhersage, Wetter (aus
   Moosen), Sonne und Mond, Wolkenschatten, Föhn, Alpenglühen, Advent, Schnee und
   Schneemann, Sturmwarnleuchte, Silvester.
 - **Höri:** Die Eiche trägt Laub nach Jahreszeit (frisch, Sommer, Gold, braun, kahl) und
@@ -172,8 +173,8 @@ ein Christbaum, jeden Tag mit einer Kugel mehr, an Heiligabend mit Stern und Lic
 - **Wetter:** wie Lichtzeit vom `wetter_ort` aus `config.json` (Open-Meteo, alle
   15 Minuten), die Vorhersage stimmt deshalb mit Lichtzeit überein. Frost zeigt den
   Tiefstwert in Eisblau.
-- **Im Orte-Wechsel** ist Inntal ein „externer Ort“: Ist er dran (fester Tag oder später
-  in der Rotation), leitet Lichtzeit auf `inntal/` weiter. Beim Tageswechsel um 4:00 geht
+- **Im Orte-Wechsel** ist Inntal ein „externer Ort“: Ist er dran (fester Tag oder
+  ausgelost), leitet Lichtzeit auf `inntal/` weiter. Beim Tageswechsel um 4:00 geht
   die Inntal-Seite zurück zu Lichtzeit, und Lichtzeit entscheidet neu. An den Festtagen ist
   immer Chiemsee.
 - **Am Muse:** Vollbild wie Lichtzeit, Berliner Zeit (auch bei falscher Zeitzone des
@@ -195,11 +196,55 @@ Test-Parameter der Inntal-Seite:
 Beispiele: `inntal/?t=2027-07-10T11:05:20` (Wanderer mit Brezn), `inntal/?t=2027-07-10T11:03:40`
 (Gleitschirm), `inntal/?t=2026-12-24T18:00` (Heiligabend), `inntal/?wetter=nebel` (Nebelmeer).
 
+## Viertes Bild: Simssee (eigene Seite)
+
+**Adresse:** https://maxslobster.github.io/lichtzeit/simssee/
+
+Der Simssee von oben, im selben flachen Stil wie Inntal. Drei gemalte Hintergründe
+(Sommer, Winter, Schnee) liegen in `simssee/`, darüber lebt alles nach echtem Wetter: Wolken
+und ihre Schatten ziehen mit dem Wind, Böen kräuseln den See, bei Flaute ist er spiegelglatt.
+Dazu kommen Morgennebel, Raureif, Föhn mit Föhnfischen, Regenbogen nach dem Regen,
+Gewitter, eine aufziehende Front, Schnee, der langsam kommt und geht, und Eis mit
+Eisläufern nach langem Frost. Im Lauf des Tages: Sonnenglitzern und Mondpfad, letztes Licht
+auf den Kuppen, Abendrot und Blaue Stunde im See, Lichter in den Häusern, Scheinwerfer im
+Berufsverkehr, Glockenringe vom Kirchturm in Pietzenkirchen, Zug am Westufer, Räumdienst,
+Schlittenhang, Rehe, Krähen, Wildgänse, Heißluftballon, Segler und Schwäne.
+Oben links stehen Uhr, Mondphase und Vorhersage für 3 Tage.
+
+- **Wetter:** vom `wetter_ort` aus `config.json` (Open-Meteo, alle 15 Minuten, mit
+  den letzten 14 Tagen für Frost und Eis), die Vorhersage stimmt mit Lichtzeit überein.
+- **Im Orte-Wechsel** wie Inntal ein externer Ort: Lichtzeit leitet auf `simssee/` weiter,
+  beim Tageswechsel um 4:00 geht es zurück zu Lichtzeit.
+- **Am Muse:** Vollbild, Berliner Zeit, Bildschirm bleibt wach, höchstens 30 Bilder/s.
+  Teure Ebenen (Böen, Front, Föhnfische, Kuppenlicht, Spiegelung, Regenbogen) werden als
+  fertige Bilder zwischengespeichert und nur neu gemalt, wenn sie sich ändern.
+
+Test-Parameter der Simssee-Seite:
+
+| Parameter | Wirkung |
+|---|---|
+| `?t=2026-11-23T16:28` | Zeit simulieren (auch mit Sekunden oder `?t=16:28`), die Uhr läuft weiter. |
+| `?tempo=60` | Zeitraffer zusammen mit `?t=`. |
+| `?wetter=klar` | Wetter erzwingen: `klar`, `wolken`, `bedeckt`, `nebel`, `regen`, `gewitter`, `schnee` (liegender Schnee), `schneefall`. |
+| `?wind=25`, `?dir=250`, `?temp=-4` | Wind (km/h), Windrichtung (Grad, woher), Temperatur (°C). |
+| `?eis=0.5` | See friert zu (`0` bis `1`, `1` = ganz zu mit Eisläufern). |
+| `?schneek=0.35` | Teil-Schneedecke (`0` bis `1`). |
+| `?raureif=1`, `?mnebel=1`, `?foehn=1`, `?rbogen=1`, `?ballon=1`, `?gans=1` | Raureif, Morgennebel, Föhn, Regenbogen, Heißluftballon, Wildgänse erzwingen. |
+| `?front=0.75` | Aufziehende Front (`0` bis `1`). |
+| `?vorhersage=heiter:6,regen:4,frost:1` | Vorhersage erzwingen. |
+| `?lat=47.86&lng=12.26` | Anderer Wetter-Ort. |
+| `?dev=1` | Oben rechts Bilder pro Sekunde und Rechenzeit je Bild. |
+
+Beispiele: `simssee/?t=2026-11-23T16:28&wetter=klar` (Abendrot im See),
+`simssee/?t=2026-11-25T08:05&wetter=klar&mnebel=1&wind=2` (Morgennebel),
+`simssee/?t=2027-01-20T13:00&wetter=klar&eis=1` (Eisläufer).
+
 ## Dateien
 
 - `index.html` – das Kunstwerk (eine Datei, ohne Build-Werkzeuge)
 - `config.json` – Einstellungen (Ort, Orte-Wechsel, Familie, Termine, Wetter, Anzeige, Himmel, Szenen, Tafel, Christkindlmarkt)
 - `inntal/index.html` – das Inntal-Bild (eigene Seite)
+- `simssee/index.html`, `simssee/bg_sommer.jpg`, `bg_winter.jpg`, `bg_schnee.jpg` – das Simssee-Bild (eigene Seite)
 - `README.md` – diese Anleitung
 - `manifest.webmanifest`, `sw.js`, `icon-192.png`, `icon-512.png` – damit Lichtzeit
   als App im Vollbild läuft (siehe „Als App am Muse“)
@@ -215,7 +260,7 @@ Alle veränderbaren Daten stehen in `config.json`. So änderst du sie:
 | Eintrag | Bedeutung |
 |---|---|
 | `ort` | Name und Koordinaten des Bildes. Bestimmen Sonnen- und Mondstand, Planeten und den Titel. |
-| `orte` | Wechsel der Bildorte: `wechsel` (`false` = immer Chiemsee), `andere_tage_pro_woche` (Standard 3), `andere` (Liste der anderen Orte, bisher nur `"hoeri"`; `"inntal"` ginge auch; bei mehreren kommen sie reihum dran), `feste_tage` (Datum `"JJJJ-MM-TT"` → Ort, z. B. `"2026-11-20": "hoeri"`; zusätzlich zu den ausgelosten Tagen). Unbekannte Namen werden ignoriert und in der Info-Zeile gemeldet. |
+| `orte` | Wechsel der Bildorte: `wechsel` (`false` = immer Chiemsee), `gewichte` (wie oft jeder Ort ausgelost wird, z. B. `{"chiemsee": 2, "hoeri": 1, "inntal": 1, "simssee": 1}` = Chiemsee doppelt so oft; `0` oder weglassen = nie; Standard: alle 1), `feste_tage` (Datum `"JJJJ-MM-TT"` → Ort, z. B. `"2026-11-20": "simssee"`; geht allem vor). Nie zweimal hintereinander derselbe Ort (außer an den Festtagen). Bekannte Orte: `chiemsee`, `hoeri`, `inntal`, `simssee`. Unbekannte Namen werden ignoriert und in der Info-Zeile gemeldet. |
 | `wetter_ort` | Name und Koordinaten (`breite`, `laenge`) für das echte Wetter, die Vorhersage, Schneemann, Eis und Föhn. Fehlt der Eintrag, gilt `ort`. Es braucht beide Koordinaten, sonst gilt ebenfalls `ort`. |
 | `familie` | Die drei Sterne. Die ersten beiden rücken am Hochzeitstag zusammen. Der dritte ist der kleine Stern: Mit `geburtsjahr` wächst er bis zum 18. Geburtstag. Am Geburtstag leuchtet der Stern golden. |
 | `hochzeitstag` | An diesem Tag leuchten die ersten beiden Sterne golden. |
@@ -498,9 +543,9 @@ Parameter werden an die Adresse angehängt: der erste mit `?`, weitere mit `&`.
 
 | Parameter | Wirkung |
 |---|---|
-| `?dev=1` | Test-Modus: Steuerleiste (Tag, Uhrzeit, Zeitraffer, Mitternacht ansehen, Seltenheit finden), Info-Zeile mit Wetter, Ort (welcher, warum, und die Orte der Woche), Luftdruck-Trend und allem, was gerade aktiv ist und warum (Vorhersage, Warnleuchte, Schneemann, Eis, Föhn, Wolkenschatten, Alpenglühen, Markt, Tafel), oben rechts die Bildrate. Ein Tipp aufs Bild blendet die Steuerung aus. |
+| `?dev=1` | Test-Modus: Steuerleiste (Tag, Uhrzeit, Zeitraffer, Mitternacht ansehen, Seltenheit finden), Info-Zeile mit Wetter, Ort (welcher, warum, die Orte der nächsten Tage und die Gewichte), Luftdruck-Trend und allem, was gerade aktiv ist und warum (Vorhersage, Warnleuchte, Schneemann, Eis, Föhn, Wolkenschatten, Alpenglühen, Markt, Tafel), oben rechts die Bildrate. Ein Tipp aufs Bild blendet die Steuerung aus. |
 | `?t=2026-12-24T17:30` | Zeit simulieren. Die Uhr läuft ab diesem Moment weiter. Auch möglich: `?t=17:30` (heute) oder `?t=0:00:20`. |
-| `?ort=hoeri` | Ort erzwingen (`chiemsee`, `hoeri` oder `inntal`; bei `inntal` geht es weiter auf die Inntal-Seite). Ohne `?ort` zeigt `?t=` den Ort, der zu diesem Zeitpunkt dran wäre. |
+| `?ort=hoeri` | Ort erzwingen (`chiemsee`, `hoeri`, `inntal` oder `simssee`; bei `inntal` und `simssee` geht es weiter auf deren Seite). Ohne `?ort` zeigt `?t=` den Ort, der zu diesem Zeitpunkt dran wäre. |
 | `?wind=0.9` | Höri: Windstärke für die Segler (`0` bis `1`; ab `0,15` fahren welche, je mehr, desto öfter). |
 | `?raster=`, `?fps=`, `?aufloesung=`, `?gpu=`, `?lesen=` | Anzeige für dieses Gerät, siehe „Anzeige und Leistung“. |
 | `?entdecken=0` | Die kleinen Szenen für dieses Gerät aus (`1` = an). |
@@ -536,8 +581,9 @@ liegen lokal in `gazers/abnahme/`, die der Fallblatt-Uhr (November 2026) in
 `gazers/abnahme/fallblatt/`, die von Auftrag 2 (kleinere Uhr, Halbinsel,
 Raddampfer, Wolkenschatten, Alpenglühen) in `gazers/abnahme/auftrag-2/`, die von
 Auftrag 3 (zweiter Ort Höri, Orte-Wechsel) in `gazers/abnahme/auftrag-3/`, die von Auftrag 4
-(Inntal) in `gazers/abnahme/auftrag-4/`. Die Stände davor sind als Git-Tags `v-vor-fallblatt`,
-`v-vor-auftrag-2`, `v-vor-auftrag-3` und `v-vor-auftrag-4` gesichert.
+(Inntal) in `gazers/abnahme/auftrag-4/`, die von Auftrag 5 (Simssee, täglicher Zufallswechsel) in
+`gazers/abnahme/auftrag-5/`. Die Stände davor sind als Git-Tags `v-vor-fallblatt`,
+`v-vor-auftrag-2`, `v-vor-auftrag-3`, `v-vor-auftrag-4` und `v-vor-auftrag-5` gesichert.
 
 Seit Oktober 2026 weicht das Bild bewusst vom ursprünglichen Prototyp
 `lichtzeit.html` ab: Die Pixel-Effekte sind seltener und schwächer, und es gibt
