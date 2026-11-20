@@ -190,6 +190,7 @@ Test-Parameter der Inntal-Seite:
 | `?wetter=regen` | Wetter erzwingen: `klar`, `wolken`, `bedeckt`, `nebel`, `regen`, `schnee` (liegender Schnee), `schneefall`. |
 | `?vorhersage=heiter:6,regen:4,frost:1` | Vorhersage erzwingen (Name:Temperatur; `sonne`, `heiter`, `wolke`, `regen`, `schnee`, `gewitter`, `frost`). |
 | `?lat=47.86&lng=12.26` | Anderer Wetter-Ort. |
+| `?dev=1` | Oben rechts Bilder pro Sekunde und Rechenzeit je Bild (zum Messen am Muse). |
 
 Beispiele: `inntal/?t=2027-07-10T11:05:20` (Wanderer mit Brezn), `inntal/?t=2027-07-10T11:03:40`
 (Gleitschirm), `inntal/?t=2026-12-24T18:00` (Heiligabend), `inntal/?wetter=nebel` (Nebelmeer).

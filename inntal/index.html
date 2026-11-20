@@ -524,5 +524,9 @@ const tag4=t=>{const d=berlin(t-4*36e5);return d.getFullYear()*10000+(d.getMonth
 setTimeout(()=>{START_TAG=tag4(echtJetzt());},3000); // nach der Uhrprüfung
 setInterval(()=>{if(SIM||START_TAG===null||tag4(echtJetzt())===START_TAG)return;fetch('../',{method:'HEAD',cache:'no-store'}).then(r=>{if(r.ok)location.replace('../'+location.search);}).catch(()=>{});},6e4);
 // höchstens 30 Bilder/s wie Lichtzeit (der Muse läuft rund um die Uhr)
-let LETZT=0;function loop(q){requestAnimationFrame(loop);if(q!==undefined&&q-LETZT<30)return;LETZT=q||0;bild(jetzt());}loop();
+// ?dev=1: oben rechts Bilder pro Sekunde und Rechenzeit je Bild (zum Messen am Muse)
+const DEV=['1','true','ja'].includes(Q.get('dev')),FPS={n:0,t0:0,ms:0,txt:''};
+function fpsZeigen(q,ms){FPS.n++;FPS.ms+=ms;if(q-FPS.t0>=2000){FPS.txt=(FPS.n*1000/(q-FPS.t0)).toFixed(1)+' Bilder/s · '+(FPS.ms/FPS.n).toFixed(1)+' ms je Bild';FPS.n=0;FPS.ms=0;FPS.t0=q;}
+  ctx.save();ctx.font='500 22px system-ui,sans-serif';ctx.textAlign='right';ctx.fillStyle='rgba(0,0,0,0.45)';ctx.fillRect(W-370,12,358,36);ctx.fillStyle='#fff';ctx.fillText(FPS.txt||'…',W-22,38);ctx.restore();}
+let LETZT=0;function loop(q){requestAnimationFrame(loop);if(q!==undefined&&q-LETZT<30)return;LETZT=q||0;const a=performance.now();bild(jetzt());if(DEV)fpsZeigen(q||a,performance.now()-a);}loop();
 </script></body></html>
