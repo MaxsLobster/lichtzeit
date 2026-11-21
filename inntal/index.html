@@ -51,7 +51,9 @@ let UHR_KORR=0;function uhrPruefen(){const t0=Date.now();fetch(location.href.spl
 uhrPruefen();setInterval(uhrPruefen,36e5);
 const echtJetzt=()=>Date.now()+UHR_KORR;
 const T_Q=Q.get('t');let SIM=T_Q&&parseT(T_Q)!==null?{at:parseT(T_Q),dev:Date.now(),k:clamp(+(Q.get('tempo')||1)||1,0.01,5000)}:null,WETTER=Q.get('wetter')||'klar';
-const jetzt=()=>SIM?SIM.at+(Date.now()-SIM.dev)*SIM.k:echtJetzt();
+// Zeitraffer der Testleiste läuft in einer Schleife über einen Tag (schleife = Länge des Tages, tag0 = 0:00)
+const jetzt=()=>{if(!SIM)return echtJetzt();const v=(Date.now()-SIM.dev)*SIM.k;return SIM.schleife?SIM.tag0+(SIM.at-SIM.tag0+v)%SIM.schleife:SIM.at+v;};
+const SIM_URL=SIM; // Zeit aus der Adresse (?t=, ?tempo=); nur sie hält den Tageswechsel an, die Testleiste nicht
 
 // ---------- Farben ----------
 const F={wiese:[160,154,90],oliv:[128,124,68],sand:[220,192,134],feld:[200,180,112],weg:[218,212,196],asphalt:[176,174,168],schotter:[150,140,124],wasser:[128,160,172],kies:[206,198,180],
@@ -438,7 +440,7 @@ function christbaum(t,hangSchatten){const d=berlin(t),m=d.getMonth(),tag=d.getDa
 // ---------- Echtes Wetter (Open-Meteo), gleicher Wetter-Ort wie Lichtzeit ----------
 // Reihenfolge: ?lat=&lng=, sonst wetter_ort aus ../config.json (Lichtzeit), sonst Chiemsee
 const WETTER_ORT={breite:+(Q.get('lat')||47.87),laenge:+(Q.get('lng')||12.43)};
-const WETTER_FIX=!!Q.get('wetter'),VORSCHAU=!/github\.io$/.test(location.hostname);let WX=null,FALL=null,FC=null; // VORSCHAU: außerhalb von github.io ohne Daten eine Beispiel-Vorhersage
+let WETTER_FIX=!!Q.get('wetter');const VORSCHAU=!/github\.io$/.test(location.hostname);let WX=null,FALL=null,FC=null; // VORSCHAU: außerhalb von github.io ohne Daten eine Beispiel-Vorhersage
 const istRegen=c=>(c>=51&&c<=67)||(c>=80&&c<=82)||c>=95,istSchnee=c=>(c>=71&&c<=77)||c===85||c===86;
 function wxAnwenden(j){try{const c=j.current.weather_code,sd=j.current.snow_depth||0;
   WX=c===45||c===48?'nebel':istRegen(c)?'regen':istSchnee(c)||sd>0.03?'schnee':c===3?'bedeckt':c===2?'wolken':'klar';FALL=istRegen(c)?'regen':istSchnee(c)?'schnee':null;
@@ -519,14 +521,112 @@ async function wach(){try{if(navigator.wakeLock&&document.visibilityState==='vis
 wach();document.addEventListener('visibilitychange',wach);addEventListener('contextmenu',e=>e.preventDefault());
 // Tageswechsel um 4:00: zurück zu Lichtzeit (../), die entscheidet neu, welcher Ort dran ist (Orte-Wechsel). Ist es wieder Inntal, kommt sie hierher zurück.
 // Keine Schleife: zurück geht es nur, wenn seit dem Laden dieser Seite ein neuer Tag begonnen hat. Nur wenn Lichtzeit erreichbar ist (sonst in einer Minute wieder).
-// Mit ?t= (Zeit simuliert) bleibt die Seite stehen.
+// Mit ?t= (Zeit simuliert) bleibt die Seite stehen, mit der Testleiste nicht.
 const tag4=t=>{const d=berlin(t-4*36e5);return d.getFullYear()*10000+(d.getMonth()+1)*100+d.getDate();};let START_TAG=null;
 setTimeout(()=>{START_TAG=tag4(echtJetzt());},3000); // nach der Uhrprüfung
-setInterval(()=>{if(SIM||START_TAG===null||tag4(echtJetzt())===START_TAG)return;fetch('../',{method:'HEAD',cache:'no-store'}).then(r=>{if(r.ok)location.replace('../'+location.search);}).catch(()=>{});},6e4);
+const OHNE_DEMO=(()=>{const q=new URLSearchParams(location.search);q.delete('demo');const s=q.toString();return s?'?'+s:'';})(); // Testleiste nicht mitnehmen
+setInterval(()=>{if(SIM_URL||START_TAG===null||tag4(echtJetzt())===START_TAG)return;fetch('../',{method:'HEAD',cache:'no-store'}).then(r=>{if(r.ok)location.replace('../'+OHNE_DEMO);}).catch(()=>{});},6e4);
 // höchstens 30 Bilder/s wie Lichtzeit (der Muse läuft rund um die Uhr)
 // ?dev=1: oben rechts Bilder pro Sekunde und Rechenzeit je Bild (zum Messen am Muse)
 const DEV=['1','true','ja'].includes(Q.get('dev')),FPS={n:0,t0:0,ms:0,txt:''};
 function fpsZeigen(q,ms){FPS.n++;FPS.ms+=ms;if(q-FPS.t0>=2000){FPS.txt=(FPS.n*1000/(q-FPS.t0)).toFixed(1)+' Bilder/s · '+(FPS.ms/FPS.n).toFixed(1)+' ms je Bild';FPS.n=0;FPS.ms=0;FPS.t0=q;}
   ctx.save();ctx.font='500 22px system-ui,sans-serif';ctx.textAlign='right';ctx.fillStyle='rgba(0,0,0,0.45)';ctx.fillRect(W-370,12,358,36);ctx.fillStyle='#fff';ctx.fillText(FPS.txt||'…',W-22,38);ctx.restore();}
+// ---------- Szenen und Stufen der Testleiste (Szenen unverändert aus der Vorschau; Szenen mit Uhrzeit ohne Wetter sind klar wie dort) ----------
+const DEMOS=[{n:'Inntal – jetzt'},
+ {n:'Sommermorgen: Sonne über den Erler Bergen',t:'2027-07-10 06:50'},
+ {n:'Vormittag: das Tal im Licht',t:'2027-07-10 10:00'},
+ {n:'Mittag: Gegenlicht vom Kaiser',t:'2027-07-10 13:20'},
+ {n:'Abend: der Wildbarren-Schatten kriecht übers Tal',t:'2027-07-10 19:50'},
+ {n:'Alpenglühen am Kaiser',t:'2027-07-10 21:08'},
+ {n:'Sommernacht: Lichter im Tal',t:'2027-07-10 23:10'},
+ {n:'Wolkenschatten ziehen übers Tal',t:'2027-06-10 11:00',w:'wolken'},
+ {n:'Regentag im Inntal',t:'2027-05-12 14:00',w:'regen'},
+ {n:'Schneefall im Advent',t:'2026-12-15 10:30',w:'schneefall'},
+ {n:'Herbst: Inntal-Nebel, nur Kirchtürme schauen raus',t:'2027-10-20 09:30',w:'nebel'},
+ {n:'Winter: Erl liegt im Schatten vom Kaiser',t:'2027-01-15 12:30',w:'schnee'},
+ {n:'Wanderer am Gipfelkreuz',t:'2027-07-10 11:05:00'},
+ {n:'Gleitschirm übers Tal',t:'2027-07-10 11:03:00'},
+ {n:'Steinadler vor dem Kaiser',t:'2027-07-10 11:15:00'},
+ {n:'Advent: am 1. Dezember die erste Kugel',t:'2026-12-01 11:00'},
+ {n:'Advent: 12. Dezember, zwölf Kugeln',t:'2026-12-12 15:30',w:'schnee'},
+ {n:'Heiligabend: Stern und Lichter am Gipfel',t:'2026-12-24 18:00'},
+ {n:'Zeitraffer: ein Sommertag in einer Minute',t:'2027-07-10 04:40',w:'klar',k:1000},
+ {n:'Zeitraffer: ein Wintertag mit Schnee',t:'2027-01-15 07:20',w:'schnee',k:700}];
+const LEISTE_CFG={szenen:DEMOS,szeneWetter:'klar',setzen:p=>{WETTER_FIX=p.wetter!==undefined||!!Q.get('wetter');WETTER=p.wetter||Q.get('wetter')||WX||'klar';},
+ wetter:[{n:'Live'},{n:'klar',p:{wetter:'klar'}},{n:'Wolken',p:{wetter:'wolken'}},{n:'Bedeckt',p:{wetter:'bedeckt'}},{n:'Nebel',p:{wetter:'nebel'}},{n:'Regen',p:{wetter:'regen'}},
+  {n:'Schneefall',p:{wetter:'schneefall'}},{n:'Schnee liegt',p:{wetter:'schnee'}}],
+ saison:[{n:'Live'},{n:'Sommer',monat:7,tag:10},{n:'Herbst',monat:10,tag:20},{n:'Winter',monat:1,tag:15}]};
+// ---------- Testleiste für die Fernbedienung (gleich in Simssee und Inntal, die Szenen und Stufen stehen oben in LEISTE_CFG) ----------
+// Dreimal schnell OK (innerhalb von 1,5 s) öffnet die Leiste, ?demo=1 öffnet sie beim Laden (?demo=12 gleich mit Szene 12).
+// Offen: Pfeil links/rechts wählt einen Knopf, OK drückt ihn, Pfeil hoch/runter blättert direkt durch die Szenen (hoch = nächste).
+// Dreimal OK schließt sie wieder; die ersten beiden OK davon werden zurückgenommen, die gewählte Szene bleibt ohne Leiste stehen.
+// Nach 10 Minuten ohne Taste: Leiste zu und das Bild wieder live. Ohne offene Leiste verändern einzelne Tasten nichts.
+// Der Tageswechsel um 4:00 zurück zu Lichtzeit läuft unabhängig davon weiter (nur ?t= in der Adresse hält ihn an).
+const TASTE=e=>{const k=e.key,c=e.keyCode||e.which||0;
+  if(k==='Enter'||k==='NumpadEnter'||e.code==='NumpadEnter'||k===' '||k==='Spacebar'||k==='Select'||c===13||c===23||c===66)return 'ok';
+  if(k==='ArrowLeft'||c===37||c===21)return 'links';if(k==='ArrowRight'||c===39||c===22)return 'rechts';
+  if(k==='ArrowUp'||c===38||c===19)return 'hoch';if(k==='ArrowDown'||c===40||c===20)return 'runter';return null;};
+const LS={auf:false,wahl:0,di:0,szene:false,ws:0,js:0,zr:false,taste:'',ok:[],rueck:[],zuletzt:Date.now(),el:null,txt:''};
+const L_SZ=LEISTE_CFG.szenen,L_WE=LEISTE_CFG.wetter,L_JZ=LEISTE_CFG.saison,L_WT=['So','Mo','Di','Mi','Do','Fr','Sa'];
+const lVon=(y,m,d,h=0,mi=0,s=0)=>{const lok=new Date(y,m,d,h,mi,s).getTime();return lok-bzVers(lok-bzVers(lok));}; // Berliner Uhrzeit -> echte Zeit
+const lUrlJetzt=()=>SIM_URL?SIM_URL.at+(Date.now()-SIM_URL.dev)*SIM_URL.k:echtJetzt();
+// Werte für das Bild: Szene, darüber die Wetter-Stufe, darüber die Jahreszeit (gleiche Namen wie die Testschalter in der Adresse)
+function lWerte(){const p={};if(LS.szene){const D=L_SZ[LS.di];for(const k in D)if(k!=='n'&&k!=='t'&&k!=='k')p[k==='w'?'wetter':k]=D[k];if(D.t&&p.wetter===undefined&&LEISTE_CFG.szeneWetter)p.wetter=LEISTE_CFG.szeneWetter;}
+  Object.assign(p,L_WE[LS.ws].p||{},L_JZ[LS.js].p||{});LEISTE_CFG.setzen(p);}
+// Zeit für das Bild: Datum der Szene (sonst heute), von der Jahreszeit verschoben; Uhrzeit der Szene oder die gerade gezeigte; Zeitraffer ab 0:00 in Schleife
+function lZeit(art){const D=LS.szene&&L_SZ[LS.di].t?L_SZ[LS.di]:null,J=L_JZ[LS.js],tD=D?parseT(D.t):null,basis=berlin(D?tD:lUrlJetzt());
+  if(!LS.zr&&!D&&!J.monat){SIM=SIM_URL;return;} // nichts verstellt: live (oder die Zeit aus der Adresse)
+  const z=berlin(art==='szene'?(D?tD:lUrlJetzt()):jetzt()),sek=art==='zr'?0:z.getHours()*3600+z.getMinutes()*60+z.getSeconds();
+  let y=basis.getFullYear(),m=basis.getMonth(),d=basis.getDate();if(J.monat){if(m>J.monat-1)y++;m=J.monat-1;d=J.tag||15;}
+  if(LS.zr){const a=lVon(y,m,d);SIM={tag0:a,at:a+sek*1000,dev:Date.now(),k:LEISTE_CFG.zeitraffer||480,schleife:lVon(y,m,d+1)-a};return;}
+  SIM={at:lVon(y,m,d,Math.floor(sek/3600),Math.floor(sek/60)%60,sek%60),dev:Date.now(),k:D?D.k||1:1};}
+function lSzene(r){LS.di=(LS.di+r+L_SZ.length)%L_SZ.length;LS.szene=true;LS.ws=0;LS.js=0;LS.zr=false;lWerte();lZeit('szene');}
+function lLive(){LS.di=0;LS.szene=false;LS.ws=0;LS.js=0;LS.zr=false;lWerte();SIM=SIM_URL;}
+const L_KN=[{txt:()=>'◀ Szene',f:()=>lSzene(-1)},{txt:()=>'Szene ▶',f:()=>lSzene(1)},
+  {txt:()=>LS.zr?'Zeitraffer aus':'Tag im Zeitraffer',an:()=>LS.zr,f:()=>{LS.zr=!LS.zr;lZeit(LS.zr?'zr':'halt');}},
+  {klein:'Wetter',txt:()=>L_WE[LS.ws].n,an:()=>LS.ws>0,f:()=>{LS.ws=(LS.ws+1)%L_WE.length;lWerte();}},
+  {klein:'Jahreszeit',txt:()=>L_JZ[LS.js].n,an:()=>LS.js>0,f:()=>{LS.js=(LS.js+1)%L_JZ.length;lWerte();lZeit('saison');}},
+  {txt:()=>'Live',f:lLive}];
+const lZustand=()=>({di:LS.di,szene:LS.szene,ws:LS.ws,js:LS.js,zr:LS.zr,wahl:LS.wahl,SIM});
+function lHerstellen(z){Object.assign(LS,{di:z.di,szene:z.szene,ws:z.ws,js:z.js,zr:z.zr,wahl:z.wahl});SIM=z.SIM;lWerte();}
+function lText(){const d=berlin(jetzt()),h=berlin(echtJetzt()),T=[];
+  if(LS.szene)T.push('Szene '+(LS.di+1)+'/'+L_SZ.length+' · '+L_SZ[LS.di].n);if(LS.zr)T.push('Zeitraffer');if(LS.js)T.push(L_JZ[LS.js].n);if(LS.ws)T.push(L_WE[LS.ws].n);
+  if(!T.length)T.push(SIM?'Zeit aus der Adresse':'Live');
+  const gleich=d.getFullYear()===h.getFullYear()&&d.getMonth()===h.getMonth()&&d.getDate()===h.getDate();
+  T.push((gleich?'':L_WT[d.getDay()]+' '+d.getDate()+'.'+(d.getMonth()+1)+'.'+(d.getFullYear()!==h.getFullYear()?d.getFullYear():'')+' ')+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'));
+  return T.join(' · ');}
+function lMass(){document.documentElement.style.setProperty('--lu',Math.min(innerWidth,innerHeight*W/H)/100+'px');} // 1 % der Bildbreite
+function lBauen(){const st=document.createElement('style');
+  st.textContent='#leiste{position:fixed;left:50%;bottom:calc(var(--lu)*3);transform:translateX(-50%);width:calc(var(--lu)*94);box-sizing:border-box;padding:calc(var(--lu)*2.2) calc(var(--lu)*2.2) calc(var(--lu)*2.4);'+
+    'background:rgba(16,22,30,.6);border-radius:calc(var(--lu)*2.6);color:#f4efe6;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;cursor:default;z-index:5}'+
+    '#leiste .l-info{font-weight:600;font-size:calc(var(--lu)*3.4);line-height:1.25;text-align:center;margin-bottom:calc(var(--lu)*.6)}'+
+    '#leiste .l-taste{font-size:calc(var(--lu)*2.1);color:rgba(244,239,230,.62);text-align:center;margin-bottom:calc(var(--lu)*1.8)}'+
+    '#leiste .l-kn{display:grid;grid-template-columns:repeat(3,1fr);gap:calc(var(--lu)*1.6)}'+
+    '#leiste button{appearance:none;border:calc(var(--lu)*.45) solid transparent;background:rgba(255,255,255,.1);color:#f4efe6;font:600 calc(var(--lu)*3.3)/1.15 system-ui,-apple-system,"Segoe UI",sans-serif;'+
+    'padding:calc(var(--lu)*1.7) calc(var(--lu)*1);border-radius:calc(var(--lu)*1.6);cursor:pointer;outline:none;transition:transform .12s,background .12s}'+
+    '#leiste button small{display:block;font-size:.62em;font-weight:500;opacity:.7;margin-bottom:.15em}'+
+    '#leiste button.an{color:#ffd27a}'+
+    '#leiste button.wahl{background:#fff7e0;color:#14171d;border-color:#ffc23d;transform:scale(1.07);box-shadow:0 0 0 calc(var(--lu)*.7) rgba(255,194,61,.5),0 0 calc(var(--lu)*4) rgba(255,214,120,.7)}'+
+    '#leiste button.wahl small{opacity:.75}';
+  document.head.appendChild(st);const el=document.createElement('div');el.id='leiste';el.innerHTML='<div class="l-info"></div><div class="l-taste"></div><div class="l-kn"></div>';
+  L_KN.forEach((b,i)=>{const x=document.createElement('button');x.type='button';x.tabIndex=-1;x.onclick=()=>{LS.zuletzt=Date.now();LS.wahl=i;b.f();lAnzeigen();lFokus();};el.lastChild.appendChild(x);b.el=x;b.k='';});
+  document.body.appendChild(el);LS.el=el;lMass();addEventListener('resize',lMass);}
+function lAnzeigen(){if(!LS.auf)return;const t=lText();if(t!==LS.txt){LS.txt=t;LS.el.firstChild.textContent=t;}
+  const k='Zuletzt empfangen: '+(LS.taste||'–')+'  ·  ◀ ▶ wählen, OK drücken, ▲ ▼ Szenen, 3× OK schließt';if(LS.el.children[1].textContent!==k)LS.el.children[1].textContent=k;
+  L_KN.forEach((b,i)=>{const x=b.txt(),c=(i===LS.wahl?'wahl ':'')+(b.an&&b.an()?'an':'');if(b.k!==x+c){b.k=x+c;b.el.className=c.trim();b.el.innerHTML=(b.klein?'<small>'+b.klein+'</small>':'')+x;}});}
+function lAuf(){if(!LS.el)lBauen();LS.auf=true;LS.el.style.display='';LS.zuletzt=Date.now();lAnzeigen();}
+function lZu(){LS.auf=false;if(LS.el)LS.el.style.display='none';}
+addEventListener('keydown',e=>{const a=TASTE(e);LS.taste=(e.key===' '?'Leertaste':e.key||'?')+' (keyCode '+(e.keyCode||e.which||0)+')';LS.zuletzt=Date.now();if(!a){lAnzeigen();return;}e.preventDefault();
+  if(a==='ok'){if(e.repeat)return;const n=performance.now();LS.ok=LS.ok.filter(x=>n-x<1500);LS.rueck=LS.rueck.filter(x=>n-x.t<1500);
+    if(LS.ok.length>=2){const r=LS.rueck.find(x=>x.t===LS.ok[0]);LS.ok=[];LS.rueck=[];if(LS.auf){if(r)lHerstellen(r.z);lZu();}else lAuf();return;}
+    LS.ok.push(n);if(LS.auf){LS.rueck.push({t:n,z:lZustand()});L_KN[LS.wahl].f();}lAnzeigen();return;}
+  if(!LS.auf)return;
+  if(a==='links'||a==='rechts')LS.wahl=(LS.wahl+(a==='rechts'?1:L_KN.length-1))%L_KN.length;else lSzene(a==='hoch'?1:-1);lAnzeigen();},true);
+setInterval(()=>{if((LS.auf||LS.szene||LS.ws||LS.js||LS.zr)&&Date.now()-LS.zuletzt>6e5){lLive();lZu();}lAnzeigen();},500);
+// Tasten kommen nur an, wenn die Seite den Fokus hat: Bild fokussierbar machen und beim Laden, Zurückkehren und Antippen fokussieren
+cv.tabIndex=0;cv.style.outline='none';function lFokus(){try{if(document.activeElement!==cv)cv.focus({preventScroll:true});}catch(e){}}
+lFokus();addEventListener('load',lFokus);addEventListener('pageshow',lFokus);addEventListener('focus',lFokus);addEventListener('pointerup',lFokus);
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')lFokus();});
+{const v=Q.get('demo');if(v!==null&&!['0','nein','false'].includes(v)){lAuf();const n=parseInt(v,10);if(n>1&&n<=L_SZ.length){LS.di=n-2;lSzene(1);lAnzeigen();}}}
 let LETZT=0;function loop(q){requestAnimationFrame(loop);if(q!==undefined&&q-LETZT<30)return;LETZT=q||0;const a=performance.now();bild(jetzt());if(DEV)fpsZeigen(q||a,performance.now()-a);}loop();
 </script></body></html>

@@ -66,6 +66,12 @@ input[type=range]{flex:1;accent-color:var(--gold);height:24px}
 .row button.on{border-color:var(--gold);color:var(--gold)}
 button:focus-visible,input:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 .hint{font-size:11px;color:var(--ink-soft);margin:8px 2px 0}
+/* Fernbedienung: gewählter Knopf oder Schieber hell hervorgehoben; per Fernbedienung geöffnet ist die Leiste größer (fern) */
+.row button.wahl,.row button.wahl.on{background:#ffc23d;color:#14171d;border-color:#fff;transform:scale(1.08);box-shadow:0 0 0 3px #ffc23d,0 0 20px rgba(255,194,61,.85)}
+.sl.wahl{background:rgba(255,194,61,.38);box-shadow:0 0 0 3px #ffc23d,0 0 18px rgba(255,214,120,.6);border-radius:10px;color:var(--ink)}
+.row button{transition:transform .12s,background .12s}
+body.fern #panel{transform:translateX(-50%) scale(var(--fz,1));transform-origin:50% 100%}
+canvas:focus{outline:none}
 </style>
 </head>
 <body>
@@ -1624,7 +1630,7 @@ const $=id=>document.getElementById(id);
 const NAMES=['Chiemsee'];
 const STYLES=[{rmode:'mix',variant:'raster',mode:'weather',tex:0.42,shimmer:0.4,gl:0.8,cloudSoft:true,hazeAdd:0.18,wash:'hor',washA:0.14,sat:0.18,rip:0.4,vig:0.24,star:0.6,paper:true}];
 // Adresse: ?dev=1 Test-Modus mit Steuerleiste, ?t=2026-12-24T17:30 Zeit simulieren, ?wetter=gewitter|regen|nebel|klar|schnee Wetter erzwingen
-const Q=new URLSearchParams(location.search),DEV=['1','true','ja'].includes(Q.get('dev')),URL_INFO=[];
+const Q=new URLSearchParams(location.search),DEV_URL=['1','true','ja'].includes(Q.get('dev')),URL_INFO=[];let DEV=DEV_URL; // DEV schaltet auch die Fernbedienung um (dreimal OK)
 if(DEV)document.body.classList.add('dev');
 // ?t= versteht "2026-12-24T17:30", "2026-12-24 17:30:20", "2026-12-24" (dann 12 Uhr) und "17:30" (heute). Die Zeit läuft von dort aus weiter.
 function parseT(s){s=s.trim();let m=/^(\d{4})-(\d{1,2})-(\d{1,2})(?:[T ](\d{1,2}):(\d{2})(?::(\d{2}))?)?$/.exec(s);
@@ -1648,13 +1654,45 @@ const _mf=()=>{const n=new Date();let m=new Date(n.getFullYear(),9,4,18,40);if(m
 // Jeder Moment kommt einmal dran (sonst käme im Oktober jeden Tag das Gespenst); "Jetzt" fängt wieder von vorn an.
 const GEZEIGT=new Set();
 $('rare').onclick=()=>{const from=curT()+30000,w=wall(from);for(let runde=0;runde<2;runde++){for(let o=0;o<400;o++){const d=wall(fromWall(w.getFullYear(),w.getMonth(),w.getDate()+o,12));const m=momenteAm(d).find(x=>x.T>from&&!GEZEIGT.has(x.n));
-  if(m){GEZEIGT.add(m.n);playing=false;mode='live';T_SIM={at:m.T,dev:Date.now()};MOMENT=m;setMode();return;}}GEZEIGT.clear();}};
+  if(m){GEZEIGT.add(m.n);playing=false;mode='live';T_SIM={at:m.T,dev:Date.now(),leiste:true};MOMENT=m;setMode();return;}}GEZEIGT.clear();}};
+// ---------- Fernbedienung (Muse Frame): dreimal schnell OK (innerhalb von 1,5 s) öffnet und schließt den Test-Modus mit der Steuerleiste ----------
+// Offen: Pfeil links/rechts wählt Schieber oder Knopf, OK drückt den Knopf, Pfeil hoch/runter verstellt den gewählten Schieber (Tag ±1, Uhrzeit ±15 min).
+// Dreimal OK zum Schließen: die ersten beiden OK davon werden zurückgenommen; die eingestellte Zeit bleibt ohne Leiste stehen.
+// Nach 10 Minuten ohne Taste: Leiste zu, Bild wieder live (nicht bei ?dev=1 in der Adresse). Ohne offene Leiste verändern einzelne Tasten nichts.
+const TASTE=e=>{const k=e.key,c=e.keyCode||e.which||0;
+  if(k==='Enter'||k==='NumpadEnter'||e.code==='NumpadEnter'||k===' '||k==='Spacebar'||k==='Select'||c===13||c===23||c===66)return 'ok';
+  if(k==='ArrowLeft'||c===37||c===21)return 'links';if(k==='ArrowRight'||c===39||c===22)return 'rechts';
+  if(k==='ArrowUp'||c===38||c===19)return 'hoch';if(k==='ArrowDown'||c===40||c===20)return 'runter';return null;};
+const FERN={wahl:2,ok:[],rueck:[],zuletzt:Date.now(),taste:'',el:null,liste:['day','min','now','play','fm','mid','rare']};
+function fernZustand(){return {mode,manualT,playing,playT,speed,T_SIM,MOMENT,gez:[...GEZEIGT],clean:document.body.classList.contains('clean'),wahl:FERN.wahl};}
+function fernHerstellen(z){({mode,manualT,playing,playT,speed,T_SIM,MOMENT}=z);GEZEIGT.clear();for(const n of z.gez)GEZEIGT.add(n);document.body.classList.toggle('clean',z.clean);FERN.wahl=z.wahl;setMode();}
+function fernMass(){$('panel').style.setProperty('--fz',clamp(Math.min(innerWidth*0.94,innerHeight*0.6)/560,1,2.6));}
+function fernZeigen(){if(!DEV)return;FERN.liste.forEach((id,i)=>{const el=$(id),z=id==='day'||id==='min'?el.closest('.sl'):el;z.classList.toggle('wahl',i===FERN.wahl);});
+  if(!FERN.el){FERN.el=document.createElement('div');FERN.el.className='hint';$('panel').appendChild(FERN.el);}
+  const t='Fernbedienung: zuletzt '+(FERN.taste||'–')+' · ◀ ▶ wählen, OK drücken, ▲ ▼ Schieber verstellen, 3× OK schließt';if(FERN.el.textContent!==t)FERN.el.textContent=t;}
+function devSetzen(an,fern){DEV=an;document.body.classList.toggle('dev',an);document.body.classList.remove('clean');document.body.classList.toggle('fern',an&&!!fern);if(an){fernMass();fernZeigen();}}
+addEventListener('resize',()=>{if(DEV)fernMass();});
+addEventListener('keydown',e=>{const a=TASTE(e);FERN.taste=(e.key===' '?'Leertaste':e.key||'?')+' (keyCode '+(e.keyCode||e.which||0)+')';FERN.zuletzt=Date.now();if(!a){fernZeigen();return;}e.preventDefault();
+  if(a==='ok'){if(e.repeat)return;const n=performance.now();FERN.ok=FERN.ok.filter(x=>n-x<1500);FERN.rueck=FERN.rueck.filter(x=>n-x.t<1500);
+    if(FERN.ok.length>=2){const r=FERN.rueck.find(x=>x.t===FERN.ok[0]);FERN.ok=[];FERN.rueck=[];if(DEV){if(r)fernHerstellen(r.z);devSetzen(false);}else devSetzen(true,true);return;}
+    FERN.ok.push(n);if(DEV){if(document.body.classList.contains('clean')){document.body.classList.remove('clean');fernZeigen();return;} // ausgeblendete Leiste erst wieder zeigen
+      FERN.rueck.push({t:n,z:fernZustand()});const id=FERN.liste[FERN.wahl];if(id!=='day'&&id!=='min')$(id).click();}fernZeigen();return;}
+  if(!DEV)return;if(document.body.classList.contains('clean')){document.body.classList.remove('clean');fernZeigen();return;}
+  const L=FERN.liste.length;if(a==='links'||a==='rechts')FERN.wahl=(FERN.wahl+(a==='rechts'?1:L-1))%L;
+  else{const id=FERN.liste[FERN.wahl];if(id==='day'||id==='min'){const el=$(id),s=id==='day'?1:15;el.value=clamp(+el.value+(a==='hoch'?s:-s),+el.min,+el.max);el.oninput();}}
+  fernZeigen();},true);
+addEventListener('keyup',e=>{if(TASTE(e))e.preventDefault();},true);addEventListener('pointerdown',()=>{FERN.zuletzt=Date.now();});
+setInterval(()=>{if(!DEV_URL&&Date.now()-FERN.zuletzt>6e5&&(DEV||geblaettert())){$('now').onclick();devSetzen(false);}},5e3);
+// Tasten kommen nur an, wenn die Seite den Fokus hat: Bild fokussierbar machen und beim Laden, Zurückkehren und Antippen fokussieren
+cv.tabIndex=0;function fernFokus(){try{if(document.activeElement!==cv&&!(document.activeElement&&document.activeElement.closest&&document.activeElement.closest('#panel')))cv.focus({preventScroll:true});}catch(e){}}
+fernFokus();addEventListener('load',fernFokus);addEventListener('pageshow',fernFokus);addEventListener('focus',fernFokus);document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')fernFokus();});
+if(DEV)fernZeigen();
 // Bildschirm wach halten (Wake Lock, wenn der Browser es kann). Nach dem Zurückkehren auf die Seite erneut anfordern.
 let wake=null;
 function keepAwake(){try{if(!wake&&navigator.wakeLock&&document.visibilityState==='visible')navigator.wakeLock.request('screen').then(w=>{wake=w;w.addEventListener('release',()=>{wake=null;});}).catch(()=>{});}catch(e){}}
 document.addEventListener('visibilitychange',keepAwake);addEventListener('pointerdown',keepAwake);setInterval(keepAwake,6e4);
 // Tipp aufs Bild blendet die Steuerung aus, nur im Test-Modus. Im Ausstellungsmodus passiert bei Berührung nichts.
-if(DEV)cv.addEventListener('click',()=>document.body.classList.toggle('clean'));else addEventListener('contextmenu',e=>e.preventDefault());
+cv.addEventListener('click',()=>{if(DEV)document.body.classList.toggle('clean');});addEventListener('contextmenu',e=>{if(!DEV)e.preventDefault();});
 // Einmal täglich um 4:00 neu laden, damit Updates ankommen, aber nur, wenn die Seite gerade erreichbar ist (sonst in 10 Minuten wieder versuchen)
 let reloadAt=(()=>{const n=wall(nowT());let r=fromWall(n.getFullYear(),n.getMonth(),n.getDate(),4);if(r<=nowT())r=fromWall(n.getFullYear(),n.getMonth(),n.getDate()+1,4);return r;})();
 setInterval(()=>{if(nowT()<reloadAt)return;reloadAt=nowT()+10*6e4;fetch(location.href,{method:'HEAD',cache:'no-store'}).then(r=>{if(r.ok)location.reload();}).catch(()=>{});},3e4);
@@ -2080,12 +2118,13 @@ function ortSetzen(d){const k=(ORT_TEST||'')+'|'+dayKey(d)+'|'+(d.getHours()<4?0
   const nm=ORTE[ORT_ID].name;if(ORT_JETZT.titel!==nm){ORT_JETZT.titel=nm;const e=$('sname');if(e)e.textContent=nm;document.title='Lichtzeit – '+nm;}}
   const ex=ORTE[ORT_ID].extern;if(ex)ortWeiter(ex);}
 // Weiterleitung auf die Seite eines externen Ortes (Adress-Parameter wie ?t=, ?tempo=, ?ort= kommen mit). Nicht, solange im Test-Modus geblättert oder Zeitraffer läuft.
-function ortWeiter(ziel){if(ORT_JETZT.weiter||(DEV&&(mode!=='live'||playing)))return;ORT_JETZT.weiter=true;location.replace(ziel+location.search);}
+const geblaettert=()=>mode!=='live'||playing||!!(T_SIM&&T_SIM.leiste);
+function ortWeiter(ziel){if(ORT_JETZT.weiter||geblaettert())return;ORT_JETZT.weiter=true;location.replace(ziel+location.search);}
 // Gleich nach dem Laden der Einstellungen prüfen (vor dem Wetter), damit die Weiterleitung schnell geht
 function ortFrueh(){try{const oq=(Q.get('ort')||'').trim().toLowerCase();if(ORTE[oq])ORT_TEST=oq;ortSetzen(wall(curT()));}catch(e){}}
 function ortText(d){const t0=ortTag(d),kurz=['So','Mo','Di','Mi','Do','Fr','Sa'],nm=o=>ORTE[o]?ORTE[o].name:o,G=ORTE_CFG.gewichte,V=[];
   for(let i=1;i<=6;i++){const x=new Date(t0.getFullYear(),t0.getMonth(),t0.getDate()+i),T=tagOrt(x);V.push(kurz[x.getDay()]+' '+nm(T.ort)+(T.grund==='Zufall'?'':' ('+T.grund+')'));}
-  return 'Ort: '+nm(ORT_ID)+' ('+ORT_JETZT.grund+')'+(ORTE[ORT_ID].extern?', eigene Seite '+ORTE[ORT_ID].extern+(DEV&&(mode!=='live'||playing)?' (beim Blättern keine Weiterleitung, hier der Chiemsee)':''):'')+
+  return 'Ort: '+nm(ORT_ID)+' ('+ORT_JETZT.grund+')'+(ORTE[ORT_ID].extern?', eigene Seite '+ORTE[ORT_ID].extern+(geblaettert()?' (beim Blättern keine Weiterleitung, hier der Chiemsee)':''):'')+
     '; danach: '+V.join(', ')+'; Gewichte: '+(ORTE_CFG.wechsel?Object.keys(G).map(o=>nm(o)+' '+G[o]).join(', ')||'keine':'Wechsel aus');}
 // Geräteuhr prüfen: Weicht sie mehr als eine Minute vom Server-Zeitstempel ab, rechnet Lichtzeit mit der Serverzeit
 const CLOCK_MAX=60e3,DEV_TZ=(()=>{try{return Intl.DateTimeFormat().resolvedOptions().timeZone||'?';}catch(e){return '?';}})();

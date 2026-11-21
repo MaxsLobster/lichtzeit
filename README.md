@@ -192,6 +192,7 @@ Test-Parameter der Inntal-Seite:
 | `?vorhersage=heiter:6,regen:4,frost:1` | Vorhersage erzwingen (Name:Temperatur; `sonne`, `heiter`, `wolke`, `regen`, `schnee`, `gewitter`, `frost`). |
 | `?lat=47.86&lng=12.26` | Anderer Wetter-Ort. |
 | `?dev=1` | Oben rechts Bilder pro Sekunde und Rechenzeit je Bild (zum Messen am Muse). |
+| `?demo=1` | Testleiste öffnen (wie dreimal OK, siehe „Testleiste und Fernbedienung“); `?demo=12` gleich mit Szene 12. |
 
 Beispiele: `inntal/?t=2027-07-10T11:05:20` (Wanderer mit Brezn), `inntal/?t=2027-07-10T11:03:40`
 (Gleitschirm), `inntal/?t=2026-12-24T18:00` (Heiligabend), `inntal/?wetter=nebel` (Nebelmeer).
@@ -234,6 +235,7 @@ Test-Parameter der Simssee-Seite:
 | `?vorhersage=heiter:6,regen:4,frost:1` | Vorhersage erzwingen. |
 | `?lat=47.86&lng=12.26` | Anderer Wetter-Ort. |
 | `?dev=1` | Oben rechts Bilder pro Sekunde und Rechenzeit je Bild. |
+| `?demo=1` | Testleiste öffnen (wie dreimal OK, siehe „Testleiste und Fernbedienung“); `?demo=12` gleich mit Szene 12. |
 
 Beispiele: `simssee/?t=2026-11-23T16:28&wetter=klar` (Abendrot im See),
 `simssee/?t=2026-11-25T08:05&wetter=klar&mnebel=1&wind=2` (Morgennebel),
@@ -497,6 +499,64 @@ Zeitzone eingestellt ist. Geht die Uhr des Geräts mehr als eine Minute falsch,
 korrigiert Lichtzeit sie anhand der Serveruhr. Beides steht im Test-Modus in
 der Info-Zeile.
 
+## Testleiste und Fernbedienung
+
+Der Muse wird mit der Fernbedienung bedient. Alles Testen geht deshalb nur mit
+den Pfeiltasten und **OK** (Klicken geht zusätzlich).
+
+- **Dreimal schnell OK** (innerhalb von 1,5 Sekunden) öffnet die Testleiste,
+  dreimal OK schließt sie wieder. Einzelne Tasten bewirken ohne offene Leiste
+  nichts.
+- **Pfeil links/rechts** wählt einen Knopf (der gewählte leuchtet hell), **OK**
+  drückt ihn.
+- **Nach 10 Minuten ohne Taste** geht die Leiste von selbst zu und das Bild
+  wieder auf live.
+- Beim Schließen mit dreimal OK zählen die ersten beiden OK nicht als
+  Knopfdruck. Was eingestellt war, bleibt ohne Leiste stehen, z. B. zum
+  Anschauen einer Szene. Zurück auf live geht es mit „Live“, nach 10 Minuten
+  oder um 4:00.
+- Über den Knöpfen steht klein die zuletzt empfangene Taste (`key` und
+  `keyCode`). So sieht man, ob die Fernbedienung ankommt.
+- Verstanden werden als OK `Enter`, `NumpadEnter`, Leertaste, `Select` und
+  keyCode 13, 23, 66, als Pfeile die Pfeiltasten (keyCode 37–40 und 19–22).
+  Die Seite holt sich beim Laden und beim Zurückkehren den Tastatur-Fokus.
+
+**Simssee und Inntal** haben dieselbe Leiste:
+
+- **◀ Szene / Szene ▶** blättern durch die Szenen, bei Simssee 35, bei Inntal 20.
+  Es sind dieselben wie in der Vorschau. **Pfeil hoch/runter** blättert direkt,
+  egal welcher Knopf gewählt ist (hoch = nächste).
+- **Tag im Zeitraffer** spielt den gezeigten Tag ab 0:00 in 3 Minuten durch, in
+  einer Schleife. Wetter und Jahreszeit aus der Leiste bleiben dabei.
+- **Wetter** schaltet je OK eine Stufe weiter:
+  - Simssee: Live, klar, Wolken, Morgennebel, Nebel, Regen, Gewitter,
+    Schneefall, Föhn, Böen (Wind 38)
+  - Inntal: Live, klar, Wolken, Bedeckt, Nebel, Regen, Schneefall,
+    Schnee liegt
+- **Jahreszeit** schaltet je OK eine Stufe weiter:
+  - Simssee: Live, Sommer (10. Juli), Winter (15. Januar ohne Schnee), Schnee,
+    Tauwetter, Eis, Raureif
+  - Inntal: Live, Sommer, Herbst, Winter
+- **Live** setzt alles auf das echte Bild zurück, die Leiste bleibt offen.
+- Darüber steht, was gerade läuft, z. B. „Szene 12/35 · Föhn“ oder
+  „Zeitraffer · Winter · Nebel · 14:20“.
+- Der Tageswechsel um 4:00 zurück zu Lichtzeit läuft auch bei offener Leiste.
+  Nur `?t=` in der Adresse hält ihn an.
+- Die Leiste nimmt keine Rechenzeit weg, solange sie zu ist. Das Bild ist dann
+  pixelgleich wie ohne Leiste.
+
+**Lichtzeit** (Chiemsee und Höri): Dreimal OK öffnet den ganzen Test-Modus, also
+dasselbe wie `?dev=1`, nur größer: Steuerleiste, Info-Zeile und Bildrate.
+
+- **Pfeil links/rechts** wählt zwischen den Schiebern Tag und Uhrzeit und den
+  Knöpfen Jetzt, Zeitraffer, Nächster Vollmond, Mitternacht ansehen und
+  Seltenheit finden.
+- **OK** drückt den gewählten Knopf.
+- **Pfeil hoch/runter** verstellt den gewählten Schieber: Tag ±1, Uhrzeit
+  ±15 Minuten.
+- Mit `?dev=1` in der Adresse bleibt der Test-Modus offen, ohne
+  10-Minuten-Grenze.
+
 ## Ausstellungsmodus
 
 Die normale Adresse **https://maxslobster.github.io/lichtzeit/** zeigt nur das
@@ -523,11 +583,24 @@ Adressleiste und ohne Android-Leisten, im Hochformat, mit der Adresse
 4. Den Chrome-Tab schließen und Lichtzeit über das neue Symbol (Mond über den
    Bergen) starten.
 
-**Updates:** Die App holt die Seite und `config.json` bei jedem Start und beim
-Neuladen um 4:00 frisch vom Server. Die zuletzt geladene Fassung wird nur als
-Notkopie aufgehoben, falls beim Start kein Internet da ist (z. B. wenn das WLAN
-langsamer hochkommt als der Muse). Ohne Netz lädt die App um 4:00 nicht neu,
-sondern versucht es alle 10 Minuten wieder.
+**Updates:** Seiten, Skripte und `config.json` kommen immer zuerst frisch vom
+Server (network-first), auch für Simssee und Inntal. Der Browser fragt dabei
+jedes Mal beim Server nach und nimmt nie blind seinen eigenen Zwischenspeicher
+(GitHub erlaubt sonst 10 Minuten).
+
+- Ein **normales Neuladen** bei offenem Tab zeigt sofort die neue Fassung. Eine
+  neue Fassung von `sw.js` gilt sofort (`skipWaiting`, `clients.claim`), ohne
+  dass der Tab geschlossen werden muss.
+- Die zuletzt geladene Fassung wird nur als **Notkopie** aufgehoben, falls beim
+  Start kein Internet da ist (z. B. wenn das WLAN langsamer hochkommt als der
+  Muse).
+- Jede Seite hat ihre **eigene Notkopie** unter ihrer Adresse. Simssee kommt
+  dabei mit den Hintergrundbildern. Ohne Netz startet unter `lichtzeit/` also
+  nie eine andere Seite als Lichtzeit.
+- „Wir drei“ liegt außerhalb von `lichtzeit/`. Diese Seite fasst der Service
+  Worker nicht an.
+- Ohne Netz lädt die App um 4:00 nicht neu, sondern versucht es alle
+  10 Minuten wieder.
 
 **Andere Werte für den Muse** (z. B. Raster 6): Die Start-Adresse steht in
 `manifest.webmanifest` (`start_url`). Chrome übernimmt eine Änderung von
@@ -543,7 +616,7 @@ Parameter werden an die Adresse angehängt: der erste mit `?`, weitere mit `&`.
 
 | Parameter | Wirkung |
 |---|---|
-| `?dev=1` | Test-Modus: Steuerleiste (Tag, Uhrzeit, Zeitraffer, Mitternacht ansehen, Seltenheit finden), Info-Zeile mit Wetter, Ort (welcher, warum, die Orte der nächsten Tage und die Gewichte), Luftdruck-Trend und allem, was gerade aktiv ist und warum (Vorhersage, Warnleuchte, Schneemann, Eis, Föhn, Wolkenschatten, Alpenglühen, Markt, Tafel), oben rechts die Bildrate. Ein Tipp aufs Bild blendet die Steuerung aus. |
+| `?dev=1` | Test-Modus (dreimal OK auf der Fernbedienung öffnet ihn auch, siehe „Testleiste und Fernbedienung“): Steuerleiste (Tag, Uhrzeit, Zeitraffer, Mitternacht ansehen, Seltenheit finden), Info-Zeile mit Wetter, Ort (welcher, warum, die Orte der nächsten Tage und die Gewichte), Luftdruck-Trend und allem, was gerade aktiv ist und warum (Vorhersage, Warnleuchte, Schneemann, Eis, Föhn, Wolkenschatten, Alpenglühen, Markt, Tafel), oben rechts die Bildrate. Ein Tipp aufs Bild blendet die Steuerung aus. |
 | `?t=2026-12-24T17:30` | Zeit simulieren. Die Uhr läuft ab diesem Moment weiter. Auch möglich: `?t=17:30` (heute) oder `?t=0:00:20`. |
 | `?ort=hoeri` | Ort erzwingen (`chiemsee`, `hoeri`, `inntal` oder `simssee`; bei `inntal` und `simssee` geht es weiter auf deren Seite). Ohne `?ort` zeigt `?t=` den Ort, der zu diesem Zeitpunkt dran wäre. |
 | `?wind=0.9` | Höri: Windstärke für die Segler (`0` bis `1`; ab `0,15` fahren welche, je mehr, desto öfter). |
@@ -582,8 +655,9 @@ liegen lokal in `gazers/abnahme/`, die der Fallblatt-Uhr (November 2026) in
 Raddampfer, Wolkenschatten, Alpenglühen) in `gazers/abnahme/auftrag-2/`, die von
 Auftrag 3 (zweiter Ort Höri, Orte-Wechsel) in `gazers/abnahme/auftrag-3/`, die von Auftrag 4
 (Inntal) in `gazers/abnahme/auftrag-4/`, die von Auftrag 5 (Simssee, täglicher Zufallswechsel) in
-`gazers/abnahme/auftrag-5/`. Die Stände davor sind als Git-Tags `v-vor-fallblatt`,
-`v-vor-auftrag-2`, `v-vor-auftrag-3`, `v-vor-auftrag-4` und `v-vor-auftrag-5` gesichert.
+`gazers/abnahme/auftrag-5/`, die von Auftrag 6 (Testleiste per Fernbedienung) in `gazers/abnahme/auftrag-6/`.
+Die Stände davor sind als Git-Tags `v-vor-fallblatt`,
+`v-vor-auftrag-2`, `v-vor-auftrag-3`, `v-vor-auftrag-4`, `v-vor-auftrag-5` und `v-vor-auftrag-6` gesichert.
 
 Seit Oktober 2026 weicht das Bild bewusst vom ursprünglichen Prototyp
 `lichtzeit.html` ab: Die Pixel-Effekte sind seltener und schwächer, und es gibt
