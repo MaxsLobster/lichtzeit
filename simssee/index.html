@@ -506,7 +506,7 @@ const DEMOS=[{n:'Simssee – jetzt'},
  {n:'Schneefall',t:'2026-12-15 10:30',w:'schneefall',temp:-1},
  {n:'Sommer: Segler bei Wind',t:'2027-07-10 15:00',w:'wolken',wind:18,temp:24},
  {n:'Zeitraffer: ein Wintertag',t:'2026-11-23 05:30',w:'klar',k:300}];
-const LEISTE_CFG={szenen:DEMOS,setzen:p=>{OV=p;},
+const LEISTE_CFG={ort:'simssee',szenen:DEMOS,setzen:p=>{OV=p;},
  wetter:[{n:'Live'},{n:'klar',p:{wetter:'klar'}},{n:'Wolken',p:{wetter:'wolken'}},{n:'Morgennebel',p:{wetter:'klar',mnebel:1,wind:2}},{n:'Nebel',p:{wetter:'nebel'}},
   {n:'Regen',p:{wetter:'regen'}},{n:'Gewitter',p:{wetter:'gewitter',wind:30}},{n:'Schneefall',p:{wetter:'schneefall'}},{n:'Föhn',p:{wetter:'klar',foehn:1,wind:22,dir:190,temp:15}},
   {n:'Böen (Wind 38)',p:{wetter:'wolken',wind:38,dir:250}}],
@@ -538,14 +538,19 @@ function lZeit(art){const D=LS.szene&&L_SZ[LS.di].t?L_SZ[LS.di]:null,J=L_JZ[LS.j
   SIM={at:lVon(y,m,d,Math.floor(sek/3600),Math.floor(sek/60)%60,sek%60),dev:Date.now(),k:D?D.k||1:1};}
 function lSzene(r){LS.di=(LS.di+r+L_SZ.length)%L_SZ.length;LS.szene=true;LS.ws=0;LS.js=0;LS.zr=false;lWerte();lZeit('szene');}
 function lLive(){LS.di=0;LS.szene=false;LS.ws=0;LS.js=0;LS.zr=false;lWerte();SIM=SIM_URL;}
-const L_KN=[{txt:()=>'◀ Szene',f:()=>lSzene(-1)},{txt:()=>'Szene ▶',f:()=>lSzene(1)},
+// Bild wechseln: die Wahl gilt bis zum nächsten Tageswechsel um 4:00 und ändert den Plan in config.json nicht. Kurz verzögert, damit dreimal OK zum Schließen nicht wechselt.
+const L_ORTE=[['chiemsee','Chiemsee'],['hoeri','Höri'],['inntal','Inntal'],['simssee','Simssee']],L_HIER=LEISTE_CFG.ort;
+function lOrt(o){clearTimeout(LS.ortT);LS.wechsel=o===L_HIER?'':o;LS.ortT=setTimeout(()=>{let ok=true;try{localStorage.setItem('lichtzeit-ort-wahl',JSON.stringify({ort:o,tag:tag4(echtJetzt())}));}catch(e){ok=false;}
+  if(o===L_HIER)return;try{sessionStorage.setItem('lichtzeit-leiste-offen','1');}catch(e){}const q=new URLSearchParams();for(const k of ['raster','dev'])if(Q.has(k))q.set(k,Q.get(k));if(!ok)q.set('ort',o);const s=q.toString();
+  location.replace('../'+(o==='inntal'||o==='simssee'?o+'/':'')+(s?'?'+s:''));},650);}
+const L_KN=[...L_ORTE.map(([o,n])=>({ort:o,txt:()=>n,an:()=>o===L_HIER,f:()=>lOrt(o)})),{txt:()=>'◀ Szene',f:()=>lSzene(-1)},{txt:()=>'Szene ▶',f:()=>lSzene(1)},
   {txt:()=>LS.zr?'Zeitraffer aus':'Tag im Zeitraffer',an:()=>LS.zr,f:()=>{LS.zr=!LS.zr;lZeit(LS.zr?'zr':'halt');}},
   {klein:'Wetter',txt:()=>L_WE[LS.ws].n,an:()=>LS.ws>0,f:()=>{LS.ws=(LS.ws+1)%L_WE.length;lWerte();}},
   {klein:'Jahreszeit',txt:()=>L_JZ[LS.js].n,an:()=>LS.js>0,f:()=>{LS.js=(LS.js+1)%L_JZ.length;lWerte();lZeit('saison');}},
   {txt:()=>'Live',f:lLive}];
 const lZustand=()=>({di:LS.di,szene:LS.szene,ws:LS.ws,js:LS.js,zr:LS.zr,wahl:LS.wahl,SIM});
 function lHerstellen(z){Object.assign(LS,{di:z.di,szene:z.szene,ws:z.ws,js:z.js,zr:z.zr,wahl:z.wahl});SIM=z.SIM;lWerte();}
-function lText(){const d=berlin(jetzt()),h=berlin(echtJetzt()),T=[];
+function lText(){if(LS.wechsel)return 'Wechsle zu '+L_ORTE.find(x=>x[0]===LS.wechsel)[1]+' …';const d=berlin(jetzt()),h=berlin(echtJetzt()),T=[];
   if(LS.szene)T.push('Szene '+(LS.di+1)+'/'+L_SZ.length+' · '+L_SZ[LS.di].n);if(LS.zr)T.push('Zeitraffer');if(LS.js)T.push(L_JZ[LS.js].n);if(LS.ws)T.push(L_WE[LS.ws].n);
   if(!T.length)T.push(SIM?'Zeit aus der Adresse':'Live');
   const gleich=d.getFullYear()===h.getFullYear()&&d.getMonth()===h.getMonth()&&d.getDate()===h.getDate();
@@ -557,6 +562,7 @@ function lBauen(){const st=document.createElement('style');
     'background:rgba(16,22,30,.6);border-radius:calc(var(--lu)*2.6);color:#f4efe6;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;cursor:default;z-index:5}'+
     '#leiste .l-info{font-weight:600;font-size:calc(var(--lu)*3.4);line-height:1.25;text-align:center;margin-bottom:calc(var(--lu)*.6)}'+
     '#leiste .l-taste{font-size:calc(var(--lu)*2.1);color:rgba(244,239,230,.62);text-align:center;margin-bottom:calc(var(--lu)*1.8)}'+
+    '#leiste .l-orte{display:grid;grid-template-columns:repeat(4,1fr);gap:calc(var(--lu)*1.2);margin-bottom:calc(var(--lu)*1.8)}#leiste .l-orte::before{content:"Bild wechseln";grid-column:1/-1;font-size:calc(var(--lu)*2.2);color:rgba(244,239,230,.7);text-align:center}'+
     '#leiste .l-kn{display:grid;grid-template-columns:repeat(3,1fr);gap:calc(var(--lu)*1.6)}'+
     '#leiste button{appearance:none;border:calc(var(--lu)*.45) solid transparent;background:rgba(255,255,255,.1);color:#f4efe6;font:600 calc(var(--lu)*3.3)/1.15 system-ui,-apple-system,"Segoe UI",sans-serif;'+
     'padding:calc(var(--lu)*1.7) calc(var(--lu)*1);border-radius:calc(var(--lu)*1.6);cursor:pointer;outline:none;transition:transform .12s,background .12s}'+
@@ -564,17 +570,17 @@ function lBauen(){const st=document.createElement('style');
     '#leiste button.an{color:#ffd27a}'+
     '#leiste button.wahl{background:#fff7e0;color:#14171d;border-color:#ffc23d;transform:scale(1.07);box-shadow:0 0 0 calc(var(--lu)*.7) rgba(255,194,61,.5),0 0 calc(var(--lu)*4) rgba(255,214,120,.7)}'+
     '#leiste button.wahl small{opacity:.75}';
-  document.head.appendChild(st);const el=document.createElement('div');el.id='leiste';el.innerHTML='<div class="l-info"></div><div class="l-taste"></div><div class="l-kn"></div>';
-  L_KN.forEach((b,i)=>{const x=document.createElement('button');x.type='button';x.tabIndex=-1;x.onclick=()=>{LS.zuletzt=Date.now();LS.wahl=i;b.f();lAnzeigen();lFokus();};el.lastChild.appendChild(x);b.el=x;b.k='';});
+  document.head.appendChild(st);const el=document.createElement('div');el.id='leiste';el.innerHTML='<div class="l-info"></div><div class="l-taste"></div><div class="l-orte"></div><div class="l-kn"></div>';
+  L_KN.forEach((b,i)=>{const x=document.createElement('button');x.type='button';x.tabIndex=-1;x.onclick=()=>{LS.zuletzt=Date.now();LS.wahl=i;b.f();lAnzeigen();lFokus();};el.querySelector(b.ort?'.l-orte':'.l-kn').appendChild(x);b.el=x;b.k='';});
   document.body.appendChild(el);LS.el=el;lMass();addEventListener('resize',lMass);}
 function lAnzeigen(){if(!LS.auf)return;const t=lText();if(t!==LS.txt){LS.txt=t;LS.el.firstChild.textContent=t;}
   const k='Zuletzt empfangen: '+(LS.taste||'–')+'  ·  ◀ ▶ wählen, OK drücken, ▲ ▼ Szenen, 3× OK schließt';if(LS.el.children[1].textContent!==k)LS.el.children[1].textContent=k;
   L_KN.forEach((b,i)=>{const x=b.txt(),c=(i===LS.wahl?'wahl ':'')+(b.an&&b.an()?'an':'');if(b.k!==x+c){b.k=x+c;b.el.className=c.trim();b.el.innerHTML=(b.klein?'<small>'+b.klein+'</small>':'')+x;}});}
-function lAuf(){if(!LS.el)lBauen();LS.auf=true;LS.el.style.display='';LS.zuletzt=Date.now();lAnzeigen();}
+function lAuf(){if(!LS.el)lBauen();LS.auf=true;LS.wahl=L_ORTE.findIndex(x=>x[0]===L_HIER);LS.el.style.display='';LS.zuletzt=Date.now();lAnzeigen();}
 function lZu(){LS.auf=false;if(LS.el)LS.el.style.display='none';}
 addEventListener('keydown',e=>{const a=TASTE(e);LS.taste=(e.key===' '?'Leertaste':e.key||'?')+' (keyCode '+(e.keyCode||e.which||0)+')';LS.zuletzt=Date.now();if(!a){lAnzeigen();return;}e.preventDefault();
   if(a==='ok'){if(e.repeat)return;const n=performance.now();LS.ok=LS.ok.filter(x=>n-x<1500);LS.rueck=LS.rueck.filter(x=>n-x.t<1500);
-    if(LS.ok.length>=2){const r=LS.rueck.find(x=>x.t===LS.ok[0]);LS.ok=[];LS.rueck=[];if(LS.auf){if(r)lHerstellen(r.z);lZu();}else lAuf();return;}
+    if(LS.ok.length>=2){const r=LS.rueck.find(x=>x.t===LS.ok[0]);clearTimeout(LS.ortT);LS.wechsel='';LS.ok=[];LS.rueck=[];if(LS.auf){if(r)lHerstellen(r.z);lZu();}else lAuf();return;}
     LS.ok.push(n);if(LS.auf){LS.rueck.push({t:n,z:lZustand()});L_KN[LS.wahl].f();}lAnzeigen();return;}
   if(!LS.auf)return;
   if(a==='links'||a==='rechts')LS.wahl=(LS.wahl+(a==='rechts'?1:L_KN.length-1))%L_KN.length;else lSzene(a==='hoch'?1:-1);lAnzeigen();},true);
@@ -583,6 +589,7 @@ setInterval(()=>{if((LS.auf||LS.szene||LS.ws||LS.js||LS.zr)&&Date.now()-LS.zulet
 cv.tabIndex=0;cv.style.outline='none';function lFokus(){try{if(document.activeElement!==cv)cv.focus({preventScroll:true});}catch(e){}}
 lFokus();addEventListener('load',lFokus);addEventListener('pageshow',lFokus);addEventListener('focus',lFokus);addEventListener('pointerup',lFokus);
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')lFokus();});
+try{if(sessionStorage.getItem('lichtzeit-leiste-offen')){sessionStorage.removeItem('lichtzeit-leiste-offen');lAuf();}}catch(e){}
 {const v=Q.get('demo');if(v!==null&&!['0','nein','false'].includes(v)){lAuf();const n=parseInt(v,10);if(n>1&&n<=L_SZ.length){LS.di=n-2;lSzene(1);lAnzeigen();}}}
 let LETZT=0;function loop(q){requestAnimationFrame(loop);if(q!==undefined&&q-LETZT<30)return;LETZT=q||0;const a=performance.now();bild(jetzt());if(DEV)fpsZeigen(q||a,performance.now()-a);}loop();
 </script></body></html>

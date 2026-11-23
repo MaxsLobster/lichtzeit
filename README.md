@@ -521,6 +521,15 @@ den Pfeiltasten und **OK** (Klicken geht zusätzlich).
   keyCode 13, 23, 66, als Pfeile die Pfeiltasten (keyCode 37–40 und 19–22).
   Die Seite holt sich beim Laden und beim Zurückkehren den Tastatur-Fokus.
 
+**Bild wechseln:** In der obersten Reihe stehen Chiemsee, Höri, Inntal und
+Simssee. Beim Öffnen ist das aktuelle Bild gewählt. Mit Pfeil links/rechts ein
+anderes wählen und OK drücken, nach einem kurzen Moment wechselt das Bild und
+die Leiste bleibt offen.
+
+- Die Wahl gilt bis zum nächsten Tageswechsel um 4:00, auch nach dem Neuladen.
+  Danach gilt wieder der Plan aus `config.json`, der dadurch nicht verändert wird.
+- Vorrang: `?ort=` in der Adresse, dann die Wahl im Menü, dann der Plan.
+
 **Simssee und Inntal** haben dieselbe Leiste:
 
 - **◀ Szene / Szene ▶** blättern durch die Szenen, bei Simssee 35, bei Inntal 20.
