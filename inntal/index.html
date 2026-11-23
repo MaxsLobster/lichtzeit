@@ -526,6 +526,9 @@ const tag4=t=>{const d=berlin(t-4*36e5);return d.getFullYear()*10000+(d.getMonth
 setTimeout(()=>{START_TAG=tag4(echtJetzt());},3000); // nach der Uhrprüfung
 const OHNE_DEMO=(()=>{const q=new URLSearchParams(location.search);q.delete('demo');const s=q.toString();return s?'?'+s:'';})(); // Testleiste nicht mitnehmen
 setInterval(()=>{if(SIM_URL||START_TAG===null||tag4(echtJetzt())===START_TAG)return;fetch('../',{method:'HEAD',cache:'no-store'}).then(r=>{if(r.ok)location.replace('../'+OHNE_DEMO);}).catch(()=>{});},6e4);
+// Normales Neuladen: Lichtzeit entscheidet neu, welcher Ort dran ist (config.json). Nur ohne Testschalter in der Adresse, also nicht mit ?ort=, ?t=, ?demo= usw.
+// Ist wieder Inntal dran, kommt Lichtzeit per normaler Navigation hierher zurück, das zählt nicht als Neuladen: keine Schleife.
+if((performance.getEntriesByType('navigation')[0]||{}).type==='reload'&&[...Q.keys()].every(k=>k==='raster'||k==='dev'))fetch('../',{method:'HEAD',cache:'no-store'}).then(r=>{if(r.ok)location.replace('../'+location.search);}).catch(()=>{});
 // höchstens 30 Bilder/s wie Lichtzeit (der Muse läuft rund um die Uhr)
 // ?dev=1: oben rechts Bilder pro Sekunde und Rechenzeit je Bild (zum Messen am Muse)
 const DEV=['1','true','ja'].includes(Q.get('dev')),FPS={n:0,t0:0,ms:0,txt:''};
